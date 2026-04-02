@@ -51,7 +51,6 @@
   .btn:hover{background:#00c888;transform:translateY(-1px);}
   .btn.visible{display:block;}
   .kg-section{border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;display:none;}
-  .kg-section h3{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:16px;}
   .kg-table{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12px;margin-bottom:16px;}
   .kg-table th{text-align:left;padding:8px 12px;background:var(--surface2);color:var(--muted);border-bottom:1px solid var(--border);}
   .kg-table td{padding:8px 12px;border-bottom:1px solid #1f1f1f;}
@@ -62,21 +61,51 @@
   .adjust-section{display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;}
   .target-input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;}
   .target-input:focus{border-color:var(--accent);}
-  .info-section{border-top:1px solid var(--border);padding-top:24px;}
-  .tab-btns{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
-  .tab-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;transition:all 0.15s;}
-  .tab-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .tab-content{display:none;}
-  .tab-content.active{display:block;}
-  .mapping-table{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12px;}
-  .mapping-table th{text-align:left;padding:8px 12px;background:var(--surface2);color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);}
-  .mapping-table td{padding:7px 12px;border-bottom:1px solid #1f1f1f;color:var(--muted);}
-  .mapping-table td:first-child{color:var(--text);}
-  .mapping-table td span{color:var(--accent);}
+
+  /* LOGIN */
+  .login-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px);}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:360px;}
+  .login-box h2{font-size:20px;font-weight:800;margin-bottom:6px;}
+  .login-box p{color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;margin-bottom:24px;}
+  .login-input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;margin-bottom:12px;}
+  .login-input:focus{border-color:var(--accent);}
+  .login-btn{width:100%;padding:13px;border-radius:8px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;}
+  .login-btn:hover{background:#00c888;}
+  .login-error{color:var(--error);font-family:'DM Mono',monospace;font-size:12px;margin-top:10px;display:none;}
+
+  /* USER BAR */
+  .user-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px;font-family:'DM Mono',monospace;font-size:12px;}
+  .user-bar span{color:var(--muted);}
+  .user-bar strong{color:var(--accent);}
+  .logout-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;}
+  .logout-btn:hover{border-color:var(--error);color:var(--error);}
 </style>
 </head>
 <body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>Fatura <span style="color:var(--accent)">Aracı</span></h2>
+    <p>Devam etmek için giriş yapın</p>
+    <input class="login-input" id="loginUser" type="text" placeholder="Kullanıcı adı" autocomplete="username">
+    <input class="login-input" id="loginPass" type="password" placeholder="Şifre" autocomplete="current-password">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <input type="checkbox" id="rememberMe" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+      <label for="rememberMe" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);cursor:pointer;">Beni 7 gün hatırla</label>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Giriş Yap</button>
+    <div class="login-error" id="loginError">Kullanıcı adı veya şifre hatalı.</div>
+  </div>
+</div>
+
 <div class="container">
+  <!-- USER BAR -->
+  <div class="user-bar" id="userBar" style="display:none;">
+    <span>Giriş yapıldı: <strong id="userBarName"></strong></span>
+    <button class="logout-btn" onclick="doLogout()">Çıkış</button>
+  </div>
+
   <div class="header">
     <h1>Fatura <span>Aracı</span></h1>
     <p>Master fatura Excel'ini yükle → Ülkeyi seç → İndir</p>
@@ -141,52 +170,43 @@
 
   <!-- KG HESAPLAMA -->
   <div class="kg-section" id="kgSection">
-    <div onclick="toggleKgTable()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:0;user-select:none;">
-      <h3 style="margin-bottom:0;">⚖️ Kilo Hesaplama (BRÜT / NET)</h3>
+    <div onclick="toggleKgTable()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+      <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:0;">⚖️ Kilo Hesaplama (BRÜT / NET)</h3>
       <span id="kgTableArrow" style="font-size:14px;color:var(--accent);">▼</span>
     </div>
     <div id="kgTableBody" style="display:none;margin-top:14px;">
-    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">
-      Her ÜRÜN ARA GRUBU için birim kilo girin (AG sütunu 0/boş olan satırlara uygulanır):
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">
+        Her ÜRÜN ARA GRUBU için birim kilo girin (AG sütunu 0/boş olan satırlara uygulanır):
+      </div>
+      <table class="kg-table" id="kgTable">
+        <tr><th>ÜRÜN ARA GRUBU</th><th>Birim Kilo (KG)</th><th>0/Boş satır sayısı</th></tr>
+      </table>
     </div>
-    <table class="kg-table" id="kgTable">
-      <tr>
-        <th>ÜRÜN ARA GRUBU</th>
-        <th>Birim Kilo (KG)</th>
-        <th>0/Boş satır sayısı</th>
-      </tr>
-    </table>
-    </div><!-- end kgTableBody -->
-    <!-- Kaydedilmiş / dolu gruplar - gizli açılır kapanır -->
     <div id="savedKgSection" style="display:none;margin-top:12px;">
       <div onclick="toggleSavedKg()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 12px;background:var(--surface2);border-radius:8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);user-select:none;">
-        <span>📦 AG sütunu dolu gruplar (kilo girişi gerekmiyor)</span>
+        <span>📦 AG sütunu dolu gruplar</span>
         <span id="savedKgArrow">▼</span>
       </div>
       <div id="savedKgBody" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;">
         <div id="savedKgTable"></div>
       </div>
     </div>
-
     <button class="apply-btn" onclick="applyGroupWeights()" style="margin-top:16px;">✓ Kiloları Uygula ve Hesapla</button>
-
     <div class="adjust-section" id="adjustSection">
       <div class="stat" style="margin-bottom:12px;">Hesaplanan Toplam BRÜT: <span id="calcTotal">—</span> kg</div>
       <div style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;margin-bottom:8px;">Olması gereken toplam BRÜT (kg):</div>
       <div style="display:flex;gap:10px;align-items:center;">
-        <input class="target-input" id="targetWeight" type="number" step="0.01" placeholder="örn: 8870,00">
+        <input class="target-input" id="targetWeight" type="text" inputmode="decimal" placeholder="örn: 8870,00">
         <button class="apply-btn" onclick="applyWeightAdjust()">Uygula</button>
       </div>
       <div id="adjustResult" style="margin-top:12px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);display:none;"></div>
     </div>
   </div>
 
-  <!-- EUR KUR BÖLÜMÜ -->
+  <!-- EUR KUR -->
   <div id="eurSection" style="display:none;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
     <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;">💱 Euro Kur Bilgisi</h3>
-    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">
-      Fiyat sütunu bu kura bölünür → UNIT PRICE EUR hesaplanır
-    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">Fiyat sütunu bu kura bölünür → UNIT PRICE EUR hesaplanır</div>
     <div style="display:flex;gap:10px;align-items:center;">
       <input id="eurRateInput" type="text" inputmode="decimal" placeholder="örn: 36,50"
         oninput="onEurRateChanged()"
@@ -195,7 +215,7 @@
     </div>
   </div>
 
-  <!-- İSTİSNA SKU YÖNETİMİ -->
+  <!-- İSTİSNA SKU -->
   <div style="border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
     <div onclick="toggleExSku()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
       <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:0;">⚠️ İstisna SKU Listesi</h3>
@@ -208,33 +228,20 @@
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <input id="newExSku" placeholder="SKU" style="flex:2;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
         <input id="newExKg" type="text" inputmode="decimal" placeholder="kg" style="width:80px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
-        <button onclick="addExceptionSku()" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Ekle</button>
+        <button onclick="addExceptionSku()" id="addSkuBtn" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Ekle</button>
       </div>
       <div id="exSkuList" style="max-height:200px;overflow-y:auto;"></div>
+      <div id="skuSaveStatus" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:12px;display:none;"></div>
     </div>
   </div>
 
   <button class="btn" id="downloadBtn" onclick="downloadResult()">⬇ İşlenmiş Dosyayı İndir</button>
-
+</div>
 
 <script>
-const COUNTRIES = {
-  kz:{label:'Kazakistan',suffix:'_kazakistan'},rs:{label:'Sırbistan',suffix:'_sirbistan'},
-  iq:{label:'Irak',suffix:'_irak'},ge:{label:'Gürcistan',suffix:'_gurcistan'},
-  cy:{label:'KKTC',suffix:'_kktc'},ru:{label:'Rusya',suffix:'_rusya'},
-  ba:{label:'Bosna',suffix:'_bosna'},be:{label:'Belçika',suffix:'_belcika'},
-};
+const COUNTRIES={kz:{label:'Kazakistan',suffix:'_kazakistan'},rs:{label:'Sırbistan',suffix:'_sirbistan'},iq:{label:'Irak',suffix:'_irak'},ge:{label:'Gürcistan',suffix:'_gurcistan'},cy:{label:'KKTC',suffix:'_kktc'},ru:{label:'Rusya',suffix:'_rusya'},ba:{label:'Bosna',suffix:'_bosna'},be:{label:'Belçika',suffix:'_belcika'}};
 const KZ_COLS=['E-Fatura Seri Numarası','Madde Kodu','MENŞEİ -EN','MENŞEİ -RU','Asorti Barkodu','SKU','Renk Açıkmalası EN','GTİP','ALT GRUBU -EN','Ürün Açıklaması EN','Ürün Açıklaması RU','Miktar','Fiyat','MATERYAL -EN','MATERYAL -RU','ALT GRUBU Açıklama','EBAT Açıklama','BRÜT','NET'];
-const RS_INV=[
-  {out:'COUNTRY OF ORIGIN',src:'MENŞEİ -EN'},{out:'MASTER ITEM CODE',src:'Asorti Barkodu'},
-  {out:'ITEM CODE',src:'SKU'},{out:'ITEM DESCRIPTION',src:'ALT GRUBU -EN'},
-  {out:'ITEM NAME',src:'Ürün Açıklaması EN'},{out:'UNIT',src:'Birim Cinsi (1)'},
-  {out:'QTY',src:'Miktar'},{out:'UNIT PRICE',src:'Fiyat'},{out:'TOTAL AMOUNT TRY',src:'__CALC__'},
-  {out:'HS CODE',src:'GTİP'},{out:'MATERIAL',src:'MATERYAL -EN'},
-  {out:'ITEM NAME-Serb',src:'Ürün Açıklaması XS'},{out:'COLOR SERB',src:'Renk Açıkmalası XS'},
-  {out:'MATERIAL SERB',src:'MATERYAL -XS'},{out:'DIMENSION',src:'EBAT Açıklama'},
-  {out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'},
-];
+const RS_INV=[{out:'COUNTRY OF ORIGIN',src:'MENŞEİ -EN'},{out:'MASTER ITEM CODE',src:'Asorti Barkodu'},{out:'ITEM CODE',src:'SKU'},{out:'ITEM DESCRIPTION',src:'ALT GRUBU -EN'},{out:'ITEM NAME',src:'Ürün Açıklaması EN'},{out:'UNIT',src:'Birim Cinsi (1)'},{out:'QTY',src:'Miktar'},{out:'UNIT PRICE',src:'Fiyat'},{out:'TOTAL AMOUNT TRY',src:'__CALC__'},{out:'HS CODE',src:'GTİP'},{out:'MATERIAL',src:'MATERYAL -EN'},{out:'ITEM NAME-Serb',src:'Ürün Açıklaması XS'},{out:'COLOR SERB',src:'Renk Açıkmalası XS'},{out:'MATERIAL SERB',src:'MATERYAL -XS'},{out:'DIMENSION',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}];
 const SIMPLE_MAPS={
   iq:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'SKU',src:'SKU'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Madde Açıklaması',src:'Madde Açıklaması'},{out:'Miktar',src:'Miktar'},{out:'Fiyat',src:'Fiyat'},{out:'Miktar X Fiyat',src:'__CALC__'},{out:'GTİP',src:'GTİP'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
   ge:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'GTİP',src:'GTİP'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Miktar',src:'Miktar'},{out:'Fiyat',src:'Fiyat'},{out:'Miktar X Fiyat',src:'__CALC__'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Barkod',src:'Barkod'},{out:'MATERYAL -EN',src:'MATERYAL -EN'},{out:'EBAT Açıklama',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
@@ -245,420 +252,253 @@ const SIMPLE_MAPS={
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let currentCountry='kz', currentMode='grouped', lastFileData=null, originalFileName='';
-let processedWB=null, masterRows=null, workingRows=null;
-let groupWeights={}, exceptionSkus={};
-// ── SHARED CONFIG (Netlify/GitHub üzerinden ortak) ───────────────────────────
+let currentCountry='kz',currentMode='grouped',lastFileData=null,originalFileName='';
+let processedWB=null,masterRows=null,workingRows=null;
+let groupWeights={},exceptionSkus={};
+let currentUser=null,currentPass=null;
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
 async function loadSharedConfig() {
   try {
-    const res = await fetch('./config.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('config.json okunamadı');
-    const cfg = await res.json();
+    const res=await fetch('./config.json',{cache:'no-store'});
+    if(!res.ok)throw new Error();
+    const cfg=await res.json();
+    if(cfg.defaultGroupWeights)groupWeights={...cfg.defaultGroupWeights};
+    if(cfg.defaultExceptionSkus)exceptionSkus={...cfg.defaultExceptionSkus};
+  } catch(e){console.warn('config.json yüklenemedi');}
+}
 
-    // config.json varsa defaultları bas
-    if (cfg && typeof cfg === 'object') {
-      if (cfg.defaultGroupWeights && typeof cfg.defaultGroupWeights === 'object') {
-        groupWeights = { ...cfg.defaultGroupWeights };
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const user=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!user||!pass){document.getElementById('loginError').style.display='block';return;}
+
+  // Netlify Function ile doğrula (basit test isteği)
+  const btn=document.querySelector('.login-btn');
+  btn.textContent='Giriş yapılıyor...';btn.disabled=true;
+  try {
+    const res=await fetch('/.netlify/functions/update-config',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'verify',username:user,password:pass}),
+    });
+    const data=await res.json();
+    if(res.ok&&data.success){
+      currentUser=user;currentPass=pass;
+      const remember=document.getElementById('rememberMe').checked;
+      if(remember){
+        const expires=Date.now()+(7*24*60*60*1000);
+        localStorage.setItem('fa_user',JSON.stringify({user,pass,expires}));
+      } else {
+        sessionStorage.setItem('fa_user',JSON.stringify({user,pass}));
       }
-      if (cfg.defaultExceptionSkus && typeof cfg.defaultExceptionSkus === 'object') {
-        exceptionSkus = { ...cfg.defaultExceptionSkus };
-      }
+      showLoggedIn(user);
+      document.getElementById('loginError').style.display='none';
+    } else {
+      document.getElementById('loginError').style.display='block';
     }
-  } catch (e) {
-    console.warn('Shared config yüklenemedi, mevcut değerler kullanılacak.', e);
+  } catch(e){
+    document.getElementById('loginError').textContent='Bağlantı hatası, tekrar deneyin.';
+    document.getElementById('loginError').style.display='block';
   }
+  btn.textContent='Giriş Yap';btn.disabled=false;
 }
 
-//try{const s=localStorage.getItem('gwData');if(s)groupWeights=JSON.parse(s);}catch(e){}
-//try{const s=localStorage.getItem('exSkus');if(s)exceptionSkus=JSON.parse(s);}catch(e){}
-
-const DEFAULT_EXCEPTION_SKUS=['1SPOCA0029197.','1SPOCA0030197.','1SSARF1507139.','1SPOCA0027197.','1SPOCA0028169.','1SPOCA0030169.','1SPOCA0028197.'];
-DEFAULT_EXCEPTION_SKUS.forEach(sku=>{if(!(sku in exceptionSkus))exceptionSkus[sku]=0.01;});
-//try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
-
-// ── NUMBER PARSING (TR/EN) ────────────────────────────────────────────────────
-function parseNum(v) {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  let s = String(v).trim();
-  if (!s) return 0;
-
-  // remove spaces incl. non-breaking
-  s = s.replace(/\s|\u00A0/g, '');
-
-  // keep digits, dots, commas, minus
-  s = s.replace(/[^0-9,.\-]/g, '');
-
-  // If both '.' and ',' exist, assume TR style: '.' thousands, ',' decimal
-  if (s.includes('.') && s.includes(',')) {
-    s = s.replace(/\./g, '').replace(',', '.');
-  } else if (s.includes(',')) {
-    // only comma: treat as decimal separator
-    s = s.replace(',', '.');
-  }
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+function showLoggedIn(user){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('userBar').style.display='flex';
+  document.getElementById('userBarName').textContent=user;
 }
-function round2(n){ return Math.round((parseNum(n))*100)/100; }
+
+function doLogout(){
+  currentUser=null;currentPass=null;
+  localStorage.removeItem('fa_user');
+  sessionStorage.removeItem('fa_user');
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('userBar').style.display='none';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+}
+
+// Enter ile login
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('loginOverlay').style.display!=='none')doLogin();
+});
+
+// ── NUMBER PARSING ────────────────────────────────────────────────────────────
+function parseNum(v){
+  if(v===null||v===undefined)return 0;
+  if(typeof v==='number')return Number.isFinite(v)?v:0;
+  let s=String(v).trim().replace(/\s|\u00A0/g,'').replace(/[^0-9,.\-]/g,'');
+  if(s.includes('.')&&s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  else if(s.includes(','))s=s.replace(',','.');
+  const n=Number(s);return Number.isFinite(n)?n:0;
+}
+function round2(n){return Math.round(parseNum(n)*100)/100;}
 
 // ── UI ────────────────────────────────────────────────────────────────────────
-function setCountry(c) {
+function setCountry(c){
   currentCountry=c;
-  ['kz','rs','iq','ge','cy','ru','ba','be'].forEach(k=>{
-    const el=document.getElementById('country-'+k);
-    if(el)el.classList.toggle('active',k===c);
-  });
+  ['kz','rs','iq','ge','cy','ru','ba','be'].forEach(k=>{const el=document.getElementById('country-'+k);if(el)el.classList.toggle('active',k===c);});
   document.getElementById('modeSection').style.display=c==='kz'?'block':'none';
   document.getElementById('eurSection').style.display=c==='be'?'block':'none';
-
   if(workingRows)buildAndDownloadReady();
-  else enforceCountryRequirements();
 }
-
-function setMode(m) {
+function setMode(m){
   currentMode=m;
   document.getElementById('modeGrouped').classList.toggle('active',m==='grouped');
   document.getElementById('modeRaw').classList.toggle('active',m==='raw');
   if(workingRows)buildAndDownloadReady();
 }
-function showStatus(type,html) {
-  const sb=document.getElementById('statusBox');
-  sb.className='status-box visible '+type;
-  sb.innerHTML=html;
-}
-function toggleKgTable() {
-  const body=document.getElementById('kgTableBody');
-  const arrow=document.getElementById('kgTableArrow');
-  if(body.style.display==='none'){body.style.display='block';arrow.textContent='▲';}
-  else{body.style.display='none';arrow.textContent='▼';}
-}
-function toggleSavedKg() {
-  const body=document.getElementById('savedKgBody');
-  const arrow=document.getElementById('savedKgArrow');
-  if(body.style.display==='none'){body.style.display='block';arrow.textContent='▲';}
-  else{body.style.display='none';arrow.textContent='▼';}
-}
-
-// Belçika için kur zorunluluğu
-function enforceCountryRequirements() {
-  const dl=document.getElementById('downloadBtn');
-  if (!dl) return;
-
-  if (currentCountry === 'be') {
-    const rate = getEurRate();
-    if (!rate) {
-      dl.classList.remove('visible');
-      if (workingRows) {
-        showStatus('error','⚠ Belçika (EUR) için lütfen Euro kuru girin. (TRY / EUR)');
-      }
-      return false;
-    }
-  }
-  return true;
-}
-
-function onEurRateChanged() {
-  if (currentCountry !== 'be') return;
-  if (!workingRows) return;
-  buildAndDownloadReady();
-}
+function showStatus(type,html){const sb=document.getElementById('statusBox');sb.className='status-box visible '+type;sb.innerHTML=html;}
+function toggleKgTable(){const b=document.getElementById('kgTableBody'),a=document.getElementById('kgTableArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
+function toggleSavedKg(){const b=document.getElementById('savedKgBody'),a=document.getElementById('savedKgArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
+function toggleExSku(){const b=document.getElementById('exSkuBody'),a=document.getElementById('exSkuArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
+function onEurRateChanged(){if(currentCountry==='be'&&workingRows)buildAndDownloadReady();}
 
 // ── FILE ──────────────────────────────────────────────────────────────────────
 const dropZone=document.getElementById('dropZone');
 dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
 dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
-
-function handleFile(file) {
-  if(!file)return;
-  originalFileName=file.name.replace(/\.xlsx?$/,'');
-  document.getElementById('fileName').textContent='📄 '+file.name;
-  const r=new FileReader();
-  r.onload=e=>{lastFileData=e.target.result;loadFile(lastFileData);};
-  r.readAsArrayBuffer(file);
-}
-
-function loadFile(data) {
+function handleFile(file){if(!file)return;originalFileName=file.name.replace(/\.xlsx?$/,'');document.getElementById('fileName').textContent='📄 '+file.name;const r=new FileReader();r.onload=e=>{lastFileData=e.target.result;loadFile(lastFileData);};r.readAsArrayBuffer(file);}
+function loadFile(data){
   processedWB=null;workingRows=null;masterRows=null;
   document.getElementById('statusBox').className='status-box';
   document.getElementById('downloadBtn').classList.remove('visible');
   document.getElementById('kgSection').style.display='none';
   document.getElementById('adjustSection').style.display='none';
   document.getElementById('adjustResult').style.display='none';
-  try {
+  try{
     const wb=XLSX.read(data,{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
     if(!rows.length)throw new Error('Dosya boş.');
     const keys=Object.keys(rows[0]);
-    if(keys.includes('BRÜT')||keys.includes('NET'))throw new Error('Bu dosya eski formatta (BRÜT/NET var). Lütfen revize master kullanın.');
+    if(keys.includes('BRÜT')||keys.includes('NET'))throw new Error('Eski format (BRÜT/NET var). Revize master kullanın.');
     if(!keys.includes('Ürün Ağırlığı (KG)')||!keys.includes('ÜRÜN ARA GRUBU'))throw new Error('Ürün Ağırlığı (KG) veya ÜRÜN ARA GRUBU sütunu bulunamadı.');
     masterRows=rows;
-
-    showStatus(
-      'success',
-      `<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div>
-       <div class="stat">Kilo hesaplaması için tabloyu doldurun, ardından ülke seçip indirin.</div>`
-    );
-
+    showStatus('success',`<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div><div class="stat">Kilo hesaplaması için tabloyu doldurun, ardından ülke seçip indirin.</div>`);
     buildKgTable(rows);
     document.getElementById('kgSection').style.display='block';
-    document.getElementById('downloadBtn').classList.remove('visible');
-  } catch(err) {
-    showStatus('error','⚠ '+err.message);
-  }
+  }catch(err){showStatus('error','⚠ '+err.message);}
 }
 
 // ── KG TABLE ──────────────────────────────────────────────────────────────────
-function buildKgTable(rows) {
+function buildKgTable(rows){
   const groups=[...new Set(rows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))].sort();
   const tbody=document.getElementById('kgTable');
   while(tbody.rows.length>1)tbody.deleteRow(1);
-
-  const needsInput=[], alreadyFull=[];
+  const needsInput=[],alreadyFull=[];
   groups.forEach(g=>{
-    const zeroCount=rows.filter(r=>{
-      const v=parseNum(r['Ürün Ağırlığı (KG)']);
-      return String(r['ÜRÜN ARA GRUBU'])===g && (v===0);
-    }).length;
-    if(zeroCount>0)needsInput.push({g,zeroCount});
-    else alreadyFull.push(g);
+    const zeroCount=rows.filter(r=>String(r['ÜRÜN ARA GRUBU'])===g&&parseNum(r['Ürün Ağırlığı (KG)'])===0).length;
+    if(zeroCount>0)needsInput.push({g,zeroCount});else alreadyFull.push(g);
   });
-
-  const kgBody=document.getElementById('kgTableBody');
-  const kgArrow=document.getElementById('kgTableArrow');
+  const kgBody=document.getElementById('kgTableBody'),kgArrow=document.getElementById('kgTableArrow');
   if(needsInput.length>0){kgBody.style.display='block';kgArrow.textContent='▲';}
   else{kgBody.style.display='none';kgArrow.textContent='▼';}
-
-  if(needsInput.length===0){
-    const tr=tbody.insertRow();
-    tr.innerHTML='<td colspan="3" style="color:var(--accent);padding:12px;">✓ Tüm satırlarda kilo değeri dolu.</td>';
-  } else {
-    needsInput.forEach(({g,zeroCount})=>{
-      const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');
-      const saved=groupWeights[g]!==undefined?groupWeights[g]:'';
-      const tr=tbody.insertRow();
-      tr.innerHTML=`<td style="color:var(--text);">${g}</td>
-                    <td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td>
-                    <td style="color:#ff9d72;">${zeroCount} satır</td>`;
-    });
-  }
-
-  const savedSection=document.getElementById('savedKgSection');
-  const savedTable=document.getElementById('savedKgTable');
+  if(needsInput.length===0){const tr=tbody.insertRow();tr.innerHTML='<td colspan="3" style="color:var(--accent);padding:12px;">✓ Tüm satırlarda kilo değeri dolu.</td>';}
+  else{needsInput.forEach(({g,zeroCount})=>{const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');const saved=groupWeights[g]!==undefined?groupWeights[g]:'';const tr=tbody.insertRow();tr.innerHTML=`<td style="color:var(--text);">${g}</td><td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td><td style="color:#ff9d72;">${zeroCount} satır</td>`;});}
+  const savedSection=document.getElementById('savedKgSection'),savedTable=document.getElementById('savedKgTable');
   savedTable.innerHTML='';
   if(alreadyFull.length>0){
     savedSection.style.display='block';
-    alreadyFull.forEach(g=>{
-      const saved=groupWeights[g]!==undefined?groupWeights[g]:'—';
-      const div=document.createElement('div');
-      div.style.cssText='display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #1f1f1f;font-family:"DM Mono",monospace;font-size:12px;';
-      div.innerHTML=`<span style="color:var(--text);">${g}</span><span style="color:var(--muted);">AG dolu &nbsp;|&nbsp; kayıtlı: <span style="color:var(--accent);">${saved} kg</span></span>`;
-      savedTable.appendChild(div);
-    });
-  } else {
-    savedSection.style.display='none';
-  }
+    alreadyFull.forEach(g=>{const saved=groupWeights[g]!==undefined?groupWeights[g]:'—';const div=document.createElement('div');div.style.cssText='display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #1f1f1f;font-family:"DM Mono",monospace;font-size:12px;';div.innerHTML=`<span style="color:var(--text);">${g}</span><span style="color:var(--muted);">AG dolu &nbsp;|&nbsp; kayıtlı: <span style="color:var(--accent);">${saved} kg</span></span>`;savedTable.appendChild(div);});
+  }else{savedSection.style.display='none';}
 }
 
 // ── APPLY GROUP WEIGHTS ───────────────────────────────────────────────────────
-function applyGroupWeights() {
+function applyGroupWeights(){
   if(!masterRows)return;
-
   const groups=[...new Set(masterRows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))];
-  groups.forEach(g=>{
-    const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');
-    const el=document.getElementById(id);
-    if(el && el.value!=='') groupWeights[g]=parseNum(el.value);
-  });
-  //try{localStorage.setItem('gwData',JSON.stringify(groupWeights));}catch(e){}
-
+  groups.forEach(g=>{const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');const el=document.getElementById(id);if(el&&el.value!=='')groupWeights[g]=parseNum(el.value);});
   workingRows=masterRows.map(row=>{
-    const r={...row};
-    const sku=String(r['SKU']);
-    let kg;
-
-    if(sku in exceptionSkus){
-      kg=parseNum(exceptionSkus[sku]);
-    } else {
-      kg=parseNum(r['Ürün Ağırlığı (KG)']);
-      if(kg===0) kg=parseNum(groupWeights[String(r['ÜRÜN ARA GRUBU'])] || 0);
-    }
-
+    const r={...row};const sku=String(r['SKU']);let kg;
+    if(sku in exceptionSkus){kg=parseNum(exceptionSkus[sku]);}
+    else{kg=parseNum(r['Ürün Ağırlığı (KG)']);if(kg===0)kg=parseNum(groupWeights[String(r['ÜRÜN ARA GRUBU'])]||0);}
     const miktar=parseNum(r['Miktar']);
-    r['_kg']=kg;
-    r['_hamBrut']=kg*miktar;
-    r['BRÜT']=r['_hamBrut'];
-    r['NET']=r['BRÜT']*0.9;
+    r['_kg']=kg;r['_hamBrut']=kg*miktar;r['BRÜT']=r['_hamBrut'];r['NET']=r['BRÜT']*0.9;
     return r;
   });
-
-  const totalBrut=workingRows.reduce((s,r)=>s+(parseNum(r['BRÜT'])||0),0);
+  const totalBrut=workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
   document.getElementById('calcTotal').textContent=round2(totalBrut);
-
   document.getElementById('adjustSection').style.display='block';
   document.getElementById('adjustResult').style.display='none';
-
-  // bu noktada ülke şartlarını kontrol edelim (BE için kur yoksa indirme kapalı kalacak)
   buildAndDownloadReady();
 }
 
 // ── WEIGHT ADJUSTMENT ─────────────────────────────────────────────────────────
-function applyWeightAdjust() {
+function applyWeightAdjust(){
   if(!workingRows)return;
-
   const target=parseNum(document.getElementById('targetWeight').value);
-  if(!target || target<=0){alert('Lütfen geçerli bir hedef kilo girin.');return;}
-
-  const hamTotal=workingRows.reduce((s,r)=>s+(parseNum(r['_hamBrut'])||0),0);
+  if(!target||target<=0){alert('Lütfen geçerli bir hedef kilo girin.');return;}
+  const hamTotal=workingRows.reduce((s,r)=>s+parseNum(r['_hamBrut']),0);
   if(hamTotal<=0){alert('Ham BRÜT hesaplanamadı.');return;}
-
   const multiplier=target/hamTotal;
-  workingRows=workingRows.map(row=>{
-    const r={...row};
-    r['BRÜT']=(parseNum(r['_hamBrut'])||0)*multiplier;
-    r['NET']=r['BRÜT']*0.9;
-    return r;
-  });
-
+  workingRows=workingRows.map(row=>{const r={...row};r['BRÜT']=parseNum(r['_hamBrut'])*multiplier;r['NET']=r['BRÜT']*0.9;return r;});
   const finalBrut=workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
   const finalNet=workingRows.reduce((s,r)=>s+parseNum(r['NET']),0);
-  const res=document.getElementById('adjustResult');
-  res.style.display='block';
+  const res=document.getElementById('adjustResult');res.style.display='block';
   res.innerHTML=`✓ Orantılı ölçekleme &nbsp;|&nbsp; BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
-
   buildAndDownloadReady();
 }
 
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
-function buildAndDownloadReady() {
+function buildAndDownloadReady(){
   if(!workingRows)return;
-
-  // Ülke gereksinimleri (BE kur) sağlanmıyorsa indirmeyi kapat
-  if(!enforceCountryRequirements()) return;
-
+  if(currentCountry==='be'&&!getEurRate()){showStatus('error','⚠ Belçika için Euro kuru girin.');document.getElementById('downloadBtn').classList.remove('visible');return;}
   buildOutput(workingRows);
 }
-
-function buildOutput(rows) {
+function buildOutput(rows){
   try{
     if(currentCountry==='kz')buildKZ(rows);
     else if(currentCountry==='rs')buildRS(rows);
     else if(SIMPLE_MAPS[currentCountry])buildSimple(rows,SIMPLE_MAPS[currentCountry]);
-    else{
-      showStatus('error','⚠ Bu ülke için sütun tanımı henüz eklenmemiş.');
-      document.getElementById('downloadBtn').classList.remove('visible');
-    }
-  }catch(err){
-    showStatus('error','⚠ '+err.message);
-    document.getElementById('downloadBtn').classList.remove('visible');
-  }
+    else{showStatus('error','⚠ Bu ülke için sütun tanımı henüz eklenmemiş.');document.getElementById('downloadBtn').classList.remove('visible');}
+  }catch(err){showStatus('error','⚠ '+err.message);document.getElementById('downloadBtn').classList.remove('visible');}
 }
-
-function getEurRate() {
-  const el=document.getElementById('eurRateInput');
-  const v=el?parseNum(el.value):0;
-  return(v&&v>0)?v:null;
-}
-
-function getVal(row,src) {
-  if(src==='__CALC__') return round2(parseNum(row['Miktar'])*parseNum(row['Fiyat']));
-  if(src==='Birim Cinsi (1)'){
-    const v=row[src]!==undefined?row[src]:'';
-    return String(v).trim()==='AD'?'PCS':v;
-  }
-  if(src==='__EUR__'){
-    const rate=getEurRate();
-    if(!rate) return ''; // kur yokken zaten indirme kapalı
-    return parseNum(row['Fiyat'])/rate;
-  }
-  if(src==='__EUR_TOTAL__'){
-    const rate=getEurRate();
-    if(!rate) return '';
-    return (parseNum(row['Fiyat'])/rate) * parseNum(row['Miktar']);
-  }
+function getEurRate(){const el=document.getElementById('eurRateInput');const v=el?parseNum(el.value):0;return(v&&v>0)?v:null;}
+function getVal(row,src){
+  if(src==='__CALC__')return round2(parseNum(row['Miktar'])*parseNum(row['Fiyat']));
+  if(src==='Birim Cinsi (1)'){const v=row[src]!==undefined?row[src]:'';return String(v).trim()==='AD'?'PCS':v;}
+  if(src==='__EUR__'){const rate=getEurRate();if(!rate)return '';return parseNum(row['Fiyat'])/rate;}
+  if(src==='__EUR_TOTAL__'){const rate=getEurRate();if(!rate)return '';return(parseNum(row['Fiyat'])/rate)*parseNum(row['Miktar']);}
   return row[src]!==undefined?row[src]:'';
 }
+function makeWS(result,headers){const ws=XLSX.utils.json_to_sheet(result,{header:headers});ws['!cols']=headers.map(c=>({wch:Math.min(Math.max(c.length+4,14),35)}));return ws;}
 
-function makeWS(result,headers) {
-  const ws=XLSX.utils.json_to_sheet(result,{header:headers});
-  ws['!cols']=headers.map(c=>({wch:Math.min(Math.max(c.length+4,14),35)}));
-  return ws;
-}
-
-// ── KAZAKISTAN ────────────────────────────────────────────────────────────────
-function buildKZ(rows) {
-  const before=rows.length;
-  let result;
-
+function buildKZ(rows){
+  const before=rows.length;let result;
   if(currentMode==='grouped'){
     const grouped={},order=[];
-    for(const row of rows){
-      const sku=row['SKU'];
-      if(!grouped[sku]){grouped[sku]={...row};order.push(sku);}
-      else{
-        grouped[sku]['Miktar']=parseNum(grouped[sku]['Miktar'])+parseNum(row['Miktar']);
-        grouped[sku]['BRÜT']=parseNum(grouped[sku]['BRÜT'])+parseNum(row['BRÜT']);
-        grouped[sku]['NET']=parseNum(grouped[sku]['NET'])+parseNum(row['NET']);
-      }
-    }
+    for(const row of rows){const sku=row['SKU'];if(!grouped[sku]){grouped[sku]={...row};order.push(sku);}else{grouped[sku]['Miktar']=parseNum(grouped[sku]['Miktar'])+parseNum(row['Miktar']);grouped[sku]['BRÜT']=parseNum(grouped[sku]['BRÜT'])+parseNum(row['BRÜT']);grouped[sku]['NET']=parseNum(grouped[sku]['NET'])+parseNum(row['NET']);}}
     result=order.map(sku=>{const r={};KZ_COLS.forEach(c=>r[c]=grouped[sku][c]??'');return r;});
-  } else {
-    result=rows.map(row=>{const r={};KZ_COLS.forEach(c=>r[c]=row[c]??'');return r;});
-  }
-
-  processedWB=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(processedWB,makeWS(result,KZ_COLS),'Sheet');
-
-  showStatus(
-    'success',
-    currentMode==='grouped'
-      ? `<div class="stat">✓ Kazakistan — Gruplandırma tamamlandı</div><div class="stat">Orijinal: <span>${before.toLocaleString('tr')} satır</span> → Sonuç: <span>${result.length.toLocaleString('tr')} satır</span></div>`
-      : `<div class="stat">✓ Kazakistan — Tüm satırlar: <span>${result.length.toLocaleString('tr')} satır</span></div>`
-  );
-
+  }else{result=rows.map(row=>{const r={};KZ_COLS.forEach(c=>r[c]=row[c]??'');return r;});}
+  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(result,KZ_COLS),'Sheet');
+  showStatus('success',currentMode==='grouped'?`<div class="stat">✓ Kazakistan — Gruplandırma tamamlandı</div><div class="stat">Orijinal: <span>${before.toLocaleString('tr')} satır</span> → Sonuç: <span>${result.length.toLocaleString('tr')} satır</span></div>`:`<div class="stat">✓ Kazakistan — Tüm satırlar: <span>${result.length.toLocaleString('tr')} satır</span></div>`);
   document.getElementById('downloadBtn').classList.add('visible');
 }
-
-// ── SIRBISTAN ─────────────────────────────────────────────────────────────────
-function buildRS(rows) {
+function buildRS(rows){
   const invResult=rows.map(row=>{const r={};RS_INV.forEach(m=>r[m.out]=getVal(row,m.src));return r;});
   const invH=RS_INV.map(m=>m.out);
-  processedWB=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(processedWB,makeWS(invResult,invH),'INV');
-  showStatus('success',`<div class="stat">✓ Sırbistan — INV</div><div class="stat">Toplam: <span>${invResult.length.toLocaleString('tr')} satır · ${invH.length} s��tun</span></div>`);
+  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(invResult,invH),'INV');
+  showStatus('success',`<div class="stat">✓ Sırbistan — INV</div><div class="stat">Toplam: <span>${invResult.length.toLocaleString('tr')} satır · ${invH.length} sütun</span></div>`);
   document.getElementById('downloadBtn').classList.add('visible');
 }
-
-// ── SIMPLE ────────────────────────────────────────────────────────────────────
-function buildSimple(rows,colMap) {
+function buildSimple(rows,colMap){
   const headers=colMap.map(m=>m.out);
   const result=rows.map(row=>{const r={};colMap.forEach(m=>r[m.out]=getVal(row,m.src));return r;});
-  processedWB=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(processedWB,makeWS(result,headers),'Sheet');
+  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(result,headers),'Sheet');
   const label=COUNTRIES[currentCountry]?.label||currentCountry;
   showStatus('success',`<div class="stat">✓ ${label} — Tamamlandı</div><div class="stat">Toplam: <span>${result.length.toLocaleString('tr')} satır · ${headers.length} sütun</span></div>`);
   document.getElementById('downloadBtn').classList.add('visible');
 }
 
 // ── İSTİSNA SKU ───────────────────────────────────────────────────────────────
-function toggleExSku() {
-  const body = document.getElementById('exSkuBody');
-  const arrow = document.getElementById('exSkuArrow');
-  if (body.style.display === 'none') { body.style.display = 'block'; arrow.textContent = '▲'; }
-  else { body.style.display = 'none'; arrow.textContent = '▼'; }
-}
-
-function renderExSkuList() {
-  const container=document.getElementById('exSkuList');
-  if(!container)return;
-
-  // alfabetik sırala
+function renderExSkuList(){
+  const container=document.getElementById('exSkuList');if(!container)return;
   const entries=Object.entries(exceptionSkus).sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'tr'));
-  if(!entries.length){
-    container.innerHTML='<div style="color:var(--muted);font-family:DM Mono,monospace;font-size:12px;">Henüz istisna SKU yok.</div>';
-    return;
-  }
-
+  if(!entries.length){container.innerHTML='<div style="color:var(--muted);font-family:DM Mono,monospace;font-size:12px;">Henüz istisna SKU yok.</div>';return;}
   container.innerHTML=entries.map(([sku,kg])=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #1f1f1f;font-family:'DM Mono',monospace;font-size:12px;">
       <span style="color:var(--text);">${sku}</span>
@@ -667,43 +507,87 @@ function renderExSkuList() {
     </div>`).join('');
 }
 
-function addExceptionSku() {
+function setSkuSaveStatus(msg,isError=false){
+  const el=document.getElementById('skuSaveStatus');
+  el.style.display='block';
+  el.style.color=isError?'var(--error)':'var(--accent)';
+  el.textContent=msg;
+  if(!isError)setTimeout(()=>{el.style.display='none';},3000);
+}
+
+async function callUpdateConfig(action,sku,kg){
+  const res=await fetch('/.netlify/functions/update-config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action,username:currentUser,password:currentPass,sku,kg}),
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Sunucu hatası');
+  return data;
+}
+
+async function addExceptionSku(){
   const sku=document.getElementById('newExSku').value.trim();
   const kg=parseNum(document.getElementById('newExKg').value);
   if(!sku||!kg||kg<=0){alert('SKU ve geçerli bir kilo girin.');return;}
-  exceptionSkus[sku]=kg;
-  //try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
-  document.getElementById('newExSku').value='';
-  document.getElementById('newExKg').value='';
-  renderExSkuList();
+  const btn=document.getElementById('addSkuBtn');
+  btn.textContent='Kaydediliyor...';btn.disabled=true;
+  try{
+    const data=await callUpdateConfig('add',sku,kg);
+    exceptionSkus={...data.config.defaultExceptionSkus};
+    document.getElementById('newExSku').value='';
+    document.getElementById('newExKg').value='';
+    renderExSkuList();
+    setSkuSaveStatus('✓ SKU eklendi ve config güncellendi (~30sn deploy)');
+  }catch(e){setSkuSaveStatus('⚠ '+e.message,true);}
+  btn.textContent='Ekle';btn.disabled=false;
 }
 
-function removeExceptionSku(sku) {
-  delete exceptionSkus[sku];
-  //try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
-  renderExSkuList();
+async function removeExceptionSku(sku){
+  if(!confirm(`"${sku}" silinsin mi?`))return;
+  try{
+    const data=await callUpdateConfig('remove',sku);
+    exceptionSkus={...data.config.defaultExceptionSkus};
+    renderExSkuList();
+    setSkuSaveStatus('✓ SKU silindi ve config güncellendi (~30sn deploy)');
+  }catch(e){setSkuSaveStatus('⚠ '+e.message,true);}
 }
-
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadSharedConfig();
-  renderExSkuList();
-});
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
-function downloadResult() {
+function downloadResult(){
   if(!processedWB)return;
-
-  // ekstra güvenlik: BE ise kur yokken indirme yapma
-  if(currentCountry==='be' && !getEurRate()){
-    showStatus('error','⚠ Belçika (EUR) için lütfen Euro kuru girin. (TRY / EUR)');
-    document.getElementById('downloadBtn').classList.remove('visible');
-    return;
-  }
-
+  if(currentCountry==='be'&&!getEurRate()){showStatus('error','⚠ Belçika için Euro kuru girin.');return;}
   let suffix=COUNTRIES[currentCountry]?.suffix||('_'+currentCountry);
   if(currentCountry==='kz')suffix+=(currentMode==='grouped'?'_gruplu':'_tum');
   XLSX.writeFile(processedWB,originalFileName+suffix+'.xlsx');
 }
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',async()=>{
+  await loadSharedConfig();
+  renderExSkuList();
+
+  // Kaydedilmiş oturum var mı kontrol et
+  const lsData = localStorage.getItem('fa_user');
+  const ssData = sessionStorage.getItem('fa_user');
+  if(lsData){
+    try{
+      const {user,pass,expires}=JSON.parse(lsData);
+      if(expires && Date.now()<expires){
+        currentUser=user;currentPass=pass;
+        showLoggedIn(user);
+      } else {
+        localStorage.removeItem('fa_user');
+      }
+    }catch(e){localStorage.removeItem('fa_user');}
+  } else if(ssData){
+    try{
+      const {user,pass}=JSON.parse(ssData);
+      currentUser=user;currentPass=pass;
+      showLoggedIn(user);
+    }catch(e){sessionStorage.removeItem('fa_user');}
+  }
+});
 </script>
 </body>
 </html>
