@@ -1,0 +1,12 @@
+{
+  "defaultExceptionSkus": {
+    "1SPOCA0029197.": 0.01,
+    "1SPOCA0030197.": 0.01,
+    "1SSARF1507139.": 0.01,
+    "1SPOCA0027197.": 0.01,
+    "1SPOCA0028169.": 0.01,
+    "1SPOCA0030169.": 0.01,
+    "1SPOCA0028197.": 0.01
+  },
+  "defaultGroupWeights": {}
+}
