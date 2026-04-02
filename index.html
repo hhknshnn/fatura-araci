@@ -62,50 +62,12 @@
   .target-input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;}
   .target-input:focus{border-color:var(--accent);}
 
-  /* LOGIN */
-  .login-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px);}
-  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:360px;}
-  .login-box h2{font-size:20px;font-weight:800;margin-bottom:6px;}
-  .login-box p{color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;margin-bottom:24px;}
-  .login-input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;margin-bottom:12px;}
-  .login-input:focus{border-color:var(--accent);}
-  .login-btn{width:100%;padding:13px;border-radius:8px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;}
-  .login-btn:hover{background:#00c888;}
-  .login-error{color:var(--error);font-family:'DM Mono',monospace;font-size:12px;margin-top:10px;display:none;}
 
-  /* USER BAR */
-  .user-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px;font-family:'DM Mono',monospace;font-size:12px;}
-  .user-bar span{color:var(--muted);}
-  .user-bar strong{color:var(--accent);}
-  .logout-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;}
-  .logout-btn:hover{border-color:var(--error);color:var(--error);}
 </style>
 </head>
 <body>
 
-<!-- LOGIN OVERLAY -->
-<div class="login-overlay" id="loginOverlay">
-  <div class="login-box">
-    <h2>Fatura <span style="color:var(--accent)">Aracı</span></h2>
-    <p>Devam etmek için giriş yapın</p>
-    <input class="login-input" id="loginUser" type="text" placeholder="Kullanıcı adı" autocomplete="username">
-    <input class="login-input" id="loginPass" type="password" placeholder="Şifre" autocomplete="current-password">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-      <input type="checkbox" id="rememberMe" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
-      <label for="rememberMe" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);cursor:pointer;">Beni 7 gün hatırla</label>
-    </div>
-    <button class="login-btn" onclick="doLogin()">Giriş Yap</button>
-    <div class="login-error" id="loginError">Kullanıcı adı veya şifre hatalı.</div>
-  </div>
-</div>
-
 <div class="container">
-  <!-- USER BAR -->
-  <div class="user-bar" id="userBar" style="display:none;">
-    <span>Giriş yapıldı: <strong id="userBarName"></strong></span>
-    <button class="logout-btn" onclick="doLogout()">Çıkış</button>
-  </div>
-
   <div class="header">
     <h1>Fatura <span>Aracı</span></h1>
     <p>Master fatura Excel'ini yükle → Ülkeyi seç → İndir</p>
@@ -231,7 +193,6 @@
         <button onclick="addExceptionSku()" id="addSkuBtn" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Ekle</button>
       </div>
       <div id="exSkuList" style="max-height:200px;overflow-y:auto;"></div>
-      <div id="skuSaveStatus" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:12px;display:none;"></div>
     </div>
   </div>
 
@@ -255,7 +216,6 @@ const SIMPLE_MAPS={
 let currentCountry='kz',currentMode='grouped',lastFileData=null,originalFileName='';
 let processedWB=null,masterRows=null,workingRows=null;
 let groupWeights={},exceptionSkus={};
-let currentUser=null,currentPass=null;
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 async function loadSharedConfig() {
@@ -267,64 +227,6 @@ async function loadSharedConfig() {
     if(cfg.defaultExceptionSkus)exceptionSkus={...cfg.defaultExceptionSkus};
   } catch(e){console.warn('config.json yüklenemedi');}
 }
-
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
-async function doLogin() {
-  const user=document.getElementById('loginUser').value.trim();
-  const pass=document.getElementById('loginPass').value;
-  if(!user||!pass){document.getElementById('loginError').style.display='block';return;}
-
-  // Netlify Function ile doğrula (basit test isteği)
-  const btn=document.querySelector('.login-btn');
-  btn.textContent='Giriş yapılıyor...';btn.disabled=true;
-  try {
-    const res=await fetch('/.netlify/functions/update-config',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'verify',username:user,password:pass}),
-    });
-    const data=await res.json();
-    if(res.ok&&data.success){
-      currentUser=user;currentPass=pass;
-      const remember=document.getElementById('rememberMe').checked;
-      if(remember){
-        const expires=Date.now()+(7*24*60*60*1000);
-        localStorage.setItem('fa_user',JSON.stringify({user,pass,expires}));
-      } else {
-        sessionStorage.setItem('fa_user',JSON.stringify({user,pass}));
-      }
-      showLoggedIn(user);
-      document.getElementById('loginError').style.display='none';
-    } else {
-      document.getElementById('loginError').style.display='block';
-    }
-  } catch(e){
-    document.getElementById('loginError').textContent='Bağlantı hatası, tekrar deneyin.';
-    document.getElementById('loginError').style.display='block';
-  }
-  btn.textContent='Giriş Yap';btn.disabled=false;
-}
-
-function showLoggedIn(user){
-  document.getElementById('loginOverlay').style.display='none';
-  document.getElementById('userBar').style.display='flex';
-  document.getElementById('userBarName').textContent=user;
-}
-
-function doLogout(){
-  currentUser=null;currentPass=null;
-  localStorage.removeItem('fa_user');
-  sessionStorage.removeItem('fa_user');
-  document.getElementById('loginOverlay').style.display='flex';
-  document.getElementById('userBar').style.display='none';
-  document.getElementById('loginUser').value='';
-  document.getElementById('loginPass').value='';
-}
-
-// Enter ile login
-document.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&document.getElementById('loginOverlay').style.display!=='none')doLogin();
-});
 
 // ── NUMBER PARSING ────────────────────────────────────────────────────────────
 function parseNum(v){
@@ -507,50 +409,22 @@ function renderExSkuList(){
     </div>`).join('');
 }
 
-function setSkuSaveStatus(msg,isError=false){
-  const el=document.getElementById('skuSaveStatus');
-  el.style.display='block';
-  el.style.color=isError?'var(--error)':'var(--accent)';
-  el.textContent=msg;
-  if(!isError)setTimeout(()=>{el.style.display='none';},3000);
-}
-
-async function callUpdateConfig(action,sku,kg){
-  const res=await fetch('/.netlify/functions/update-config',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action,username:currentUser,password:currentPass,sku,kg}),
-  });
-  const data=await res.json();
-  if(!res.ok)throw new Error(data.error||'Sunucu hatası');
-  return data;
-}
-
-async function addExceptionSku(){
+function addExceptionSku(){
   const sku=document.getElementById('newExSku').value.trim();
   const kg=parseNum(document.getElementById('newExKg').value);
   if(!sku||!kg||kg<=0){alert('SKU ve geçerli bir kilo girin.');return;}
-  const btn=document.getElementById('addSkuBtn');
-  btn.textContent='Kaydediliyor...';btn.disabled=true;
-  try{
-    const data=await callUpdateConfig('add',sku,kg);
-    exceptionSkus={...data.config.defaultExceptionSkus};
-    document.getElementById('newExSku').value='';
-    document.getElementById('newExKg').value='';
-    renderExSkuList();
-    setSkuSaveStatus('✓ SKU eklendi ve config güncellendi (~30sn deploy)');
-  }catch(e){setSkuSaveStatus('⚠ '+e.message,true);}
-  btn.textContent='Ekle';btn.disabled=false;
+  exceptionSkus[sku]=kg;
+  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
+  document.getElementById('newExSku').value='';
+  document.getElementById('newExKg').value='';
+  renderExSkuList();
 }
 
-async function removeExceptionSku(sku){
+function removeExceptionSku(sku){
   if(!confirm(`"${sku}" silinsin mi?`))return;
-  try{
-    const data=await callUpdateConfig('remove',sku);
-    exceptionSkus={...data.config.defaultExceptionSkus};
-    renderExSkuList();
-    setSkuSaveStatus('✓ SKU silindi ve config güncellendi (~30sn deploy)');
-  }catch(e){setSkuSaveStatus('⚠ '+e.message,true);}
+  delete exceptionSkus[sku];
+  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
+  renderExSkuList();
 }
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
@@ -565,28 +439,10 @@ function downloadResult(){
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',async()=>{
   await loadSharedConfig();
+  // localStorage'dan istisna SKU'ları yükle (config.json'ı override etme, üstüne ekle)
+  try{const s=localStorage.getItem('exSkus');if(s){const local=JSON.parse(s);exceptionSkus={...exceptionSkus,...local};}}catch(e){}
+  try{const s=localStorage.getItem('gwData');if(s){const local=JSON.parse(s);groupWeights={...groupWeights,...local};}}catch(e){}
   renderExSkuList();
-
-  // Kaydedilmiş oturum var mı kontrol et
-  const lsData = localStorage.getItem('fa_user');
-  const ssData = sessionStorage.getItem('fa_user');
-  if(lsData){
-    try{
-      const {user,pass,expires}=JSON.parse(lsData);
-      if(expires && Date.now()<expires){
-        currentUser=user;currentPass=pass;
-        showLoggedIn(user);
-      } else {
-        localStorage.removeItem('fa_user');
-      }
-    }catch(e){localStorage.removeItem('fa_user');}
-  } else if(ssData){
-    try{
-      const {user,pass}=JSON.parse(ssData);
-      currentUser=user;currentPass=pass;
-      showLoggedIn(user);
-    }catch(e){sessionStorage.removeItem('fa_user');}
-  }
 });
 </script>
 </body>
