@@ -248,13 +248,33 @@ const SIMPLE_MAPS={
 let currentCountry='kz', currentMode='grouped', lastFileData=null, originalFileName='';
 let processedWB=null, masterRows=null, workingRows=null;
 let groupWeights={}, exceptionSkus={};
+// ── SHARED CONFIG (Netlify/GitHub üzerinden ortak) ───────────────────────────
+async function loadSharedConfig() {
+  try {
+    const res = await fetch('./config.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('config.json okunamadı');
+    const cfg = await res.json();
 
-try{const s=localStorage.getItem('gwData');if(s)groupWeights=JSON.parse(s);}catch(e){}
-try{const s=localStorage.getItem('exSkus');if(s)exceptionSkus=JSON.parse(s);}catch(e){}
+    // config.json varsa defaultları bas
+    if (cfg && typeof cfg === 'object') {
+      if (cfg.defaultGroupWeights && typeof cfg.defaultGroupWeights === 'object') {
+        groupWeights = { ...cfg.defaultGroupWeights };
+      }
+      if (cfg.defaultExceptionSkus && typeof cfg.defaultExceptionSkus === 'object') {
+        exceptionSkus = { ...cfg.defaultExceptionSkus };
+      }
+    }
+  } catch (e) {
+    console.warn('Shared config yüklenemedi, mevcut değerler kullanılacak.', e);
+  }
+}
+
+//try{const s=localStorage.getItem('gwData');if(s)groupWeights=JSON.parse(s);}catch(e){}
+//try{const s=localStorage.getItem('exSkus');if(s)exceptionSkus=JSON.parse(s);}catch(e){}
 
 const DEFAULT_EXCEPTION_SKUS=['1SPOCA0029197.','1SPOCA0030197.','1SSARF1507139.','1SPOCA0027197.','1SPOCA0028169.','1SPOCA0030169.','1SPOCA0028197.'];
 DEFAULT_EXCEPTION_SKUS.forEach(sku=>{if(!(sku in exceptionSkus))exceptionSkus[sku]=0.01;});
-try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
+//try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
 
 // ── NUMBER PARSING (TR/EN) ────────────────────────────────────────────────────
 function parseNum(v) {
@@ -450,7 +470,7 @@ function applyGroupWeights() {
     const el=document.getElementById(id);
     if(el && el.value!=='') groupWeights[g]=parseNum(el.value);
   });
-  try{localStorage.setItem('gwData',JSON.stringify(groupWeights));}catch(e){}
+  //try{localStorage.setItem('gwData',JSON.stringify(groupWeights));}catch(e){}
 
   workingRows=masterRows.map(row=>{
     const r={...row};
@@ -652,7 +672,7 @@ function addExceptionSku() {
   const kg=parseNum(document.getElementById('newExKg').value);
   if(!sku||!kg||kg<=0){alert('SKU ve geçerli bir kilo girin.');return;}
   exceptionSkus[sku]=kg;
-  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
+  //try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
   document.getElementById('newExSku').value='';
   document.getElementById('newExKg').value='';
   renderExSkuList();
@@ -660,11 +680,14 @@ function addExceptionSku() {
 
 function removeExceptionSku(sku) {
   delete exceptionSkus[sku];
-  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
+  //try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
   renderExSkuList();
 }
 
-document.addEventListener('DOMContentLoaded',renderExSkuList);
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadSharedConfig();
+  renderExSkuList();
+});
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 function downloadResult() {
