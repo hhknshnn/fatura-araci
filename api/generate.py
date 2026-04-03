@@ -118,7 +118,7 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None):
     last_col = get_column_letter(col_count)
-    col_widths = {'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':26,'I':22}
+    col_widths = {'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':26,'I':22,'J':13,'K':12,'L':16,'M':9,'N':9,'O':10}
     for col, w in col_widths.items():
         if column_index_from_string(col) <= col_count:
             ws.column_dimensions[col].width = w
@@ -128,18 +128,43 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     ws['A1'].fill = PatternFill('solid', fgColor='FFFFFF')
     if logo_bytes:
         try:
-            img = XLImage(io.BytesIO(logo_bytes))
+            from PIL import Image as PILImage
+            import tempfile, os
+            pil_img = PILImage.open(io.BytesIO(logo_bytes))
+            # Beyaz boşlukları kırp
+            import numpy as np
+            arr = np.array(pil_img.convert('RGB'))
+            mask = (arr < 240).any(axis=2)
+            rows = np.any(mask, axis=1)
+            cols = np.any(mask, axis=0)
+            if rows.any() and cols.any():
+                rmin,rmax = np.where(rows)[0][[0,-1]]
+                cmin,cmax = np.where(cols)[0][[0,-1]]
+                pad = 10
+                pil_img = pil_img.crop((
+                    max(0,cmin-pad), max(0,rmin-pad),
+                    min(arr.shape[1],cmax+pad), min(arr.shape[0],rmax+pad)
+                ))
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            pil_img.save(tmp.name)
+            tmp.close()
+            img = XLImage(tmp.name)
             img.width, img.height = 240, 22
             ws.add_image(img, 'E1')
-        except: pass
+            os.unlink(tmp.name)
+        except Exception as e:
+            pass
 
     ws.row_dimensions[2].height = 28.0
-    ws.merge_cells(f'A2:{last_col}2')
+    ws.merge_cells('A2:I2')
     c = ws['A2']
     c.value = sheet_title
     c.font = Font(name='Arial', bold=True, size=14, color='FFFFFF')
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='center', vertical='center')
+    # J-O beyaz
+    for col_idx in range(10, column_index_from_string(last_col)+1):
+        ws.cell(row=2, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
     for i in range(3, 9):
         ws.row_dimensions[i].height = 22
@@ -196,24 +221,29 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_val(8, 'CIP')
 
 def build_footer(ws, footer_start, col_count):
-    last_col = get_column_letter(col_count)
     for r in range(footer_start, footer_start+3):
         ws.row_dimensions[r].height = 18
-    ws.merge_cells(f'A{footer_start}:{last_col}{footer_start}')
+
+    # Her zaman A:I birleştir, J ve sonrası beyaz
+    for r in range(footer_start, footer_start+3):
+        for col_idx in range(10, col_count+1):
+            ws.cell(row=r, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+
+    ws.merge_cells(f'A{footer_start}:I{footer_start}')
     c = ws.cell(row=footer_start, column=1)
     c.value = 'DEHA MAGAZACILIK EV TEKSTILI URUNLERI SAN. VE TIC. A.S.'
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=9)
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    ws.merge_cells(f'A{footer_start+1}:{last_col}{footer_start+1}')
+    ws.merge_cells(f'A{footer_start+1}:I{footer_start+1}')
     c = ws.cell(row=footer_start+1, column=1)
     c.value = 'Mecidiyeköy Mah. Oğuz Sok Rönesans Biz İş Merkezi No:4/14 K:4 34387 Şişli/İstanbul'
     c.font = Font(name='Arial', color='000000', size=8)
     c.fill = PatternFill('solid', fgColor=LIGHT_BLUE)
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    ws.merge_cells(f'A{footer_start+2}:{last_col}{footer_start+2}')
+    ws.merge_cells(f'A{footer_start+2}:I{footer_start+2}')
     c = ws.cell(row=footer_start+2, column=1)
     c.value = 'Tel: +90 212 000 00 00  |  E-mail: info@deha.com.tr  |  www.deha.com.tr'
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=8)
@@ -304,7 +334,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     c.fill=PatternFill('solid',fgColor=GOLD)
     c.alignment=Alignment(horizontal='right',vertical='center')
     c.number_format=TL_FMT; c.border=brd()
-    build_footer(ws_inv,gr+2,len(INV_COLS))
+    build_footer(ws_inv,gr+1,len(INV_COLS))
     set_print(ws_inv,f'A1:I{gr}')
 
     # PL
@@ -321,9 +351,9 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
         for c_idx,(out_col,src_col) in enumerate(PL_COLS):
             cn=c_idx+1
             if src_col=='__BRUT__':
-                dat(ws_pl,er,cn,round(brut_list[r_idx],4),bg=bg,align='right',fmt='#,##0.0000')
+                dat(ws_pl,er,cn,round(brut_list[r_idx],2),bg=bg,align='right',fmt='#,##0.00')
             elif src_col=='__NET__':
-                dat(ws_pl,er,cn,round(net_list[r_idx],4),bg=bg,align='right',fmt='#,##0.0000')
+                dat(ws_pl,er,cn,round(net_list[r_idx],2),bg=bg,align='right',fmt='#,##0.00')
             elif out_col=='QTY':
                 dat(ws_pl,er,cn,parse_num(row.get(src_col,0)),bg=bg,align='right',fmt='#,##0')
             elif out_col=='MASTER ITEM CODE':
@@ -332,26 +362,21 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
                 dat(ws_pl,er,cn,row.get(src_col,''),bg=bg,align='left')
 
     last_pl=DS+len(df)
-    pl_tr,pl_gr=last_pl+1,last_pl+2
-    for r in[pl_tr,pl_gr]: ws_pl.row_dimensions[r].height=22
+    pl_gr=last_pl+1  # Sadece GRAND TOTAL, mavi satır yok
     ws_pl.row_dimensions[pl_gr].height=28
-    ws_pl.merge_cells(f'A{pl_tr}:F{pl_tr}')
-    for cn,fmt in[(7,'#,##0'),(8,'#,##0.0000'),(9,'#,##0.0000')]:
-        cl=get_column_letter(cn)
-        c=ws_pl.cell(row=pl_tr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
-        c.font=Font(name='Arial',bold=True,color='FFFFFF',size=10)
-        c.fill=PatternFill('solid',fgColor=DARK_BLUE)
-        c.alignment=Alignment(horizontal='right',vertical='center')
-        c.number_format=fmt; c.border=brd()
     ws_pl.merge_cells(f'A{pl_gr}:F{pl_gr}')
-    for cn,fmt in[(7,'#,##0'),(8,'#,##0.0000'),(9,'#,##0.0000')]:
+    c=ws_pl.cell(row=pl_gr,column=1,value='GRAND TOTAL')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
+    c.fill=PatternFill('solid',fgColor=GOLD)
+    c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
+    for cn,fmt in[(7,'#,##0'),(8,'#,##0.00'),(9,'#,##0.00')]:
         cl=get_column_letter(cn)
-        c=ws_pl.cell(row=pl_gr,column=cn,value=f'={cl}{pl_tr}')
+        c=ws_pl.cell(row=pl_gr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
         c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
         c.fill=PatternFill('solid',fgColor=GOLD)
         c.alignment=Alignment(horizontal='right',vertical='center')
         c.number_format=fmt; c.border=brd()
-    build_footer(ws_pl,pl_gr+2,len(PL_COLS))
+    build_footer(ws_pl,pl_gr+1,len(PL_COLS))
     set_print(ws_pl,f'A1:I{pl_gr}')
 
     buf=io.BytesIO()
