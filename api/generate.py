@@ -369,7 +369,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
     c.fill=PatternFill('solid',fgColor=GOLD)
     c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
-    for cn,fmt in[(7,'#,##0'),(8,'#,##0.00'),(9,'#,##0.00')]:
+    for cn,fmt in[(7,'#,##0'),(8,'#,##0'),(9,'#,##0')]:
         cl=get_column_letter(cn)
         c=ws_pl.cell(row=pl_gr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
         c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
