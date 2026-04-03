@@ -13,7 +13,7 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.properties import PageSetupProperties
 
-# ── SABITLER ──────────────────────────────────────────────────────────────────
+# ── SABITLER ────────────────────────────────────────────────────────────
 DARK_BLUE  = '1F3864'
 MID_BLUE   = '2F5496'
 LIGHT_BLUE = 'D6E4F0'
@@ -95,7 +95,8 @@ def parse_num(v):
     except: return 0.0
 
 def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
-    ham_list = []
+    ham_list   = []
+    miktar_list = []
     for _, row in df.iterrows():
         sku    = str(row.get('SKU','')).strip()
         grup   = str(row.get('ÜRÜN ARA GRUBU','')).strip()
@@ -108,12 +109,43 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
         else:
             kg = parse_num(grup_kilolari.get(grup,0))
         ham_list.append(kg * miktar)
+        miktar_list.append(miktar)
+
     ham_toplam = sum(ham_list)
     if ham_toplam <= 0:
         return [0.0]*len(ham_list), [0.0]*len(ham_list)
+
     carpan    = hedef_brut / ham_toplam
-    brut_list = [h * carpan for h in ham_list]
-    net_list  = [b * 0.9    for b in brut_list]
+    brut_list = [round(h * carpan, 2) for h in ham_list]
+
+    # Yuvarlama farkını miktara orantılı olarak tüm satırlara dağıt
+    brut_farki = round(hedef_brut - sum(brut_list), 2)
+    if brut_farki != 0.0:
+        toplam_miktar = sum(miktar_list)
+        if toplam_miktar > 0:
+            dagilim = [m / toplam_miktar * brut_farki for m in miktar_list]
+            brut_list = [round(b + d, 2) for b, d in zip(brut_list, dagilim)]
+        # İkinci turdan sonra kalan ufak farkı en büyük miktarlı satıra ekle
+        kalan = round(hedef_brut - sum(brut_list), 2)
+        if kalan != 0.0:
+            idx_max = miktar_list.index(max(miktar_list))
+            brut_list[idx_max] = round(brut_list[idx_max] + kalan, 2)
+
+    hedef_net = round(hedef_brut * 0.9, 2)
+    net_list  = [round(b * 0.9, 2) for b in brut_list]
+
+    # Net farkını da aynı şekilde dağıt
+    net_farki = round(hedef_net - sum(net_list), 2)
+    if net_farki != 0.0:
+        toplam_miktar = sum(miktar_list)
+        if toplam_miktar > 0:
+            dagilim = [m / toplam_miktar * net_farki for m in miktar_list]
+            net_list = [round(n + d, 2) for n, d in zip(net_list, dagilim)]
+        kalan = round(hedef_net - sum(net_list), 2)
+        if kalan != 0.0:
+            idx_max = miktar_list.index(max(miktar_list))
+            net_list[idx_max] = round(net_list[idx_max] + kalan, 2)
+
     return brut_list, net_list
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None):
@@ -219,7 +251,6 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_val(7, 'TURKEY')
     info_label(8, 'INCOTERM :')
     info_val(8, 'CIP')
-
 def build_footer(ws, footer_start, col_count):
     for r in range(footer_start, footer_start+3):
         ws.row_dimensions[r].height = 18
@@ -369,7 +400,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
     c.fill=PatternFill('solid',fgColor=GOLD)
     c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
-    for cn,fmt in[(7,'#,##0'),(8,'#,##0'),(9,'#,##0')]:
+    for cn,fmt in[(7,'#,##0'),(8,'#,##0.00'),(9,'#,##0.00')]:
         cl=get_column_letter(cn)
         c=ws_pl.cell(row=pl_gr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
         c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
@@ -384,7 +415,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     buf.seek(0)
     return buf.getvalue(), fatura_no
 
-# ── VERCEL HANDLER ────────────────────────────────────────────────────────────
+# ── VERCEL HANDLER ──────────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
