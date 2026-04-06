@@ -135,7 +135,7 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     net_list  = [b * 0.9    for b in brut_list]
     return brut_list, net_list
 
-def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None):
+def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None):
     last_col = get_column_letter(col_count)
     col_widths = {'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':26,'I':22,'J':13,'K':12,'L':16,'M':9,'N':9,'O':10}
     for col, w in col_widths.items():
@@ -219,7 +219,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_label(4, 'INVOICE NO :')
     info_val(4, fatura_no, bold=True)
     info_label(5, 'PACKAGES :')
-    info_val(5, str(pdf_fields.get('kap','')))
+    info_val(5, str(pdf_fields.get('kap','')) if pdf_fields else '')
 
     ws.merge_cells('A6:G6')
     hdr(ws, 6, 1, 'IMPORTER :', bg=MID_BLUE, align='left')
@@ -303,7 +303,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     # INV
     ws_inv = wb.active
     ws_inv.title = 'INV'
-    build_header(ws_inv,'COMMERCIAL INVOICE',fatura_no,fatura_date,musteri,musteri_adres,len(INV_COLS),logo_bytes)
+    build_header(ws_inv,'COMMERCIAL INVOICE',fatura_no,fatura_date,musteri,musteri_adres,len(INV_COLS),logo_bytes,pdf_fields)
     ws_inv.row_dimensions[DS].height = 35
     for i,(hd,_) in enumerate(INV_COLS):
         hdr(ws_inv,DS,i+1,hd,bg=DARK_BLUE,size=9,align='center')
