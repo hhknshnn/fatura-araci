@@ -128,6 +128,20 @@
     <div class="file-name" id="fileName"></div>
   </div>
 
+  <!-- PDF drop zone — sadece Sırbistan için -->
+  <div class="drop-zone" id="pdfDropZone" style="display:none;margin-top:12px;border-color:#2F5496;">
+    <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
+    <div class="drop-icon">📄</div>
+    <h2>Fatura PDF'ini buraya sürükle</h2>
+    <p>PACKAGES, FREIGHT ve INSURANCE otomatik okunacak</p>
+    <div class="file-name" id="pdfFileName"></div>
+    <div id="pdfFields" style="display:none;margin-top:12px;font-family:'DM Mono',monospace;font-size:12px;text-align:left;padding:0 16px;">
+      <div class="stat">📦 PACKAGES: <span id="pdfKap" style="color:var(--accent);">—</span></div>
+      <div class="stat">🚢 FREIGHT: <span id="pdfNavlun" style="color:var(--accent);">—</span></div>
+      <div class="stat">🛡 INSURANCE: <span id="pdfSigorta" style="color:var(--accent);">—</span></div>
+    </div>
+  </div>
+
   <div class="status-box" id="statusBox"></div>
 
   <!-- KG HESAPLAMA -->
@@ -215,6 +229,7 @@ const SIMPLE_MAPS={
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let currentCountry='kz',currentMode='grouped',lastFileData=null,originalFileName='';
 let processedWB=null,masterRows=null,workingRows=null;
+let lastPdfData=null,pdfFields={navlun:0,sigorta:0,kap:''};
 let groupWeights={},exceptionSkus={};
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
@@ -245,6 +260,7 @@ function setCountry(c){
   ['kz','rs','iq','ge','cy','ru','ba','be'].forEach(k=>{const el=document.getElementById('country-'+k);if(el)el.classList.toggle('active',k===c);});
   document.getElementById('modeSection').style.display=c==='kz'?'block':'none';
   document.getElementById('eurSection').style.display=c==='be'?'block':'none';
+  document.getElementById('pdfDropZone').style.display=c==='rs'?'block':'none';
   if(workingRows)buildAndDownloadReady();
 }
 function setMode(m){
@@ -262,8 +278,28 @@ function onEurRateChanged(){if(currentCountry==='be'&&workingRows)buildAndDownlo
 // ── FILE ──────────────────────────────────────────────────────────────────────
 const dropZone=document.getElementById('dropZone');
 dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
+const pdfDropZone=document.getElementById('pdfDropZone');
+pdfDropZone.addEventListener('dragover',e=>{e.preventDefault();pdfDropZone.classList.add('dragover');});
+pdfDropZone.addEventListener('dragleave',()=>pdfDropZone.classList.remove('dragover'));
+pdfDropZone.addEventListener('drop',e=>{e.preventDefault();pdfDropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handlePdf(e.dataTransfer.files[0]);});
 dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+function handlePdf(file){
+  if(!file||!file.name.endsWith('.pdf'))return;
+  document.getElementById('pdfFileName').textContent='📄 '+file.name;
+  const r=new FileReader();
+  r.onload=e=>{
+    lastPdfData=e.target.result;
+    // PDF içeriğini regex ile parse et (backend'e gitmeden önce önizleme)
+    // Gerçek parse backend'de olacak, burada sadece "yüklendi" göster
+    document.getElementById('pdfFields').style.display='block';
+    document.getElementById('pdfKap').textContent='PDF yüklendi ✓';
+    document.getElementById('pdfNavlun').textContent='Excel indirince okunacak';
+    document.getElementById('pdfSigorta').textContent='Excel indirince okunacak';
+  };
+  r.readAsArrayBuffer(file);
+}
+
 function handleFile(file){if(!file)return;originalFileName=file.name.replace(/\.xlsx?$/,'');document.getElementById('fileName').textContent='📄 '+file.name;const r=new FileReader();r.onload=e=>{lastFileData=e.target.result;loadFile(lastFileData);};r.readAsArrayBuffer(file);}
 function loadFile(data){
   processedWB=null;workingRows=null;masterRows=null;
@@ -449,11 +485,16 @@ async function downloadRS(){
       if(lr.ok){const la=await lr.arrayBuffer();logoB64=arrayBufferToBase64(la);}
     }catch(e){}
     const hedefBrut=workingRows.reduce((s,r)=>s+(r['BRÜT']||0),0);
+    // PDF base64
+    let pdfB64='';
+    if(lastPdfData) pdfB64=arrayBufferToBase64(lastPdfData);
+
     const resp=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         excel:excelB64,logo:logoB64,
+        pdf:pdfB64,
         hedefBrut:hedefBrut,
         grupKilolari:groupWeights,
         exceptionSkus:exceptionSkus,
@@ -469,6 +510,14 @@ async function downloadRS(){
     const a=document.createElement('a');
     a.href=url;a.download=originalFileName+'_INV_PL.xlsx';a.click();
     URL.revokeObjectURL(url);
+    // PDF değerlerini göster
+    if(data.pdfFields){
+      const pf=data.pdfFields;
+      document.getElementById('pdfKap').textContent=pf.kap||'—';
+      document.getElementById('pdfNavlun').textContent=pf.navlun?pf.navlun.toLocaleString('tr-TR',{minimumFractionDigits:2})+' TRY':'—';
+      document.getElementById('pdfSigorta').textContent=pf.sigorta?pf.sigorta.toLocaleString('tr-TR',{minimumFractionDigits:2})+' TRY':'—';
+      document.getElementById('pdfFields').style.display='block';
+    }
     showStatus('success',`<div class="stat">✓ Sırbistan — INV + PL indirildi</div><div class="stat">Fatura No: <span>${data.faturaNo}</span></div>`);
   }catch(err){
     showStatus('error','⚠ '+err.message);

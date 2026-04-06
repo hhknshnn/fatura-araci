@@ -2,7 +2,9 @@ from http.server import BaseHTTPRequestHandler
 import json
 import base64
 import io
+import re
 import traceback
+import pdfplumber
 
 import pandas as pd
 import openpyxl
@@ -13,7 +15,7 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.properties import PageSetupProperties
 
-# ── SABITLER ────────────────────────────────────────────────────────────
+# ── SABITLER ──────────────────────────────────────────────────────────────────
 DARK_BLUE  = '1F3864'
 MID_BLUE   = '2F5496'
 LIGHT_BLUE = 'D6E4F0'
@@ -82,6 +84,23 @@ def dat(ws, r, col, val, bg='FFFFFF', bold=False, align='left', fmt=None):
     if fmt: c.number_format = fmt
     return c
 
+def parse_pdf(pdf_bytes):
+    """PDF'den NAVLUN, SİG, KAP değerlerini çek."""
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            last_page = pdf.pages[-1]
+            text = last_page.extract_text() or ''
+            m = re.search(r'NAVLUN:\s*TRY\s*([\d.,]+)', text)
+            if m: result['navlun'] = float(m.group(1).replace('.','').replace(',','.'))
+            m = re.search(r'S[\u0130I]G\.:\s*TRY\s*([\d.,]+)', text)
+            if m: result['sigorta'] = float(m.group(1).replace('.','').replace(',','.'))
+            m = re.search(r'KAP:\s*(\d+)', text)
+            if m: result['kap'] = m.group(1)
+    except Exception as e:
+        pass
+    return result
+
 def parse_num(v):
     if v is None or v == '': return 0.0
     if isinstance(v, (int, float)):
@@ -95,8 +114,7 @@ def parse_num(v):
     except: return 0.0
 
 def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
-    ham_list   = []
-    miktar_list = []
+    ham_list = []
     for _, row in df.iterrows():
         sku    = str(row.get('SKU','')).strip()
         grup   = str(row.get('ÜRÜN ARA GRUBU','')).strip()
@@ -109,43 +127,12 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
         else:
             kg = parse_num(grup_kilolari.get(grup,0))
         ham_list.append(kg * miktar)
-        miktar_list.append(miktar)
-
     ham_toplam = sum(ham_list)
     if ham_toplam <= 0:
         return [0.0]*len(ham_list), [0.0]*len(ham_list)
-
     carpan    = hedef_brut / ham_toplam
-    brut_list = [round(h * carpan, 2) for h in ham_list]
-
-    # Yuvarlama farkını miktara orantılı olarak tüm satırlara dağıt
-    brut_farki = round(hedef_brut - sum(brut_list), 2)
-    if brut_farki != 0.0:
-        toplam_miktar = sum(miktar_list)
-        if toplam_miktar > 0:
-            dagilim = [m / toplam_miktar * brut_farki for m in miktar_list]
-            brut_list = [round(b + d, 2) for b, d in zip(brut_list, dagilim)]
-        # İkinci turdan sonra kalan ufak farkı en büyük miktarlı satıra ekle
-        kalan = round(hedef_brut - sum(brut_list), 2)
-        if kalan != 0.0:
-            idx_max = miktar_list.index(max(miktar_list))
-            brut_list[idx_max] = round(brut_list[idx_max] + kalan, 2)
-
-    hedef_net = round(hedef_brut * 0.9, 2)
-    net_list  = [round(b * 0.9, 2) for b in brut_list]
-
-    # Net farkını da aynı şekilde dağıt
-    net_farki = round(hedef_net - sum(net_list), 2)
-    if net_farki != 0.0:
-        toplam_miktar = sum(miktar_list)
-        if toplam_miktar > 0:
-            dagilim = [m / toplam_miktar * net_farki for m in miktar_list]
-            net_list = [round(n + d, 2) for n, d in zip(net_list, dagilim)]
-        kalan = round(hedef_net - sum(net_list), 2)
-        if kalan != 0.0:
-            idx_max = miktar_list.index(max(miktar_list))
-            net_list[idx_max] = round(net_list[idx_max] + kalan, 2)
-
+    brut_list = [h * carpan for h in ham_list]
+    net_list  = [b * 0.9    for b in brut_list]
     return brut_list, net_list
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None):
@@ -232,7 +219,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_label(4, 'INVOICE NO :')
     info_val(4, fatura_no, bold=True)
     info_label(5, 'PACKAGES :')
-    info_val(5, '')
+    info_val(5, str(pdf_fields.get('kap','')))
 
     ws.merge_cells('A6:G6')
     hdr(ws, 6, 1, 'IMPORTER :', bg=MID_BLUE, align='left')
@@ -251,6 +238,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_val(7, 'TURKEY')
     info_label(8, 'INCOTERM :')
     info_val(8, 'CIP')
+
 def build_footer(ws, footer_start, col_count):
     for r in range(footer_start, footer_start+3):
         ws.row_dimensions[r].height = 18
@@ -292,7 +280,7 @@ def set_print(ws, print_area):
     ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3)
     ws.print_title_rows = '1:2'
 
-def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
+def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None):
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(
         lambda x: 'PCS' if str(x).strip()=='AD' else x)
     df['GTİP'] = df['GTİP'].apply(
@@ -306,6 +294,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     musteri      = str(df['Müşteri Firma Adı'].iloc[0]).strip()
     musteri_adres= 'Gospodar Jovanova 73, Belgrade'
 
+    if pdf_fields is None: pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     wb = Workbook()
@@ -351,10 +340,10 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     c.number_format=TL_FMT; c.border=brd()
     ws_inv.merge_cells(f'A{fr}:G{fr}')
     dat(ws_inv,fr,H,'FREIGHT',bold=True,align='center')
-    dat(ws_inv,fr,I,0,fmt=TL_FMT,align='right')
+    dat(ws_inv,fr,I,float(pdf_fields.get('navlun',0)),fmt=TL_FMT,align='right')
     ws_inv.merge_cells(f'A{ir}:G{ir}')
     dat(ws_inv,ir,H,'INSURANCE',bold=True,align='center')
-    dat(ws_inv,ir,I,0,fmt=TL_FMT,align='right')
+    dat(ws_inv,ir,I,float(pdf_fields.get('sigorta',0)),fmt=TL_FMT,align='right')
     ws_inv.merge_cells(f'A{gr}:G{gr}')
     c=ws_inv.cell(row=gr,column=H,value='GRAND TOTAL')
     c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
@@ -415,7 +404,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes):
     buf.seek(0)
     return buf.getvalue(), fatura_no
 
-# ── VERCEL HANDLER ──────────────────────────────────────────────────────────
+# ── VERCEL HANDLER ────────────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -436,14 +425,22 @@ class handler(BaseHTTPRequestHandler):
             grup_kilolari = body.get('grupKilolari', {})
             exception_skus= body.get('exceptionSkus', EXCEPTION_SKUS)
 
+            # PDF parse
+            pdf_b64   = body.get('pdf', '')
+            pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
+            if pdf_b64:
+                pdf_bytes_data = base64.b64decode(pdf_b64)
+                pdf_fields = parse_pdf(pdf_bytes_data)
+
             df = pd.read_excel(io.BytesIO(excel_bytes))
             excel_out, fatura_no = generate_excel(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes)
+                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields)
 
             result = json.dumps({
-                'success':  True,
-                'excel':    base64.b64encode(excel_out).decode('utf-8'),
-                'faturaNo': fatura_no,
+                'success':   True,
+                'excel':     base64.b64encode(excel_out).decode('utf-8'),
+                'faturaNo':  fatura_no,
+                'pdfFields': pdf_fields,
             })
             self.send_response(200)
             self.send_header('Content-Type','application/json')
