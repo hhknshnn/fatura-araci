@@ -262,35 +262,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_val(8, 'CIP')
 
 def build_footer(ws, footer_start, col_count):
-    for r in range(footer_start, footer_start+3):
-        ws.row_dimensions[r].height = 18
-
-    # Her zaman A:I birleştir, J ve sonrası beyaz
-    for r in range(footer_start, footer_start+3):
-        for col_idx in range(10, col_count+1):
-            ws.cell(row=r, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
-
-    ws.merge_cells(f'A{footer_start}:I{footer_start}')
-    c = ws.cell(row=footer_start, column=1)
-    c.value = 'DEHA MAGAZACILIK EV TEKSTILI URUNLERI SAN. VE TIC. A.S.'
-    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=9)
-    c.fill = PatternFill('solid', fgColor=DARK_BLUE)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = brd()
-    ws.merge_cells(f'A{footer_start+1}:I{footer_start+1}')
-    c = ws.cell(row=footer_start+1, column=1)
-    c.value = 'Mecidiyeköy Mah. Oğuz Sok Rönesans Biz İş Merkezi No:4/14 K:4 34387 Şişli/İstanbul'
-    c.font = Font(name='Arial', color='000000', size=8)
-    c.fill = PatternFill('solid', fgColor=LIGHT_BLUE)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = brd()
-    ws.merge_cells(f'A{footer_start+2}:I{footer_start+2}')
-    c = ws.cell(row=footer_start+2, column=1)
-    c.value = 'Tel: +90 212 000 00 00  |  E-mail: info@deha.com.tr  |  www.deha.com.tr'
-    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=8)
-    c.fill = PatternFill('solid', fgColor=MID_BLUE)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = brd()
+    pass  # Footer kaldırıldı
 
 def set_print(ws, print_area):
     ws.print_area = print_area
