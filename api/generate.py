@@ -145,7 +145,17 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
             # Son satır: hedeften önceki toplamı çıkar
             brut_list.append(round(hedef_brut - toplam_yuvarlanmis, 2))
 
-    net_list = [round(b * 0.9, 2) for b in brut_list]
+    # Serbest Depo: NET = BRÜT * 0.9, son satıra kalan fark verilir
+    hedef_net_serbest = round(hedef_brut * 0.9, 2)
+    net_list = []
+    toplam_net = 0.0
+    for i, b in enumerate(brut_list):
+        if i < len(brut_list) - 1:
+            val = round(b * 0.9, 2)
+            net_list.append(val)
+            toplam_net += val
+        else:
+            net_list.append(round(hedef_net_serbest - toplam_net, 2))
     return brut_list, net_list
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None):
@@ -387,7 +397,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     ws_pl=wb.create_sheet('PL')
     pl_widths={'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':14,'I':14}
     for col,w in pl_widths.items(): ws_pl.column_dimensions[col].width=w
-    build_header(ws_pl,'PACKING LIST',fatura_no,fatura_date,musteri,musteri_adres,len(PL_COLS),logo_bytes)
+    build_header(ws_pl,'PACKING LIST',fatura_no,fatura_date,musteri,musteri_adres,len(PL_COLS),logo_bytes,pdf_fields)
     ws_pl.row_dimensions[DS].height=35
     for i,(hd,_) in enumerate(PL_COLS):
         hdr(ws_pl,DS,i+1,hd,bg=DARK_BLUE,size=9,align='center')
