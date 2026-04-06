@@ -130,9 +130,22 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     ham_toplam = sum(ham_list)
     if ham_toplam <= 0:
         return [0.0]*len(ham_list), [0.0]*len(ham_list)
-    carpan    = hedef_brut / ham_toplam
-    brut_list = [h * carpan for h in ham_list]
-    net_list  = [b * 0.9    for b in brut_list]
+    carpan = hedef_brut / ham_toplam
+
+    # Orantılı dağıtım: ilk N-1 satır yuvarlanır, son satıra kalan fark verilir
+    # Bu sayede toplam tam olarak hedef_brut'a eşit olur
+    brut_list = []
+    toplam_yuvarlanmis = 0.0
+    for i, h in enumerate(ham_list):
+        if i < len(ham_list) - 1:
+            val = round(h * carpan, 2)
+            brut_list.append(val)
+            toplam_yuvarlanmis += val
+        else:
+            # Son satır: hedeften önceki toplamı çıkar
+            brut_list.append(round(hedef_brut - toplam_yuvarlanmis, 2))
+
+    net_list = [round(b * 0.9, 2) for b in brut_list]
     return brut_list, net_list
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None):
@@ -296,11 +309,19 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     if pdf_fields is None: pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
-    # Antrepo: hedef NET girilmişse orantılı dağıt
+    # Antrepo: hedef NET girilmişse orantılı dağıt (son satıra kalan fark verilir)
     if depo_tipi == 'antrepo' and hedef_net > 0:
         toplam_brut = sum(brut_list)
         if toplam_brut > 0:
-            net_list = [(b / toplam_brut) * hedef_net for b in brut_list]
+            net_list = []
+            toplam_yuvarlanmis_net = 0.0
+            for i, b in enumerate(brut_list):
+                if i < len(brut_list) - 1:
+                    val = round((b / toplam_brut) * hedef_net, 2)
+                    net_list.append(val)
+                    toplam_yuvarlanmis_net += val
+                else:
+                    net_list.append(round(hedef_net - toplam_yuvarlanmis_net, 2))
 
     wb = Workbook()
     DS = 9  # DATA_START
