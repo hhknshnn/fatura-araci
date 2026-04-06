@@ -392,8 +392,11 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     last_pl=DS+len(df)
     pl_gr=last_pl+1  # Sadece GRAND TOTAL, mavi satır yok
     ws_pl.row_dimensions[pl_gr].height=28
-    ws_pl.merge_cells(f'A{pl_gr}:F{pl_gr}')
-    c=ws_pl.cell(row=pl_gr,column=1,value='GRAND TOTAL')
+    # A-D boş bırak, E-F birleştir GRAND TOTAL yazısı için
+    for col_idx in range(1, 5):
+        ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+    ws_pl.merge_cells(f'E{pl_gr}:F{pl_gr}')
+    c=ws_pl.cell(row=pl_gr,column=5,value='GRAND TOTAL')
     c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
     c.fill=PatternFill('solid',fgColor=GOLD)
     c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
