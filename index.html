@@ -5,539 +5,755 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fatura Aracı</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
-  :root{--bg:#0f0f0f;--surface:#1a1a1a;--surface2:#222;--border:#2a2a2a;--accent:#00e5a0;--accent-dim:rgba(0,229,160,0.07);--text:#f0f0f0;--muted:#666;--error:#ff5555;}
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 24px;}
-  .container{width:100%;max-width:720px;}
-  .header{margin-bottom:36px;}
-  .header h1{font-size:30px;font-weight:800;letter-spacing:-0.5px;}
-  .header h1 span{color:var(--accent);}
-  .header p{margin-top:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;}
-  .section-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
-  .country-section{margin-bottom:24px;}
-  .country-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
-  .country-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all 0.15s;user-select:none;text-align:center;}
-  .country-btn:hover{border-color:#444;}
-  .country-btn.active{border-color:var(--accent);background:var(--accent-dim);}
-  .country-flag{font-size:26px;}
-  .country-name{font-size:12px;font-weight:700;}
-  .country-btn.active .country-name{color:var(--accent);}
-  .country-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
-  .mode-section{margin-bottom:24px;}
-  .mode-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .mode-btn{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all 0.15s;user-select:none;}
-  .mode-btn:hover{border-color:#444;}
-  .mode-btn.active{border-color:var(--accent);background:var(--accent-dim);}
-  .mode-icon{font-size:22px;flex-shrink:0;}
-  .mode-title{font-size:13px;font-weight:700;margin-bottom:3px;}
-  .mode-btn.active .mode-title{color:var(--accent);}
-  .mode-desc{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.4;}
-  .drop-zone{border:2px dashed var(--border);border-radius:16px;padding:44px 32px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface);position:relative;margin-bottom:16px;}
-  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:var(--accent-dim);}
-  .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-  .drop-icon{font-size:40px;margin-bottom:12px;}
-  .drop-zone h2{font-size:16px;font-weight:700;margin-bottom:5px;}
-  .drop-zone p{color:var(--muted);font-size:13px;font-family:'DM Mono',monospace;}
-  .file-name{margin-top:10px;color:var(--accent);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;}
-  .status-box{padding:14px 18px;border-radius:10px;border:1px solid var(--border);background:var(--surface);font-family:'DM Mono',monospace;font-size:13px;line-height:1.9;display:none;margin-bottom:14px;}
-  .status-box.visible{display:block;}
-  .status-box.error{border-color:var(--error);color:var(--error);}
-  .status-box.success{border-color:var(--accent);}
-  .stat{color:var(--muted);}
-  .stat span{color:var(--accent);font-weight:600;}
-  .btn{width:100%;padding:15px;border-radius:10px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.15s;display:none;margin-bottom:36px;}
-  .btn:hover{background:#00c888;transform:translateY(-1px);}
-  .btn.visible{display:block;}
-  .kg-section{border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;display:none;}
-  .kg-table{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12px;margin-bottom:16px;}
-  .kg-table th{text-align:left;padding:8px 12px;background:var(--surface2);color:var(--muted);border-bottom:1px solid var(--border);}
-  .kg-table td{padding:8px 12px;border-bottom:1px solid #1f1f1f;}
-  .kg-input{width:100px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;}
-  .kg-input:focus{border-color:var(--accent);}
-  .apply-btn{padding:10px 20px;border-radius:8px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
-  .apply-btn:hover{background:#00c888;}
-  .adjust-section{display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;}
-  .target-input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;}
-  .target-input:focus{border-color:var(--accent);}
-
-
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<div class="app">
 
-<div class="container">
-  <div class="header">
-    <h1>Fatura <span>Aracı</span></h1>
-    <p>Master fatura Excel'ini yükle → Ülkeyi seç → İndir</p>
-  </div>
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="app-logo">📋</div>
+    <div class="app-title">Fatura <span>Aracı</span></div>
+    <div class="app-version">v2.0</div>
+  </header>
 
-  <div class="country-section">
-    <div class="section-label">Ülke Seç</div>
-    <div class="country-grid">
-      <div class="country-btn active" id="country-kz" onclick="setCountry('kz')">
-        <div class="country-flag">🇰🇿</div><div class="country-name">Kazakistan</div><div class="country-sub">17 sütun · gruplu</div>
-      </div>
-      <div class="country-btn" id="country-rs" onclick="setCountry('rs')">
-        <div class="country-flag">🇷🇸</div><div class="country-name">Sırbistan</div><div class="country-sub">12 sütun</div>
-      </div>
-      <div class="country-btn" id="country-iq" onclick="setCountry('iq')">
-        <div class="country-flag">🇮🇶</div><div class="country-name">Irak</div><div class="country-sub">9 sütun</div>
-      </div>
-      <div class="country-btn" id="country-ge" onclick="setCountry('ge')">
-        <div class="country-flag">🇬🇪</div><div class="country-name">Gürcistan</div><div class="country-sub">12 sütun</div>
-      </div>
-      <div class="country-btn" id="country-cy" onclick="setCountry('cy')">
-        <div class="country-flag">🇨🇾</div><div class="country-name">KKTC</div><div class="country-sub">Kıbrıs · 8 sütun</div>
-      </div>
-      <div class="country-btn" id="country-ru" onclick="setCountry('ru')">
-        <div class="country-flag">🇷🇺</div><div class="country-name">Rusya</div><div class="country-sub">20 sütun</div>
-      </div>
-      <div class="country-btn" id="country-ba" onclick="setCountry('ba')">
-        <div class="country-flag">🇧🇦</div><div class="country-name">Bosna</div><div class="country-sub">12 sütun</div>
-      </div>
-      <div class="country-btn" id="country-be" onclick="setCountry('be')">
-        <div class="country-flag">🇧🇪</div><div class="country-name">Belçika</div><div class="country-sub">11 sütun · EUR</div>
-      </div>
-      <div class="country-btn" style="opacity:0.4;cursor:not-allowed;">
-        <div class="country-flag">🌍</div><div class="country-name">Diğer Ülke</div><div class="country-sub">Yakında</div>
-      </div>
+  <!-- WIZARD STEPS -->
+  <div class="wizard-steps" id="wizardSteps">
+    <div class="step-item">
+      <div class="step-dot active" id="dot1">1</div>
+    </div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-item">
+      <div class="step-dot" id="dot2">2</div>
+    </div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-item">
+      <div class="step-dot" id="dot3">3</div>
+    </div>
+    <div class="step-line" id="line3"></div>
+    <div class="step-item">
+      <div class="step-dot" id="dot4">4</div>
+    </div>
+    <div class="step-line" id="line4"></div>
+    <div class="step-item">
+      <div class="step-dot" id="dot5">5</div>
     </div>
   </div>
 
-  <div class="mode-section" id="modeSection">
-    <div class="section-label">Çıktı Türü</div>
-    <div class="mode-options">
-      <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
-        <div class="mode-icon">🗜️</div>
-        <div><div class="mode-title">SKU'ya Göre Gruplandır</div><div class="mode-desc">Tekrar eden satırlar birleştirilir, miktar toplanır</div></div>
+  <!-- ── ADIM 1: MOD SEÇ ─────────────────────────────────────────────────── -->
+  <div class="panel" id="step1">
+    <div class="panel-label">Adım 1</div>
+    <div class="panel-title">İşlem Türü</div>
+    <div class="panel-desc">Hangi aşamada olduğunuzu seçin.</div>
+    <div class="choice-grid">
+      <div class="choice-card" id="card-oncesi" onclick="selectMod('oncesi')">
+        <span class="choice-icon">🔍</span>
+        <div class="choice-name">Fatura Öncesi</div>
+        <div class="choice-desc">Menşe ayrımı hesaplama</div>
       </div>
-      <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
-        <div class="mode-icon">📋</div>
-        <div><div class="mode-title">Gruplandırma Yapma</div><div class="mode-desc">Sadece sütunlar seçilir, satırlar olduğu gibi kalır</div></div>
+      <div class="choice-card" id="card-sonrasi" onclick="selectMod('sonrasi')">
+        <span class="choice-icon">📤</span>
+        <div class="choice-name">Fatura Sonrası</div>
+        <div class="choice-desc">INV + PL Excel çıktısı</div>
       </div>
+    </div>
+    <div class="nav-row">
+      <div></div>
+      <button class="btn-secondary" id="step1Next" onclick="goStep(2)" style="display:none;">Devam →</button>
     </div>
   </div>
 
-  <div class="drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
-    <div class="drop-icon">📂</div>
-    <h2>Master Excel dosyasını buraya sürükle</h2>
-    <p>Revize master dosyayı yükle</p>
-    <div class="file-name" id="fileName"></div>
+  <!-- ── ADIM 2: DEPO TİPİ (sadece Fatura Sonrası) ──────────────────────── -->
+  <div class="panel" id="step2" style="display:none;">
+    <div class="panel-label">Adım 2</div>
+    <div class="panel-title" id="step2Title">Depo Tipi</div>
+    <div class="panel-desc" id="step2Desc">Sevkiyat depo tipini seçin.</div>
+    <div class="mode-options" id="step2Options">
+      <div class="mode-btn" id="mode-serbest" onclick="selectDepo('serbest')">
+        <div class="mode-icon">🏭</div>
+        <div>
+          <div class="mode-title">Serbest Depo</div>
+          <div class="mode-desc">NET = BRÜT × 0.9</div>
+        </div>
+      </div>
+      <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
+        <div class="mode-icon">🏗️</div>
+        <div>
+          <div class="mode-title">Antrepo</div>
+          <div class="mode-desc">Hedef NET ayrıca girilir</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
+      <button class="btn-secondary" id="step2Next" onclick="goStep(3)" style="display:none;">Devam →</button>
+    </div>
   </div>
 
-  <!-- PDF drop zone — sadece Sırbistan için -->
-  <div class="drop-zone" id="pdfDropZone" style="display:none;margin-top:12px;border-color:#2F5496;">
-    <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
-    <div class="drop-icon">📄</div>
-    <h2>Fatura PDF'ini buraya sürükle</h2>
-    <p>PACKAGES, FREIGHT ve INSURANCE otomatik okunacak</p>
-    <div class="file-name" id="pdfFileName"></div>
-    <div id="pdfFields" style="display:none;margin-top:12px;font-family:'DM Mono',monospace;font-size:12px;text-align:left;padding:0 16px;">
-      <div class="stat">📦 PACKAGES: <span id="pdfKap" style="color:var(--accent);">—</span></div>
-      <div class="stat">🚢 FREIGHT: <span id="pdfNavlun" style="color:var(--accent);">—</span></div>
-      <div class="stat">🛡 INSURANCE: <span id="pdfSigorta" style="color:var(--accent);">—</span></div>
+  <!-- ── ADIM 3: ÜLKE (sadece Fatura Sonrası) ───────────────────────────── -->
+  <div class="panel" id="step3" style="display:none;">
+    <div class="panel-label">Adım 3</div>
+    <div class="panel-title">Ülke Seç</div>
+    <div class="panel-desc">Hedef ülkeyi seçin.</div>
+    <div class="country-grid" id="countryGrid">
+      <div class="country-btn" id="country-rs" onclick="selectCountry('rs')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/rs.png"></div>
+        <div class="country-name">Sırbistan</div>
+        <div class="country-sub">INV + PL</div>
+      </div>
+      <div class="country-btn" id="country-kz" onclick="selectCountry('kz')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/kz.png"></div>
+        <div class="country-name">Kazakistan</div>
+        <div class="country-sub">17 sütun</div>
+      </div>
+      <div class="country-btn" id="country-iq" onclick="selectCountry('iq')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/iq.png"></div>
+        <div class="country-name">Irak</div>
+        <div class="country-sub">9 sütun</div>
+      </div>
+      <div class="country-btn" id="country-ge" onclick="selectCountry('ge')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/ge.png"></div>
+        <div class="country-name">Gürcistan</div>
+        <div class="country-sub">12 sütun</div>
+      </div>
+      <div class="country-btn" id="country-cy" onclick="selectCountry('cy')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/cy.png"></div>
+        <div class="country-name">KKTC</div>
+        <div class="country-sub">8 sütun</div>
+      </div>
+      <div class="country-btn" id="country-ru" onclick="selectCountry('ru')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/ru.png"></div>
+        <div class="country-name">Rusya</div>
+        <div class="country-sub">20 sütun</div>
+      </div>
+      <div class="country-btn" id="country-ba" onclick="selectCountry('ba')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/ba.png"></div>
+        <div class="country-name">Bosna</div>
+        <div class="country-sub">12 sütun</div>
+      </div>
+      <div class="country-btn" id="country-be" onclick="selectCountry('be')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/be.png"></div>
+        <div class="country-name">Belçika</div>
+        <div class="country-sub">EUR</div>
+      </div>
     </div>
-  </div>
 
-  <div class="status-box" id="statusBox"></div>
-
-  <!-- KG HESAPLAMA -->
-  <div class="kg-section" id="kgSection">
-    <div onclick="toggleKgTable()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
-      <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:0;">⚖️ Kilo Hesaplama (BRÜT / NET)</h3>
-      <span id="kgTableArrow" style="font-size:14px;color:var(--accent);">▼</span>
-    </div>
-    <div id="kgTableBody" style="display:none;margin-top:14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">
-        Her ÜRÜN ARA GRUBU için birim kilo girin (AG sütunu 0/boş olan satırlara uygulanır):
-      </div>
-      <table class="kg-table" id="kgTable">
-        <tr><th>ÜRÜN ARA GRUBU</th><th>Birim Kilo (KG)</th><th>0/Boş satır sayısı</th></tr>
-      </table>
-    </div>
-    <div id="savedKgSection" style="display:none;margin-top:12px;">
-      <div onclick="toggleSavedKg()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 12px;background:var(--surface2);border-radius:8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);user-select:none;">
-        <span>📦 AG sütunu dolu gruplar</span>
-        <span id="savedKgArrow">▼</span>
-      </div>
-      <div id="savedKgBody" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;">
-        <div id="savedKgTable"></div>
-      </div>
-    </div>
-    <button class="apply-btn" onclick="applyGroupWeights()" style="margin-top:16px;">✓ Kiloları Uygula ve Hesapla</button>
-    <div class="adjust-section" id="adjustSection">
-      <div class="stat" style="margin-bottom:12px;">Hesaplanan Toplam BRÜT: <span id="calcTotal">—</span> kg</div>
-      <div style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;margin-bottom:8px;">Olması gereken toplam BRÜT (kg):</div>
+    <!-- EUR kur (sadece Belçika) -->
+    <div class="eur-section" id="eurSection">
+      <div class="eur-label">Euro Kur (TRY/EUR)</div>
       <div style="display:flex;gap:10px;align-items:center;">
-        <input class="target-input" id="targetWeight" type="text" inputmode="decimal" placeholder="örn: 8870,00">
-        <button class="apply-btn" onclick="applyWeightAdjust()">Uygula</button>
+        <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
+          placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
       </div>
-      <div id="adjustResult" style="margin-top:12px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);display:none;"></div>
+    </div>
+
+    <!-- KZ gruplandırma modu -->
+    <div class="eur-section" id="kzModeSection">
+      <div class="eur-label">Çıktı Türü</div>
+      <div class="mode-options">
+        <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
+          <div class="mode-icon">🗜️</div>
+          <div>
+            <div class="mode-title">Gruplandır</div>
+            <div class="mode-desc">SKU bazında birleştir</div>
+          </div>
+        </div>
+        <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
+          <div class="mode-icon">📋</div>
+          <div>
+            <div class="mode-title">Gruplandırma</div>
+            <div class="mode-desc">Tüm satırlar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goStep(2)">← Geri</button>
+      <button class="btn-secondary" id="step3Next" onclick="goStep(4)" style="display:none;">Devam →</button>
     </div>
   </div>
 
-  <!-- EUR KUR -->
-  <div id="eurSection" style="display:none;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
-    <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;">💱 Euro Kur Bilgisi</h3>
-    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:12px;">Fiyat sütunu bu kura bölünür → UNIT PRICE EUR hesaplanır</div>
-    <div style="display:flex;gap:10px;align-items:center;">
-      <input id="eurRateInput" type="text" inputmode="decimal" placeholder="örn: 36,50"
-        oninput="onEurRateChanged()"
-        style="width:160px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;">
-      <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">TRY / EUR</span>
+  <!-- ── ADIM 4: DOSYA YÜKLE ─────────────────────────────────────────────── -->
+  <div class="panel" id="step4" style="display:none;">
+    <div class="panel-label">Adım 4</div>
+    <div class="panel-title" id="step4Title">Dosya Yükle</div>
+    <div class="panel-desc" id="step4Desc">Master Excel dosyasını yükleyin.</div>
+
+    <!-- Excel Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">📊</div>
+      <h3>Master Excel</h3>
+      <p>xlsx veya xls formatında</p>
+      <div class="file-badge" id="fileName" style="display:none;"></div>
+    </div>
+
+    <!-- PDF Drop Zone (sadece Fatura Sonrası) -->
+    <div class="drop-zone" id="pdfDropZone" style="display:none;border-color:#1E3A5F;">
+      <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
+      <div class="drop-icon">📄</div>
+      <h3>Fatura PDF</h3>
+      <p>PACKAGES, FREIGHT, INSURANCE otomatik okunur</p>
+      <div class="file-badge" id="pdfFileName" style="display:none;"></div>
+    </div>
+
+    <!-- PDF Değerleri -->
+    <div class="pdf-info" id="pdfInfo">
+      <div class="pdf-row">
+        <span class="pdf-key">📦 PACKAGES</span>
+        <span class="pdf-val" id="pdfKap">—</span>
+      </div>
+      <div class="pdf-row">
+        <span class="pdf-key">🚢 FREIGHT</span>
+        <span class="pdf-val" id="pdfNavlun">—</span>
+      </div>
+      <div class="pdf-row">
+        <span class="pdf-key">🛡 INSURANCE</span>
+        <span class="pdf-val" id="pdfSigorta">—</span>
+      </div>
+    </div>
+
+    <div class="nav-row" style="margin-top:16px;">
+      <button class="btn-ghost" id="step4Back" onclick="goStep(3)">← Geri</button>
+      <button class="btn-secondary" id="step4Next" onclick="goStep(5)" style="display:none;">Devam →</button>
     </div>
   </div>
 
-  <!-- İSTİSNA SKU -->
-  <div style="border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">
-    <div onclick="toggleExSku()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
-      <h3 style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:0;">⚠️ İstisna SKU Listesi</h3>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">AG değeri ne olursa olsun bu kilolar kullanılır</span>
-        <span id="exSkuArrow" style="font-size:14px;color:var(--accent);">▼</span>
+  <!-- ── ADIM 5: KG HESAPLAMA ────────────────────────────────────────────── -->
+  <div class="panel" id="step5" style="display:none;">
+    <div class="panel-label">Adım 5</div>
+    <div class="panel-title">Kilo Hesaplama</div>
+    <div class="panel-desc">BRÜT/NET kilolarını hesaplayın.</div>
+
+    <!-- Durum mesajı -->
+    <div class="status-box" id="statusBox"></div>
+
+    <!-- KG Tablosu (boş olanlar) -->
+    <div class="kg-panel" id="kgPanel" style="display:none;">
+      <div class="kg-header" onclick="toggleKgTable()">
+        <div class="kg-header-title">
+          ⚖️ Grup Kiloları
+          <span class="kg-header-badge" id="kgBadge"></span>
+        </div>
+        <span id="kgArrow" style="color:var(--accent2);font-size:12px;">▼</span>
+      </div>
+      <div class="kg-body" id="kgBody">
+        <table class="kg-table" id="kgTable">
+          <tr>
+            <th>ÜRÜN ARA GRUBU</th>
+            <th>Birim Kilo (KG)</th>
+            <th style="color:#F59E0B;">0/Boş satır</th>
+          </tr>
+        </table>
       </div>
     </div>
-    <div id="exSkuBody" style="display:none;margin-top:14px;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <input id="newExSku" placeholder="SKU" style="flex:2;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
-        <input id="newExKg" type="text" inputmode="decimal" placeholder="kg" style="width:80px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
-        <button onclick="addExceptionSku()" id="addSkuBtn" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Ekle</button>
+
+    <!-- İstisna SKU -->
+    <div class="sku-panel" id="skuPanel">
+      <div class="sku-header" onclick="toggleExSku()">
+        <div class="kg-header-title" style="font-size:12px;">⚠️ İstisna SKU Listesi</div>
+        <span id="skuArrow" style="color:var(--accent2);font-size:12px;">▼</span>
       </div>
-      <div id="exSkuList" style="max-height:200px;overflow-y:auto;"></div>
+      <div class="sku-body" id="skuBody">
+        <div class="sku-input-row">
+          <input class="sku-input" id="newExSku" placeholder="SKU kodu">
+          <input class="sku-kg-input" id="newExKg" type="text" inputmode="decimal" placeholder="kg">
+          <button class="btn-secondary" onclick="addExceptionSku()" style="padding:8px 14px;font-size:12px;">Ekle</button>
+        </div>
+        <div class="sku-list" id="exSkuList"></div>
+      </div>
     </div>
+
+    <!-- Kiloları Uygula -->
+    <button class="btn-secondary" onclick="applyGroupWeights()" style="width:100%;margin-bottom:12px;">
+      ✓ Kiloları Uygula ve Hesapla
+    </button>
+
+    <!-- Hedef KG -->
+    <div id="adjustSection" style="display:none;">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:8px;">
+        Hesaplanan toplam BRÜT: <span id="calcTotal" style="color:var(--accent2);">—</span> kg
+      </div>
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;">Hedef BRÜT (kg)</div>
+      <div class="target-row">
+        <input class="target-input" id="targetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
+        <button class="btn-secondary" onclick="applyWeightAdjust()">Uygula</button>
+      </div>
+      <div class="adjust-result" id="adjustResult"></div>
+    </div>
+
+    <!-- Antrepo: Hedef NET -->
+    <div id="antrepoSection" style="display:none;margin-top:14px;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;">Hedef NET (kg)</div>
+      <div class="target-row">
+        <input class="target-input" id="targetNet" type="text" inputmode="decimal" placeholder="örn: 7650,00">
+        <button class="btn-secondary" onclick="applyNetAdjust()">Uygula</button>
+      </div>
+      <div class="adjust-result" id="netResult"></div>
+    </div>
+
+    <!-- Menşe Ayrımı (Fatura Öncesi) -->
+    <div class="mense-box" id="menseBox">
+      <div class="mense-row">
+        <div>
+          <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
+          <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="mense-val" id="menseTrBrut">— kg</div>
+          <div class="mense-sub" id="menseTrNet">NET: —</div>
+        </div>
+      </div>
+      <div class="mense-row">
+        <div>
+          <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
+          <div class="mense-sub">Diğer tüm menşeler</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="mense-val" id="menseOtherBrut">— kg</div>
+          <div class="mense-sub" id="menseOtherNet">NET: —</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-row" style="margin-top:16px;">
+      <button class="btn-ghost" onclick="goStep(4)">← Geri</button>
+    </div>
+
+    <!-- İndir butonu -->
+    <button class="btn-primary" id="downloadBtn" onclick="downloadResult()">
+      ⬇ INV + PL İndir
+    </button>
   </div>
 
-  <button class="btn" id="downloadBtn" onclick="downloadResult()">⬇ İşlenmiş Dosyayı İndir</button>
 </div>
 
+<script src="js/countries.js"></script>
+<script src="js/processor.js"></script>
+<script src="js/sku.js"></script>
+<script src="js/app.js"></script>
 <script>
-const COUNTRIES={kz:{label:'Kazakistan',suffix:'_kazakistan'},rs:{label:'Sırbistan',suffix:'_sirbistan'},iq:{label:'Irak',suffix:'_irak'},ge:{label:'Gürcistan',suffix:'_gurcistan'},cy:{label:'KKTC',suffix:'_kktc'},ru:{label:'Rusya',suffix:'_rusya'},ba:{label:'Bosna',suffix:'_bosna'},be:{label:'Belçika',suffix:'_belcika'}};
-const KZ_COLS=['E-Fatura Seri Numarası','Madde Kodu','MENŞEİ -EN','MENŞEİ -RU','Asorti Barkodu','SKU','Renk Açıkmalası EN','GTİP','ALT GRUBU -EN','Ürün Açıklaması EN','Ürün Açıklaması RU','Miktar','Fiyat','MATERYAL -EN','MATERYAL -RU','ALT GRUBU Açıklama','EBAT Açıklama','BRÜT','NET'];
-const RS_INV=[{out:'COUNTRY OF ORIGIN',src:'MENŞEİ -EN'},{out:'MASTER ITEM CODE',src:'Asorti Barkodu'},{out:'ITEM CODE',src:'SKU'},{out:'ITEM DESCRIPTION',src:'ALT GRUBU -EN'},{out:'ITEM NAME',src:'Ürün Açıklaması EN'},{out:'UNIT',src:'Birim Cinsi (1)'},{out:'QTY',src:'Miktar'},{out:'UNIT PRICE',src:'Fiyat'},{out:'TOTAL AMOUNT TRY',src:'__CALC__'},{out:'HS CODE',src:'GTİP'},{out:'MATERIAL',src:'MATERYAL -EN'},{out:'ITEM NAME-Serb',src:'Ürün Açıklaması XS'},{out:'COLOR SERB',src:'Renk Açıkmalası XS'},{out:'MATERIAL SERB',src:'MATERYAL -XS'},{out:'DIMENSION',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}];
-const SIMPLE_MAPS={
-  iq:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'SKU',src:'SKU'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Madde Açıklaması',src:'Madde Açıklaması'},{out:'Miktar',src:'Miktar'},{out:'Fiyat',src:'Fiyat'},{out:'Miktar X Fiyat',src:'__CALC__'},{out:'GTİP',src:'GTİP'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-  ge:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'GTİP',src:'GTİP'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Miktar',src:'Miktar'},{out:'Fiyat',src:'Fiyat'},{out:'Miktar X Fiyat',src:'__CALC__'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Barkod',src:'Barkod'},{out:'MATERYAL -EN',src:'MATERYAL -EN'},{out:'EBAT Açıklama',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-  cy:[{out:'MENŞEİ Açıklama',src:'MENŞEİ Açıklama'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'ALT GRUBU Açıklama',src:'ALT GRUBU Açıklama'},{out:'Madde Açıklaması',src:'Madde Açıklaması'},{out:'Miktar',src:'Miktar'},{out:'ÜRÜN ANA GRUBU',src:'ÜRÜN ANA GRUBU'},{out:'E-Fatura Seri Numarası',src:'E-Fatura Seri Numarası'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-  ru:[{out:'E-Fatura Seri Numarası',src:'E-Fatura Seri Numarası'},{out:'Madde Kodu',src:'Madde Kodu'},{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'MENŞEİ -RU',src:'MENŞEİ -RU'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'Barkod',src:'Barkod'},{out:'Renk Açıkmalası EN',src:'Renk Açıkmalası EN'},{out:'GTİP',src:'GTİP'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'ALT GRUBU -RU',src:'ALT GRUBU -RU'},{out:'Ürün Açıklaması RU',src:'Ürün Açıklaması RU'},{out:'Miktar',src:'Miktar'},{out:'Fiyat',src:'Fiyat'},{out:'Net Tutar (D)',src:'Net Tutar (D)'},{out:'MATERYAL -EN',src:'MATERYAL -EN'},{out:'MATERYAL -RU',src:'MATERYAL -RU'},{out:'ALT GRUBU Açıklama',src:'ALT GRUBU Açıklama'},{out:'EBAT Açıklama',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-  ba:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Miktar',src:'Miktar'},{out:'Fiyat (D)',src:'Fiyat (D)'},{out:'Net Tutar (D)',src:'Net Tutar (D)'},{out:'GTİP',src:'GTİP'},{out:'MATERYAL -EN',src:'MATERYAL -EN'},{out:'Renk Açıkmalası EN',src:'Renk Açıkmalası EN'},{out:'EBAT Açıklama',src:'EBAT Açıklama'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-  be:[{out:'MENŞEİ -EN',src:'MENŞEİ -EN'},{out:'E-Fatura Seri Numarası',src:'E-Fatura Seri Numarası'},{out:'Asorti Barkodu',src:'Asorti Barkodu'},{out:'SKU',src:'SKU'},{out:'ALT GRUBU -EN',src:'ALT GRUBU -EN'},{out:'Ürün Açıklaması EN',src:'Ürün Açıklaması EN'},{out:'Miktar',src:'Miktar'},{out:'UNIT PRICE EUR',src:'__EUR__'},{out:'TOTAL AMOUNT EUR',src:'__EUR_TOTAL__'},{out:'GTİP',src:'GTİP'},{out:'MATERYAL -EN',src:'MATERYAL -EN'},{out:'BRÜT',src:'BRÜT'},{out:'NET',src:'NET'}],
-};
+// ── WIZARD STATE ─────────────────────────────────────────────────────────────
+let currentStep = 1;
+let selectedMod = null;       // 'oncesi' | 'sonrasi'
+let selectedDepo = null;      // 'serbest' | 'antrepo'
+let currentCountry = null;
+let currentMode = 'grouped';  // KZ için
+let lastFileData = null;
+let lastPdfData = null;
+let originalFileName = '';
+let masterRows = null;
+let workingRows = null;
+let processedWB = null;
+let groupWeights = {};
+let exceptionSkus = {};
+let pdfFieldsData = {};
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
-let currentCountry='kz',currentMode='grouped',lastFileData=null,originalFileName='';
-let processedWB=null,masterRows=null,workingRows=null;
-let lastPdfData=null,pdfFields={navlun:0,sigorta:0,kap:''};
-let groupWeights={},exceptionSkus={};
+// ── WIZARD NAV ────────────────────────────────────────────────────────────────
+function goStep(n) {
+  // Adımları göster/gizle
+  for(let i=1;i<=5;i++){
+    const el=document.getElementById('step'+i);
+    if(el) el.style.display = (i===n) ? 'block' : 'none';
+  }
 
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-async function loadSharedConfig() {
-  try {
-    const res=await fetch('./config.json',{cache:'no-store'});
-    if(!res.ok)throw new Error();
-    const cfg=await res.json();
-    if(cfg.defaultGroupWeights)groupWeights={...cfg.defaultGroupWeights};
-    if(cfg.defaultExceptionSkus)exceptionSkus={...cfg.defaultExceptionSkus};
-  } catch(e){console.warn('config.json yüklenemedi');}
+  // Step dots güncelle
+  for(let i=1;i<=5;i++){
+    const dot=document.getElementById('dot'+i);
+    if(!dot) continue;
+    if(i<n){ dot.className='step-dot done'; dot.textContent='✓'; }
+    else if(i===n){ dot.className='step-dot active'; dot.textContent=i; }
+    else{ dot.className='step-dot'; dot.textContent=i; }
+
+    if(i<5){
+      const line=document.getElementById('line'+i);
+      if(line){ line.className = i<n ? 'step-line done' : (i===n ? 'step-line active' : 'step-line'); }
+    }
+  }
+
+  currentStep = n;
+
+  // Fatura Öncesi → adım 2 ve 3'ü atla
+  if(selectedMod === 'oncesi' && n === 2) {
+    // Fatura öncesinde depo ve ülke seçim yok, direkt dosyaya git
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'none';
+    document.getElementById('step4').style.display = 'block';
+    document.getElementById('step4Title').textContent = 'Master Excel Yükle';
+    document.getElementById('step4Desc').textContent = 'Menşe ayrımı için master dosyayı yükleyin.';
+    document.getElementById('pdfDropZone').style.display = 'none';
+    document.getElementById('step4Back').onclick = () => goStep(1);
+    document.getElementById('step4Next').onclick = () => goStep(5);
+    currentStep = 4;
+    updateDots(4);
+    return;
+  }
 }
 
-// ── NUMBER PARSING ────────────────────────────────────────────────────────────
-function parseNum(v){
-  if(v===null||v===undefined)return 0;
-  if(typeof v==='number')return Number.isFinite(v)?v:0;
-  let s=String(v).trim().replace(/\s|\u00A0/g,'').replace(/[^0-9,.\-]/g,'');
-  if(s.includes('.')&&s.includes(','))s=s.replace(/\./g,'').replace(',','.');
-  else if(s.includes(','))s=s.replace(',','.');
-  const n=Number(s);return Number.isFinite(n)?n:0;
+function updateDots(n) {
+  for(let i=1;i<=5;i++){
+    const dot=document.getElementById('dot'+i);
+    if(!dot) continue;
+    if(i<n){ dot.className='step-dot done'; dot.textContent='✓'; }
+    else if(i===n){ dot.className='step-dot active'; dot.textContent=i; }
+    else{ dot.className='step-dot'; dot.textContent=i; }
+    if(i<5){
+      const line=document.getElementById('line'+i);
+      if(line){ line.className = i<n ? 'step-line done' : (i===n?'step-line active':'step-line'); }
+    }
+  }
 }
-function round2(n){return Math.round(parseNum(n)*100)/100;}
 
-// ── UI ────────────────────────────────────────────────────────────────────────
-function setCountry(c){
-  currentCountry=c;
-  ['kz','rs','iq','ge','cy','ru','ba','be'].forEach(k=>{const el=document.getElementById('country-'+k);if(el)el.classList.toggle('active',k===c);});
-  document.getElementById('modeSection').style.display=c==='kz'?'block':'none';
-  document.getElementById('eurSection').style.display=c==='be'?'block':'none';
-  document.getElementById('pdfDropZone').style.display=c==='rs'?'block':'none';
-  if(workingRows)buildAndDownloadReady();
+// ── MOD SEÇ ───────────────────────────────────────────────────────────────────
+function selectMod(mod) {
+  selectedMod = mod;
+  document.getElementById('card-oncesi').classList.toggle('active', mod==='oncesi');
+  document.getElementById('card-sonrasi').classList.toggle('active', mod==='sonrasi');
+  document.getElementById('step1Next').style.display = 'block';
 }
-function setMode(m){
-  currentMode=m;
-  document.getElementById('modeGrouped').classList.toggle('active',m==='grouped');
-  document.getElementById('modeRaw').classList.toggle('active',m==='raw');
-  if(workingRows)buildAndDownloadReady();
-}
-function showStatus(type,html){const sb=document.getElementById('statusBox');sb.className='status-box visible '+type;sb.innerHTML=html;}
-function toggleKgTable(){const b=document.getElementById('kgTableBody'),a=document.getElementById('kgTableArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
-function toggleSavedKg(){const b=document.getElementById('savedKgBody'),a=document.getElementById('savedKgArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
-function toggleExSku(){const b=document.getElementById('exSkuBody'),a=document.getElementById('exSkuArrow');if(b.style.display==='none'){b.style.display='block';a.textContent='▲';}else{b.style.display='none';a.textContent='▼';}}
-function onEurRateChanged(){if(currentCountry==='be'&&workingRows)buildAndDownloadReady();}
 
-// ── FILE ──────────────────────────────────────────────────────────────────────
-const dropZone=document.getElementById('dropZone');
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
-const pdfDropZone=document.getElementById('pdfDropZone');
-pdfDropZone.addEventListener('dragover',e=>{e.preventDefault();pdfDropZone.classList.add('dragover');});
-pdfDropZone.addEventListener('dragleave',()=>pdfDropZone.classList.remove('dragover'));
-pdfDropZone.addEventListener('drop',e=>{e.preventDefault();pdfDropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handlePdf(e.dataTransfer.files[0]);});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
-function handlePdf(file){
-  if(!file||!file.name.endsWith('.pdf'))return;
-  document.getElementById('pdfFileName').textContent='📄 '+file.name;
-  const r=new FileReader();
-  r.onload=e=>{
-    lastPdfData=e.target.result;
-    // PDF içeriğini regex ile parse et (backend'e gitmeden önce önizleme)
-    // Gerçek parse backend'de olacak, burada sadece "yüklendi" göster
-    document.getElementById('pdfFields').style.display='block';
-    document.getElementById('pdfKap').textContent='PDF yüklendi ✓';
-    document.getElementById('pdfNavlun').textContent='Excel indirince okunacak';
-    document.getElementById('pdfSigorta').textContent='Excel indirince okunacak';
-  };
+// ── DEPO SEÇ ──────────────────────────────────────────────────────────────────
+function selectDepo(depo) {
+  selectedDepo = depo;
+  document.getElementById('mode-serbest').classList.toggle('active', depo==='serbest');
+  document.getElementById('mode-antrepo').classList.toggle('active', depo==='antrepo');
+  document.getElementById('step2Next').style.display = 'block';
+}
+
+// ── ÜLKE SEÇ ──────────────────────────────────────────────────────────────────
+function selectCountry(c) {
+  currentCountry = c;
+  document.querySelectorAll('.country-btn').forEach(btn=>{
+    btn.classList.remove('active');
+  });
+  document.getElementById('country-'+c).classList.add('active');
+
+  // EUR bölümü
+  document.getElementById('eurSection').classList.toggle('visible', c==='be');
+  // KZ modu
+  document.getElementById('kzModeSection').classList.toggle('visible', c==='kz');
+  // PDF drop zone
+  document.getElementById('pdfDropZone').style.display = c==='rs' ? 'block' : 'none';
+
+  document.getElementById('step3Next').style.display = 'block';
+}
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('modeGrouped').classList.toggle('active', m==='grouped');
+  document.getElementById('modeRaw').classList.toggle('active', m==='raw');
+}
+
+function onEurRateChanged() {
+  if(workingRows && currentCountry==='be') buildAndDownloadReady();
+}
+
+// ── DOSYA YÜKLEYİCİLER ───────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+const pdfDropZone = document.getElementById('pdfDropZone');
+pdfDropZone.addEventListener('dragover', e=>{ e.preventDefault(); pdfDropZone.classList.add('dragover'); });
+pdfDropZone.addEventListener('dragleave', ()=> pdfDropZone.classList.remove('dragover'));
+pdfDropZone.addEventListener('drop', e=>{ e.preventDefault(); pdfDropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handlePdf(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if(!file) return;
+  originalFileName = file.name.replace(/\.xlsx?$/, '');
+  const badge = document.getElementById('fileName');
+  badge.textContent = '✓ ' + file.name;
+  badge.style.display = 'inline-flex';
+  const r = new FileReader();
+  r.onload = e => { lastFileData = e.target.result; loadFile(lastFileData); };
   r.readAsArrayBuffer(file);
 }
 
-function handleFile(file){if(!file)return;originalFileName=file.name.replace(/\.xlsx?$/,'');document.getElementById('fileName').textContent='📄 '+file.name;const r=new FileReader();r.onload=e=>{lastFileData=e.target.result;loadFile(lastFileData);};r.readAsArrayBuffer(file);}
-function loadFile(data){
-  processedWB=null;workingRows=null;masterRows=null;
-  document.getElementById('statusBox').className='status-box';
-  document.getElementById('downloadBtn').classList.remove('visible');
-  document.getElementById('kgSection').style.display='none';
-  document.getElementById('adjustSection').style.display='none';
-  document.getElementById('adjustResult').style.display='none';
-  try{
-    const wb=XLSX.read(data,{type:'array'});
-    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-    if(!rows.length)throw new Error('Dosya boş.');
-    const keys=Object.keys(rows[0]);
-    if(keys.includes('BRÜT')||keys.includes('NET'))throw new Error('Eski format (BRÜT/NET var). Revize master kullanın.');
-    if(!keys.includes('Ürün Ağırlığı (KG)')||!keys.includes('ÜRÜN ARA GRUBU'))throw new Error('Ürün Ağırlığı (KG) veya ÜRÜN ARA GRUBU sütunu bulunamadı.');
-    masterRows=rows;
-    showStatus('success',`<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div><div class="stat">Kilo hesaplaması için tabloyu doldurun, ardından ülke seçip indirin.</div>`);
-    buildKgTable(rows);
-    document.getElementById('kgSection').style.display='block';
-  }catch(err){showStatus('error','⚠ '+err.message);}
+function handlePdf(file) {
+  if(!file) return;
+  const badge = document.getElementById('pdfFileName');
+  badge.textContent = '✓ ' + file.name;
+  badge.style.display = 'inline-flex';
+  const r = new FileReader();
+  r.onload = e => { lastPdfData = e.target.result; };
+  r.readAsArrayBuffer(file);
+}
+
+function loadFile(data) {
+  processedWB=null; workingRows=null; masterRows=null;
+  try {
+    const wb = XLSX.read(data, {type:'array'});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+    if(!rows.length) throw new Error('Dosya boş.');
+    const keys = Object.keys(rows[0]);
+    if(keys.includes('BRÜT')||keys.includes('NET')) throw new Error('Eski format. Revize master kullanın.');
+    if(!keys.includes('Ürün Ağırlığı (KG)')||!keys.includes('ÜRÜN ARA GRUBU')) throw new Error('Zorunlu sütunlar bulunamadı.');
+    masterRows = rows;
+    // Adım 4 tamamlandı → adım 5'e geç
+    document.getElementById('step4Next').style.display = 'block';
+    showStatus('success', `<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div>`);
+  } catch(err) {
+    showStatus('error', '⚠ ' + err.message);
+  }
+}
+
+// ── STEP 4 → 5 GEÇİŞİ ────────────────────────────────────────────────────────
+const origStep4Next = document.getElementById('step4Next');
+origStep4Next.onclick = function() {
+  if(!masterRows){ alert('Önce Excel dosyası yükleyin.'); return; }
+  goStep(5);
+  buildKgTable(masterRows);
+  document.getElementById('kgPanel').style.display = 'block';
+};
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+function showStatus(type, html) {
+  const sb = document.getElementById('statusBox');
+  sb.className = 'status-box visible ' + type;
+  sb.innerHTML = html;
+}
+
+// ── KG TOGGLE ─────────────────────────────────────────────────────────────────
+function toggleKgTable() {
+  const b=document.getElementById('kgBody'), a=document.getElementById('kgArrow');
+  if(b.style.display==='none'||!b.style.display){ b.style.display='block'; a.textContent='▲'; }
+  else{ b.style.display='none'; a.textContent='▼'; }
+}
+
+function toggleExSku() {
+  const b=document.getElementById('skuBody'), a=document.getElementById('skuArrow');
+  if(b.style.display==='none'||!b.style.display){ b.style.display='block'; a.textContent='▲'; }
+  else{ b.style.display='none'; a.textContent='▼'; }
 }
 
 // ── KG TABLE ──────────────────────────────────────────────────────────────────
-function buildKgTable(rows){
-  const groups=[...new Set(rows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))].sort();
-  const tbody=document.getElementById('kgTable');
-  while(tbody.rows.length>1)tbody.deleteRow(1);
-  const needsInput=[],alreadyFull=[];
+function buildKgTable(rows) {
+  const groups = [...new Set(rows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))].sort();
+  const tbody = document.getElementById('kgTable');
+  while(tbody.rows.length>1) tbody.deleteRow(1);
+  const needsInput = [];
   groups.forEach(g=>{
-    const zeroCount=rows.filter(r=>String(r['ÜRÜN ARA GRUBU'])===g&&parseNum(r['Ürün Ağırlığı (KG)'])===0).length;
-    if(zeroCount>0)needsInput.push({g,zeroCount});else alreadyFull.push(g);
+    const zeroCount = rows.filter(r=>String(r['ÜRÜN ARA GRUBU'])===g&&parseNum(r['Ürün Ağırlığı (KG)'])===0).length;
+    if(zeroCount>0) needsInput.push({g,zeroCount});
   });
-  const kgBody=document.getElementById('kgTableBody'),kgArrow=document.getElementById('kgTableArrow');
-  if(needsInput.length>0){kgBody.style.display='block';kgArrow.textContent='▲';}
-  else{kgBody.style.display='none';kgArrow.textContent='▼';}
-  if(needsInput.length===0){const tr=tbody.insertRow();tr.innerHTML='<td colspan="3" style="color:var(--accent);padding:12px;">✓ Tüm satırlarda kilo değeri dolu.</td>';}
-  else{needsInput.forEach(({g,zeroCount})=>{const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');const saved=groupWeights[g]!==undefined?groupWeights[g]:'';const tr=tbody.insertRow();tr.innerHTML=`<td style="color:var(--text);">${g}</td><td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td><td style="color:#ff9d72;">${zeroCount} satır</td>`;});}
-  const savedSection=document.getElementById('savedKgSection'),savedTable=document.getElementById('savedKgTable');
-  savedTable.innerHTML='';
-  if(alreadyFull.length>0){
-    savedSection.style.display='block';
-    alreadyFull.forEach(g=>{const saved=groupWeights[g]!==undefined?groupWeights[g]:'—';const div=document.createElement('div');div.style.cssText='display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #1f1f1f;font-family:"DM Mono",monospace;font-size:12px;';div.innerHTML=`<span style="color:var(--text);">${g}</span><span style="color:var(--muted);">AG dolu &nbsp;|&nbsp; kayıtlı: <span style="color:var(--accent);">${saved} kg</span></span>`;savedTable.appendChild(div);});
-  }else{savedSection.style.display='none';}
+  document.getElementById('kgBadge').textContent = needsInput.length > 0 ? `${needsInput.length} grup eksik` : 'Tümü dolu';
+  if(needsInput.length===0){
+    const tr=tbody.insertRow();
+    tr.innerHTML='<td colspan="3" style="color:var(--success);padding:10px;">✓ Tüm satırlarda kilo değeri dolu.</td>';
+  } else {
+    document.getElementById('kgBody').style.display='block';
+    document.getElementById('kgArrow').textContent='▲';
+    needsInput.forEach(({g,zeroCount})=>{
+      const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');
+      const saved = groupWeights[g]!==undefined ? groupWeights[g] : '';
+      const tr=tbody.insertRow();
+      tr.innerHTML=`<td style="color:var(--text);">${g}</td>
+        <td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td>
+        <td style="color:var(--gold);">${zeroCount}</td>`;
+    });
+  }
 }
 
-// ── APPLY GROUP WEIGHTS ───────────────────────────────────────────────────────
-function applyGroupWeights(){
-  if(!masterRows)return;
-  const groups=[...new Set(masterRows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))];
-  groups.forEach(g=>{const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');const el=document.getElementById(id);if(el&&el.value!=='')groupWeights[g]=parseNum(el.value);});
-  workingRows=masterRows.map(row=>{
-    const r={...row};const sku=String(r['SKU']);let kg;
-    if(sku in exceptionSkus){kg=parseNum(exceptionSkus[sku]);}
-    else{kg=parseNum(r['Ürün Ağırlığı (KG)']);if(kg===0)kg=parseNum(groupWeights[String(r['ÜRÜN ARA GRUBU'])]||0);}
+// ── APPLY WEIGHTS ─────────────────────────────────────────────────────────────
+function applyGroupWeights() {
+  if(!masterRows) return;
+  const groups = [...new Set(masterRows.map(r=>String(r['ÜRÜN ARA GRUBU'])).filter(g=>g&&g!==''))];
+  groups.forEach(g=>{
+    const id='gw_'+g.replace(/[^a-zA-Z0-9]/g,'_');
+    const el=document.getElementById(id);
+    if(el&&el.value!=='') groupWeights[g]=parseNum(el.value);
+  });
+  try{localStorage.setItem('gwData',JSON.stringify(groupWeights));}catch(e){}
+
+  workingRows = masterRows.map(row=>{
+    const r={...row};
+    const sku=String(r['SKU']);
+    let kg;
+    if(sku in exceptionSkus){ kg=parseNum(exceptionSkus[sku]); }
+    else{ kg=parseNum(r['Ürün Ağırlığı (KG)']); if(kg===0) kg=parseNum(groupWeights[String(r['ÜRÜN ARA GRUBU'])]||0); }
     const miktar=parseNum(r['Miktar']);
-    r['_kg']=kg;r['_hamBrut']=kg*miktar;r['BRÜT']=r['_hamBrut'];r['NET']=r['BRÜT']*0.9;
+    r['_kg']=kg; r['_hamBrut']=kg*miktar; r['BRÜT']=r['_hamBrut']; r['NET']=r['BRÜT']*0.9;
     return r;
   });
-  const totalBrut=workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
-  document.getElementById('calcTotal').textContent=round2(totalBrut);
-  document.getElementById('adjustSection').style.display='block';
-  document.getElementById('adjustResult').style.display='none';
+
+  const totalBrut = workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
+  document.getElementById('calcTotal').textContent = round2(totalBrut);
+  document.getElementById('adjustSection').style.display = 'block';
+  showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
+}
+
+// ── WEIGHT ADJUST ─────────────────────────────────────────────────────────────
+function applyWeightAdjust() {
+  if(!workingRows) return;
+  const target = parseNum(document.getElementById('targetWeight').value);
+  if(!target||target<=0){ alert('Geçerli bir hedef kilo girin.'); return; }
+  const hamTotal = workingRows.reduce((s,r)=>s+parseNum(r['_hamBrut']),0);
+  if(hamTotal<=0){ alert('Ham BRÜT hesaplanamadı.'); return; }
+  const multiplier = target/hamTotal;
+  workingRows = workingRows.map(row=>{
+    const r={...row};
+    r['BRÜT']=parseNum(r['_hamBrut'])*multiplier;
+    // Serbest Depo: NET = BRÜT × 0.9
+    // Antrepo: NET ayrıca girilecek, şimdilik 0.9 uygula
+    r['NET']=r['BRÜT']*0.9;
+    return r;
+  });
+  const finalBrut=workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
+  const finalNet=workingRows.reduce((s,r)=>s+parseNum(r['NET']),0);
+  const res=document.getElementById('adjustResult');
+  res.className='adjust-result visible';
+  res.innerHTML=`✓ BRÜT: ${round2(finalBrut)} kg | NET: ${round2(finalNet)} kg`;
+
+  // Antrepo ise NET giriş alanını göster
+  if(selectedDepo==='antrepo'){
+    document.getElementById('antrepoSection').style.display='block';
+  }
+
+  // Fatura Öncesi ise menşe ayrımı göster
+  if(selectedMod==='oncesi'){
+    showMenseAyrim();
+  } else {
+    buildAndDownloadReady();
+  }
+}
+
+// ── ANTREPO NET ADJUST ────────────────────────────────────────────────────────
+function applyNetAdjust() {
+  if(!workingRows) return;
+  const targetNet = parseNum(document.getElementById('targetNet').value);
+  if(!targetNet||targetNet<=0){ alert('Geçerli bir NET kilo girin.'); return; }
+  const totalBrut = workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
+  if(totalBrut<=0){ alert('Önce BRÜT hesaplayın.'); return; }
+  // NET[i] = BRÜT[i] / toplam_BRÜT × hedef_NET
+  workingRows = workingRows.map(row=>{
+    const r={...row};
+    r['NET'] = (parseNum(r['BRÜT'])/totalBrut)*targetNet;
+    return r;
+  });
+  const finalNet=workingRows.reduce((s,r)=>s+parseNum(r['NET']),0);
+  const res=document.getElementById('netResult');
+  res.className='adjust-result visible';
+  res.innerHTML=`✓ NET: ${round2(finalNet)} kg`;
   buildAndDownloadReady();
 }
 
-// ── WEIGHT ADJUSTMENT ─────────────────────────────────────────────────────────
-function applyWeightAdjust(){
-  if(!workingRows)return;
-  const target=parseNum(document.getElementById('targetWeight').value);
-  if(!target||target<=0){alert('Lütfen geçerli bir hedef kilo girin.');return;}
-  const hamTotal=workingRows.reduce((s,r)=>s+parseNum(r['_hamBrut']),0);
-  if(hamTotal<=0){alert('Ham BRÜT hesaplanamadı.');return;}
-  const multiplier=target/hamTotal;
-  workingRows=workingRows.map(row=>{const r={...row};r['BRÜT']=parseNum(r['_hamBrut'])*multiplier;r['NET']=r['BRÜT']*0.9;return r;});
-  const finalBrut=workingRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0);
-  const finalNet=workingRows.reduce((s,r)=>s+parseNum(r['NET']),0);
-  const res=document.getElementById('adjustResult');res.style.display='block';
-  res.innerHTML=`✓ Orantılı ölçekleme &nbsp;|&nbsp; BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
-  buildAndDownloadReady();
+// ── MENŞE AYRIM ───────────────────────────────────────────────────────────────
+function showMenseAyrim() {
+  if(!workingRows) return;
+  const trRows    = workingRows.filter(r=>String(r['MENŞEİ Açıklama']).trim().toUpperCase()==='TURKIYE');
+  const otherRows = workingRows.filter(r=>String(r['MENŞEİ Açıklama']).trim().toUpperCase()!=='TURKIYE');
+  const trBrut    = round2(trRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0));
+  const trNet     = round2(trRows.reduce((s,r)=>s+parseNum(r['NET']),0));
+  const otherBrut = round2(otherRows.reduce((s,r)=>s+parseNum(r['BRÜT']),0));
+  const otherNet  = round2(otherRows.reduce((s,r)=>s+parseNum(r['NET']),0));
+
+  document.getElementById('menseTrBrut').textContent   = trBrut.toLocaleString('tr-TR',{minimumFractionDigits:2})+' kg BRÜT';
+  document.getElementById('menseTrNet').textContent    = 'NET: '+trNet.toLocaleString('tr-TR',{minimumFractionDigits:2})+' kg';
+  document.getElementById('menseOtherBrut').textContent= otherBrut.toLocaleString('tr-TR',{minimumFractionDigits:2})+' kg BRÜT';
+  document.getElementById('menseOtherNet').textContent = 'NET: '+otherNet.toLocaleString('tr-TR',{minimumFractionDigits:2})+' kg';
+  document.getElementById('menseBox').classList.add('visible');
+
+  showStatus('success',
+    `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
+     <div class="stat">TR: <span>${trBrut} kg</span> | Yabancı: <span>${otherBrut} kg</span></div>`);
 }
 
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
-function buildAndDownloadReady(){
-  if(!workingRows)return;
-  if(currentCountry==='be'&&!getEurRate()){showStatus('error','⚠ Belçika için Euro kuru girin.');document.getElementById('downloadBtn').classList.remove('visible');return;}
+function buildAndDownloadReady() {
+  if(!workingRows) return;
+  if(currentCountry==='rs'){
+    document.getElementById('downloadBtn').classList.add('visible');
+    showStatus('success','<div class="stat">✓ Hazır — İndir butonuna basın</div>');
+    return;
+  }
+  if(currentCountry==='be'&&!getEurRate()){
+    showStatus('error','⚠ Euro kuru girin.');
+    return;
+  }
   buildOutput(workingRows);
 }
-function buildOutput(rows){
-  try{
-    if(currentCountry==='kz')buildKZ(rows);
-    else if(currentCountry==='rs')buildRS(rows);
-    else if(SIMPLE_MAPS[currentCountry])buildSimple(rows,SIMPLE_MAPS[currentCountry]);
-    else{showStatus('error','⚠ Bu ülke için sütun tanımı henüz eklenmemiş.');document.getElementById('downloadBtn').classList.remove('visible');}
-  }catch(err){showStatus('error','⚠ '+err.message);document.getElementById('downloadBtn').classList.remove('visible');}
-}
-function getEurRate(){const el=document.getElementById('eurRateInput');const v=el?parseNum(el.value):0;return(v&&v>0)?v:null;}
-function getVal(row,src){
-  if(src==='__CALC__')return round2(parseNum(row['Miktar'])*parseNum(row['Fiyat']));
-  if(src==='Birim Cinsi (1)'){const v=row[src]!==undefined?row[src]:'';return String(v).trim()==='AD'?'PCS':v;}
-  if(src==='__EUR__'){const rate=getEurRate();if(!rate)return '';return parseNum(row['Fiyat'])/rate;}
-  if(src==='__EUR_TOTAL__'){const rate=getEurRate();if(!rate)return '';return(parseNum(row['Fiyat'])/rate)*parseNum(row['Miktar']);}
-  return row[src]!==undefined?row[src]:'';
-}
-function makeWS(result,headers){const ws=XLSX.utils.json_to_sheet(result,{header:headers});ws['!cols']=headers.map(c=>({wch:Math.min(Math.max(c.length+4,14),35)}));return ws;}
 
-function buildKZ(rows){
-  const before=rows.length;let result;
-  if(currentMode==='grouped'){
-    const grouped={},order=[];
-    for(const row of rows){const sku=row['SKU'];if(!grouped[sku]){grouped[sku]={...row};order.push(sku);}else{grouped[sku]['Miktar']=parseNum(grouped[sku]['Miktar'])+parseNum(row['Miktar']);grouped[sku]['BRÜT']=parseNum(grouped[sku]['BRÜT'])+parseNum(row['BRÜT']);grouped[sku]['NET']=parseNum(grouped[sku]['NET'])+parseNum(row['NET']);}}
-    result=order.map(sku=>{const r={};KZ_COLS.forEach(c=>r[c]=grouped[sku][c]??'');return r;});
-  }else{result=rows.map(row=>{const r={};KZ_COLS.forEach(c=>r[c]=row[c]??'');return r;});}
-  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(result,KZ_COLS),'Sheet');
-  showStatus('success',currentMode==='grouped'?`<div class="stat">✓ Kazakistan — Gruplandırma tamamlandı</div><div class="stat">Orijinal: <span>${before.toLocaleString('tr')} satır</span> → Sonuç: <span>${result.length.toLocaleString('tr')} satır</span></div>`:`<div class="stat">✓ Kazakistan — Tüm satırlar: <span>${result.length.toLocaleString('tr')} satır</span></div>`);
-  document.getElementById('downloadBtn').classList.add('visible');
-}
-function buildRS(rows){
-  const invResult=rows.map(row=>{const r={};RS_INV.forEach(m=>r[m.out]=getVal(row,m.src));return r;});
-  const invH=RS_INV.map(m=>m.out);
-  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(invResult,invH),'INV');
-  showStatus('success',`<div class="stat">✓ Sırbistan — INV</div><div class="stat">Toplam: <span>${invResult.length.toLocaleString('tr')} satır · ${invH.length} sütun</span></div>`);
-  document.getElementById('downloadBtn').classList.add('visible');
-}
-function buildSimple(rows,colMap){
-  const headers=colMap.map(m=>m.out);
-  const result=rows.map(row=>{const r={};colMap.forEach(m=>r[m.out]=getVal(row,m.src));return r;});
-  processedWB=XLSX.utils.book_new();XLSX.utils.book_append_sheet(processedWB,makeWS(result,headers),'Sheet');
-  const label=COUNTRIES[currentCountry]?.label||currentCountry;
-  showStatus('success',`<div class="stat">✓ ${label} — Tamamlandı</div><div class="stat">Toplam: <span>${result.length.toLocaleString('tr')} satır · ${headers.length} sütun</span></div>`);
-  document.getElementById('downloadBtn').classList.add('visible');
-}
-
-// ── İSTİSNA SKU ───────────────────────────────────────────────────────────────
-function renderExSkuList(){
-  const container=document.getElementById('exSkuList');if(!container)return;
-  const entries=Object.entries(exceptionSkus).sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'tr'));
-  if(!entries.length){container.innerHTML='<div style="color:var(--muted);font-family:DM Mono,monospace;font-size:12px;">Henüz istisna SKU yok.</div>';return;}
-  container.innerHTML=entries.map(([sku,kg])=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #1f1f1f;font-family:'DM Mono',monospace;font-size:12px;">
-      <span style="color:var(--text);">${sku}</span>
-      <span style="color:var(--accent);">${parseNum(kg)} kg</span>
-      <button onclick="removeExceptionSku('${sku.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--error);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
-    </div>`).join('');
-}
-
-function addExceptionSku(){
-  const sku=document.getElementById('newExSku').value.trim();
-  const kg=parseNum(document.getElementById('newExKg').value);
-  if(!sku||!kg||kg<=0){alert('SKU ve geçerli bir kilo girin.');return;}
-  exceptionSkus[sku]=kg;
-  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
-  document.getElementById('newExSku').value='';
-  document.getElementById('newExKg').value='';
-  renderExSkuList();
-}
-
-function removeExceptionSku(sku){
-  if(!confirm(`"${sku}" silinsin mi?`))return;
-  delete exceptionSkus[sku];
-  try{localStorage.setItem('exSkus',JSON.stringify(exceptionSkus));}catch(e){}
-  renderExSkuList();
+function getEurRate(){
+  const el=document.getElementById('eurRateInput');
+  const v=el?parseNum(el.value):0;
+  return(v&&v>0)?v:null;
 }
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
-async function downloadResult(){
-  if(currentCountry==='rs'){await downloadRS();return;}
-  if(!processedWB)return;
-  if(currentCountry==='be'&&!getEurRate()){showStatus('error','⚠ Belçika için Euro kuru girin.');return;}
+async function downloadResult() {
+  if(currentCountry==='rs'){ await downloadRS(); return; }
+  if(!processedWB) return;
   let suffix=COUNTRIES[currentCountry]?.suffix||('_'+currentCountry);
-  if(currentCountry==='kz')suffix+=(currentMode==='grouped'?'_gruplu':'_tum');
-  XLSX.writeFile(processedWB,originalFileName+suffix+'.xlsx');
+  if(currentCountry==='kz') suffix+=(currentMode==='grouped'?'_gruplu':'_tum');
+  XLSX.writeFile(processedWB, originalFileName+suffix+'.xlsx');
 }
 
-async function downloadRS(){
-  if(!workingRows||!lastFileData){showStatus('error','⚠ Önce kiloları uygulayın.');return;}
+async function downloadRS() {
+  if(!workingRows||!lastFileData){ showStatus('error','⚠ Önce kiloları uygulayın.'); return; }
   const btn=document.getElementById('downloadBtn');
-  btn.textContent='⏳ Hazırlanıyor...';btn.disabled=true;
+  btn.textContent='⏳ Hazırlanıyor...'; btn.disabled=true;
   try{
     const excelB64=arrayBufferToBase64(lastFileData);
     let logoB64='';
-    try{
-      const lr=await fetch('./logo.png');
-      if(lr.ok){const la=await lr.arrayBuffer();logoB64=arrayBufferToBase64(la);}
-    }catch(e){}
-    const hedefBrut=workingRows.reduce((s,r)=>s+(r['BRÜT']||0),0);
-    // PDF base64
+    try{ const lr=await fetch('./logo.png'); if(lr.ok){const la=await lr.arrayBuffer();logoB64=arrayBufferToBase64(la);} }catch(e){}
     let pdfB64='';
     if(lastPdfData) pdfB64=arrayBufferToBase64(lastPdfData);
-
+    const hedefBrut=workingRows.reduce((s,r)=>s+(r['BRÜT']||0),0);
     const resp=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        excel:excelB64,logo:logoB64,
-        pdf:pdfB64,
-        hedefBrut:hedefBrut,
-        grupKilolari:groupWeights,
-        exceptionSkus:exceptionSkus,
-      })
+      body:JSON.stringify({excel:excelB64,logo:logoB64,pdf:pdfB64,hedefBrut,grupKilolari:groupWeights,exceptionSkus})
     });
     const data=await resp.json();
-    if(!data.success)throw new Error(data.error||'Sunucu hatası');
+    if(!data.success) throw new Error(data.error||'Sunucu hatası');
     const bin=atob(data.excel);
     const bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
     const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download=originalFileName+'_INV_PL.xlsx';a.click();
+    a.href=url; a.download=originalFileName+'_INV_PL.xlsx'; a.click();
     URL.revokeObjectURL(url);
-    // PDF değerlerini göster
     if(data.pdfFields){
       const pf=data.pdfFields;
       document.getElementById('pdfKap').textContent=pf.kap||'—';
       document.getElementById('pdfNavlun').textContent=pf.navlun?pf.navlun.toLocaleString('tr-TR',{minimumFractionDigits:2})+' TRY':'—';
       document.getElementById('pdfSigorta').textContent=pf.sigorta?pf.sigorta.toLocaleString('tr-TR',{minimumFractionDigits:2})+' TRY':'—';
-      document.getElementById('pdfFields').style.display='block';
+      document.getElementById('pdfInfo').classList.add('visible');
     }
-    showStatus('success',`<div class="stat">✓ Sırbistan — INV + PL indirildi</div><div class="stat">Fatura No: <span>${data.faturaNo}</span></div>`);
+    showStatus('success',`<div class="stat">✓ İndirildi: <span>${data.faturaNo}</span></div>`);
   }catch(err){
     showStatus('error','⚠ '+err.message);
   }finally{
-    btn.textContent='⬇ İşlenmiş Dosyayı İndir';btn.disabled=false;
+    btn.textContent='⬇ INV + PL İndir'; btn.disabled=false;
   }
 }
 
 function arrayBufferToBase64(buf){
-  const b=new Uint8Array(buf);let s='';
-  for(let i=0;i<b.byteLength;i++)s+=String.fromCharCode(b[i]);
+  const b=new Uint8Array(buf); let s='';
+  for(let i=0;i<b.byteLength;i++) s+=String.fromCharCode(b[i]);
   return btoa(s);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded',async()=>{
-  await loadSharedConfig();
-  // localStorage'dan istisna SKU'ları yükle (config.json'ı override etme, üstüne ekle)
-  try{const s=localStorage.getItem('exSkus');if(s){const local=JSON.parse(s);exceptionSkus={...exceptionSkus,...local};}}catch(e){}
-  try{const s=localStorage.getItem('gwData');if(s){const local=JSON.parse(s);groupWeights={...groupWeights,...local};}}catch(e){}
+document.addEventListener('DOMContentLoaded', async()=>{
+  // Config yükle
+  try{
+    const res=await fetch('./config.json',{cache:'no-store'});
+    if(res.ok){
+      const cfg=await res.json();
+      if(cfg.defaultGroupWeights) groupWeights={...cfg.defaultGroupWeights};
+      if(cfg.defaultExceptionSkus) exceptionSkus={...cfg.defaultExceptionSkus};
+    }
+  }catch(e){}
+  // localStorage
+  try{const s=localStorage.getItem('exSkus');if(s){const l=JSON.parse(s);exceptionSkus={...exceptionSkus,...l};}}catch(e){}
+  try{const s=localStorage.getItem('gwData');if(s){const l=JSON.parse(s);groupWeights={...groupWeights,...l};}}catch(e){}
   renderExSkuList();
 });
 </script>
