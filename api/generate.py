@@ -148,10 +148,9 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     if logo_bytes:
         try:
             from PIL import Image as PILImage
-            import tempfile, os
+            import numpy as np
             pil_img = PILImage.open(io.BytesIO(logo_bytes))
             # Beyaz boşlukları kırp
-            import numpy as np
             arr = np.array(pil_img.convert('RGB'))
             mask = (arr < 240).any(axis=2)
             rows = np.any(mask, axis=1)
@@ -164,13 +163,13 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
                     max(0,cmin-pad), max(0,rmin-pad),
                     min(arr.shape[1],cmax+pad), min(arr.shape[0],rmax+pad)
                 ))
-            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            pil_img.save(tmp.name)
-            tmp.close()
-            img = XLImage(tmp.name)
+            # Geçici dosya yerine BytesIO kullan
+            logo_buf = io.BytesIO()
+            pil_img.save(logo_buf, format='PNG')
+            logo_buf.seek(0)
+            img = XLImage(logo_buf)
             img.width, img.height = 240, 22
             ws.add_image(img, 'E1')
-            os.unlink(tmp.name)
         except Exception as e:
             pass
 
