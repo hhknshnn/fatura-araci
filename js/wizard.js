@@ -277,10 +277,23 @@ function applyWeightAdjust() {
 
   // Orantılı ölçekleme: her satırın ham BRÜT'ü hedefle orantılanır
   const multiplier = target / hamTotal;
-  workingRows = workingRows.map(row => {
+  const hedefNet   = Math.round(target * 0.9 * 100) / 100;
+
+  // Son satıra kalan fark verilir — toplam tam hedef'e eşit olur
+  let toplamBrut = 0, toplamNet = 0;
+  const n = workingRows.length;
+  workingRows = workingRows.map((row, i) => {
     const r = { ...row };
-    r['BRÜT'] = parseNum(r['_hamBrut']) * multiplier;
-    r['NET']  = r['BRÜT'] * 0.9; // Serbest Depo varsayılanı
+    if (i < n - 1) {
+      r['BRÜT'] = Math.round(parseNum(r['_hamBrut']) * multiplier * 100) / 100;
+      r['NET']  = Math.round(r['BRÜT'] * 0.9 * 100) / 100;
+      toplamBrut += r['BRÜT'];
+      toplamNet  += r['NET'];
+    } else {
+      // Son satır: hedeften önceki toplamı çıkar
+      r['BRÜT'] = Math.round((target - toplamBrut) * 100) / 100;
+      r['NET']  = Math.round((hedefNet - toplamNet) * 100) / 100;
+    }
     return r;
   });
 
@@ -313,10 +326,17 @@ function applyNetAdjust() {
   const totalBrut = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   if (totalBrut <= 0) { alert('Önce BRÜT hesaplayın.'); return; }
 
-  // NET[i] = BRÜT[i] / toplam_BRÜT × hedef_NET (orantılı dağıtım)
-  workingRows = workingRows.map(row => {
+  // NET[i] = BRÜT[i] / toplam_BRÜT × hedef_NET — son satıra kalan fark
+  let toplamNet = 0;
+  const n2 = workingRows.length;
+  workingRows = workingRows.map((row, i) => {
     const r = { ...row };
-    r['NET'] = (parseNum(r['BRÜT']) / totalBrut) * targetNet;
+    if (i < n2 - 1) {
+      r['NET'] = Math.round((parseNum(r['BRÜT']) / totalBrut) * targetNet * 100) / 100;
+      toplamNet += r['NET'];
+    } else {
+      r['NET'] = Math.round((targetNet - toplamNet) * 100) / 100;
+    }
     return r;
   });
 
