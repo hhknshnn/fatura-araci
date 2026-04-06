@@ -360,7 +360,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     ws_pl=wb.create_sheet('PL')
     pl_widths={'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':14,'I':14}
     for col,w in pl_widths.items(): ws_pl.column_dimensions[col].width=w
-    build_header(ws_pl,'PACKING LIST',fatura_no,fatura_date,musteri,musteri_adres,len(PL_COLS),logo_bytes, pdf_fields)
+    build_header(ws_pl,'PACKING LIST',fatura_no,fatura_date,musteri,musteri_adres,len(PL_COLS),logo_bytes)
     ws_pl.row_dimensions[DS].height=35
     for i,(hd,_) in enumerate(PL_COLS):
         hdr(ws_pl,DS,i+1,hd,bg=DARK_BLUE,size=9,align='center')
@@ -397,6 +397,12 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
         c.number_format=fmt; c.border=brd()
     build_footer(ws_pl,pl_gr+1,len(PL_COLS))
     set_print(ws_pl,f'A1:I{pl_gr}')
+
+    # Excel açılınca formüllerin otomatik hesaplanmasını zorla
+    from openpyxl.worksheet.properties import WorksheetProperties
+    for sheet in wb.worksheets:
+        sheet.sheet_properties.enableFormatConditionsCalculation = True
+    wb.calculation.calcMode = 'auto'
 
     buf=io.BytesIO()
     wb.save(buf)
