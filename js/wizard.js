@@ -436,6 +436,8 @@ async function downloadRS() {
         logo:          logoB64,
         pdf:           pdfB64,
         hedefBrut:     hedefBrut,
+        hedefNet:      workingRows.reduce((s,r) => s+(r['NET']||0), 0),
+        depoTipi:      selectedDepo,
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
       })

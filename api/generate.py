@@ -279,7 +279,7 @@ def set_print(ws, print_area):
     ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3)
     ws.print_title_rows = '1:2'
 
-def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None):
+def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(
         lambda x: 'PCS' if str(x).strip()=='AD' else x)
     df['GTİP'] = df['GTİP'].apply(
@@ -295,6 +295,12 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
 
     if pdf_fields is None: pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
+
+    # Antrepo: hedef NET girilmişse orantılı dağıt
+    if depo_tipi == 'antrepo' and hedef_net > 0:
+        toplam_brut = sum(brut_list)
+        if toplam_brut > 0:
+            net_list = [(b / toplam_brut) * hedef_net for b in brut_list]
 
     wb = Workbook()
     DS = 9  # DATA_START
@@ -427,6 +433,8 @@ class handler(BaseHTTPRequestHandler):
             logo_b64      = body.get('logo','')
             logo_bytes    = base64.b64decode(logo_b64) if logo_b64 else None
             hedef_brut    = float(body.get('hedefBrut', 0))
+            hedef_net     = float(body.get('hedefNet', 0))
+            depo_tipi     = body.get('depoTipi', 'serbest')
             grup_kilolari = body.get('grupKilolari', {})
             exception_skus= body.get('exceptionSkus', EXCEPTION_SKUS)
 
@@ -439,7 +447,8 @@ class handler(BaseHTTPRequestHandler):
 
             df = pd.read_excel(io.BytesIO(excel_bytes))
             excel_out, fatura_no = generate_excel(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields)
+                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                hedef_net=hedef_net, depo_tipi=depo_tipi)
 
             result = json.dumps({
                 'success':   True,
