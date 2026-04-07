@@ -112,11 +112,11 @@ function selectTaslakDepo(tip) {
 // ── FORM OLUŞTUR ──────────────────────────────────────────────────────────────
 function buildTaslakForm() {
   if (!taslakUlke) return;
-  const cfg    = TASLAK_ULKELER[taslakUlke];
+  const formCfg    = TASLAK_ULKELER[taslakUlke];
   const container = document.getElementById('taslakFormAlanlari');
   container.innerHTML = '';
 
-  cfg.alanlar.forEach(alan => {
+  formCfg.alanlar.forEach(alan => {
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
 
@@ -147,8 +147,8 @@ function buildTaslakForm() {
   });
 
   // Template varsa drop zone'u gizle
-  const cfg = TASLAK_ULKELER[taslakUlke];
-  const hasTemplate = cfg && cfg.template;
+  const ulkeCfg = TASLAK_ULKELER[taslakUlke];
+  const hasTemplate = ulkeCfg && ulkeCfg.template;
   document.getElementById('taslakDropZoneWrapper').style.display = hasTemplate ? 'none' : 'block';
   document.getElementById('taslakExcelSection').style.display = 'block';
 
@@ -203,10 +203,10 @@ function handleTaslakFile(file) {
 // ── FORM VERİLERİNİ TOPLA ────────────────────────────────────────────────────
 function getTaslakFormData() {
   if (!taslakUlke) return null;
-  const cfg    = TASLAK_ULKELER[taslakUlke];
+  const formDataCfg    = TASLAK_ULKELER[taslakUlke];
   const data   = {};
 
-  for (const alan of cfg.alanlar) {
+  for (const alan of formDataCfg.alanlar) {
     const el = document.getElementById('taslak_' + alan.id);
     if (!el) continue;
     const val = el.value.trim();
