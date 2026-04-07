@@ -14,10 +14,8 @@
 
   <!-- HEADER -->
   <header class="app-header">
-  <a href="/" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;" onclick="location.reload()">
     <div class="app-logo">📋</div>
     <div class="app-title">Fatura <span>Aracı</span></div>
-  </a>
     <div class="app-version">v2.0</div>
   </header>
 
@@ -48,22 +46,89 @@
   <div class="panel" id="step1">
     <div class="panel-label">Adım 1</div>
     <div class="panel-title">İşlem Türü</div>
-    <div class="panel-desc">Hangi aşamada olduğunuzu seçin.</div>
-    <div class="choice-grid">
+    <div class="panel-desc">Hangi işlemi yapmak istiyorsunuz?</div>
+    <div class="choice-grid" style="grid-template-columns:1fr;">
+      <div class="choice-card" id="card-taslak" onclick="selectMod('taslak')">
+        <span class="choice-icon">📝</span>
+        <div class="choice-name">Fatura Öncesi — Taslak Doldur</div>
+        <div class="choice-desc">Ülkeye göre taslak formu doldur ve indir</div>
+      </div>
       <div class="choice-card" id="card-oncesi" onclick="selectMod('oncesi')">
         <span class="choice-icon">🔍</span>
-        <div class="choice-name">Fatura Öncesi</div>
-        <div class="choice-desc">Menşe ayrımı hesaplama</div>
+        <div class="choice-name">Fatura Öncesi — Menşe Hesapla</div>
+        <div class="choice-desc">KG hesapla ve menşe ayrımı yap</div>
       </div>
       <div class="choice-card" id="card-sonrasi" onclick="selectMod('sonrasi')">
         <span class="choice-icon">📤</span>
         <div class="choice-name">Fatura Sonrası</div>
-        <div class="choice-desc">INV + PL Excel çıktısı</div>
+        <div class="choice-desc">INV + PL Excel çıktısı al</div>
       </div>
     </div>
     <div class="nav-row">
       <div></div>
       <button class="btn-secondary" id="step1Next" onclick="goStep(2)" style="display:none;">Devam →</button>
+    </div>
+  </div>
+
+
+  <!-- ── TASLAK DOLDUR PANELİ ─────────────────────────────────────────────── -->
+  <div class="panel" id="stepTaslak" style="display:none;">
+    <div class="panel-label">Taslak Doldur</div>
+    <div class="panel-title">Fatura Taslağı</div>
+    <div class="panel-desc">Ülkeyi ve depo tipini seçin, formu doldurun.</div>
+
+    <div class="status-box" id="taslakStatus"></div>
+
+    <!-- Ülke seç -->
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Ülke</div>
+    <div class="country-grid" id="taslakUlkeGrid" style="margin-bottom:20px;"></div>
+
+    <!-- Depo tipi -->
+    <div id="taslakDepoSection" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Depo Tipi</div>
+      <div class="mode-options" style="margin-bottom:20px;">
+        <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
+          <div class="mode-icon">🏭</div>
+          <div>
+            <div class="mode-title">Serbest Depo</div>
+            <div class="mode-desc">NET = BRÜT × 0.9</div>
+          </div>
+        </div>
+        <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
+          <div class="mode-icon">🏗️</div>
+          <div>
+            <div class="mode-title">Antrepo</div>
+            <div class="mode-desc">NET elle girilir</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form alanları -->
+    <div id="taslakFormSection" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">Bilgileri Girin</div>
+      <div id="taslakFormAlanlari"></div>
+
+      <!-- Taslak Excel yükle -->
+      <div id="taslakExcelSection" style="margin-top:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Taslak Excel</div>
+        <div class="drop-zone" id="taslakDropZone" style="padding:24px;">
+          <input type="file" accept=".xlsx,.xls" onchange="handleTaslakFile(this.files[0])">
+          <div class="drop-icon" style="font-size:24px;">📂</div>
+          <h3 style="font-size:13px;">Taslak Excel'i sürükle</h3>
+          <p>Boş taslak dosyasını yükle</p>
+          <div class="file-badge" id="taslakFileName" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- İndir butonu -->
+      <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()" style="display:none;margin-top:16px;">
+        ⬇ Taslak İndir
+      </button>
+    </div>
+
+    <div class="nav-row" style="margin-top:20px;">
+      <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
     </div>
   </div>
 
@@ -299,6 +364,23 @@
     </div>
 
     <!-- Menşe Ayrımı (Fatura Öncesi) -->
+    <!-- Menşe → Taslak indirme -->
+    <div id="menseTaslakSection" style="display:none;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:8px;">Taslağa Menşe Ekle</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+        <input class="target-input" id="menseRefNo" placeholder="Referans No (örn: 100)" style="flex:1;">
+      </div>
+      <div class="drop-zone" id="menseTaslakDropZone" style="padding:20px;margin-bottom:10px;">
+        <input type="file" accept=".xlsx,.xls" onchange="handleTaslakFile(this.files[0])">
+        <div class="drop-icon" style="font-size:20px;">📂</div>
+        <h3 style="font-size:12px;">Daha önce indirilen taslağı yükle</h3>
+        <div class="file-badge" id="taslakFileName2" style="display:none;"></div>
+      </div>
+      <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">
+        ⬇ Menşe Taslak İndir
+      </button>
+    </div>
+
     <div class="mense-box" id="menseBox">
       <div class="mense-row">
         <div>
@@ -338,6 +420,7 @@
 <script src="js/processor.js"></script>
 <script src="js/sku.js"></script>
 <script src="js/wizard.js"></script>
+<script src="js/taslak.js"></script>
 
 </body>
 </html>

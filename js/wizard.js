@@ -97,8 +97,19 @@ function setupStepFaturaOncesi() {
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
 function selectMod(mod) {
   selectedMod = mod;
+  document.getElementById('card-taslak').classList.toggle('active', mod === 'taslak');
   document.getElementById('card-oncesi').classList.toggle('active', mod === 'oncesi');
   document.getElementById('card-sonrasi').classList.toggle('active', mod === 'sonrasi');
+
+  if (mod === 'taslak') {
+    // Taslak doldur → doğrudan taslak paneline git
+    showOnlyStep(0); // tüm adımları gizle
+    document.getElementById('stepTaslak').style.display = 'block';
+    updateDots(1);
+    initTaslakPanel();
+    return;
+  }
+
   document.getElementById('step1Next').style.display = 'block';
 }
 
@@ -369,6 +380,7 @@ function showMenseAyrim() {
   document.getElementById('menseOtherNet').textContent  = 'NET: ' + fmt(otherNet) + ' kg';
 
   document.getElementById('menseBox').classList.add('visible');
+  document.getElementById('menseTaslakSection').style.display = 'block';
 
   showStatus('success',
     `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
@@ -530,3 +542,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     initStep5();
   };
 });
+
+
+// ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────
+function triggerMenseTaslak() {
+  if (!workingRows) { showStatus('error', '⚠ Önce menşe hesaplayın.'); return; }
+
+  const trRows    = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
+  const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
+
+  const trKg      = round2(trRows.reduce((s,r)    => s + parseNum(r['BRÜT']), 0));
+  const yabanciKg = round2(otherRows.reduce((s,r) => s + parseNum(r['BRÜT']), 0));
+  const brutKg    = round2(workingRows.reduce((s,r) => s + parseNum(r['BRÜT']), 0));
+  const netKg     = round2(workingRows.reduce((s,r) => s + parseNum(r['NET']),  0));
+
+  indirMenseTaslak(trKg, yabanciKg, brutKg, netKg);
+}
