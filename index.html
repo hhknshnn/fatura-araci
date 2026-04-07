@@ -122,7 +122,11 @@
     </div>
 
     <div class="nav-row" style="margin-top:20px;">
-      <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
+      <button class="btn-ghost" onclick="
+        document.getElementById('stepTaslak').style.display='none';
+        document.getElementById('step1').style.display='block';
+        updateDots(1);
+      ">← Geri</button>
     </div>
   </div>
 
