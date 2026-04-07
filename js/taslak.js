@@ -332,7 +332,44 @@ function showTaslakStatus(tip, html) {
   sb.innerHTML = html;
 }
 
+// ── MENŞE ÜLKE GRİD ──────────────────────────────────────────────────────────
+function buildMenseUlkeGrid() {
+  const grid = document.getElementById('menseUlkeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
+    const btn = document.createElement('div');
+    btn.className = 'country-btn';
+    btn.id = 'mense-ulke-' + kod;
+    btn.onclick = () => selectMenseUlke(kod);
+    btn.innerHTML = `
+      <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
+      <div class="country-name">${cfg.label}</div>`;
+    grid.appendChild(btn);
+  });
+}
+
+async function selectMenseUlke(kod) {
+  taslakUlke = kod;
+  document.querySelectorAll('#menseUlkeGrid .country-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('mense-ulke-' + kod);
+  if (btn) btn.classList.add('active');
+
+  // Template otomatik yükle
+  const cfg = TASLAK_ULKELER[kod];
+  if (cfg && cfg.template) {
+    try {
+      const resp = await fetch('./' + cfg.template, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('Template bulunamadı');
+      taslakBytes = await resp.arrayBuffer();
+    } catch(e) {
+      console.warn('Menşe taslak yüklenemedi:', e);
+    }
+  }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initTaslakDropZone();
+  buildMenseUlkeGrid();
 });
