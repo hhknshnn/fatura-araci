@@ -186,7 +186,14 @@ function getTaslakFormData() {
     if (!val) continue;
 
     if (alan.tip === 'number') {
-      data[alan.id] = parseFloat(val.replace(',', '.')) || 0;
+      // Türkçe format: 1.234,56 → 1234.56
+      let numStr = val;
+      if (numStr.includes('.') && numStr.includes(',')) {
+        numStr = numStr.replace(/\./g, '').replace(',', '.');
+      } else {
+        numStr = numStr.replace(',', '.');
+      }
+      data[alan.id] = parseFloat(numStr) || 0;
     } else {
       data[alan.id] = val;
     }
