@@ -7,8 +7,9 @@
 // Yeni ülke eklemek için buraya ekle + config/ klasörüne JSON ekle.
 const TASLAK_ULKELER = {
   rs: {
-    label: 'Sırbistan',
-    flag:  'rs',
+    label:    'Sırbistan',
+    flag:     'rs',
+    template: 'templates/taslak_rs.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
       { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
@@ -65,12 +66,30 @@ function buildTaslakUlkeGrid() {
 }
 
 // ── ÜLKE SEÇ ──────────────────────────────────────────────────────────────────
-function selectTaslakUlke(kod) {
+async function selectTaslakUlke(kod) {
   taslakUlke = kod;
 
   // Aktif ülkeyi işaretle
   document.querySelectorAll('#taslakUlkeGrid .country-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('taslak-ulke-' + kod).classList.add('active');
+
+  // Template Excel'i otomatik yükle
+  const cfg = TASLAK_ULKELER[kod];
+  if (cfg.template) {
+    try {
+      showTaslakStatus('info', '⏳ Taslak yükleniyor...');
+      const resp = await fetch('./' + cfg.template, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('Template bulunamadı');
+      const buf = await resp.arrayBuffer();
+      taslakBytes = buf;
+      // Badge göster
+      document.getElementById('taslakFileName').textContent = '✓ ' + cfg.label + ' taslağı yüklendi';
+      document.getElementById('taslakFileName').style.display = 'inline-flex';
+      showTaslakStatus('success', '<div class="stat">✓ Taslak otomatik yüklendi</div>');
+    } catch(e) {
+      showTaslakStatus('error', '⚠ Taslak yüklenemedi: ' + e.message);
+    }
+  }
 
   // Depo tipi seçimini göster
   document.getElementById('taslakDepoSection').style.display = 'block';
@@ -127,8 +146,16 @@ function buildTaslakForm() {
     container.appendChild(div);
   });
 
-  // Taslak Excel yükleme alanı
+  // Template varsa drop zone'u gizle
+  const cfg = TASLAK_ULKELER[taslakUlke];
+  const hasTemplate = cfg && cfg.template;
+  document.getElementById('taslakDropZoneWrapper').style.display = hasTemplate ? 'none' : 'block';
   document.getElementById('taslakExcelSection').style.display = 'block';
+
+  // Template varsa indir butonunu göster
+  if (hasTemplate && taslakBytes) {
+    document.getElementById('taslakIndir').style.display = 'block';
+  }
 }
 
 // ── NET KG OTOMATİK HESAPLA ───────────────────────────────────────────────────
