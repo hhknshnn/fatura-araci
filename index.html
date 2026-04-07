@@ -112,17 +112,8 @@
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">Bilgileri Girin</div>
       <div id="taslakFormAlanlari"></div>
 
-      <!-- Taslak Excel yükle -->
-      <div id="taslakExcelSection" style="margin-top:20px;">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Taslak Excel</div>
-        <div class="drop-zone" id="taslakDropZone" style="padding:24px;">
-          <input type="file" accept=".xlsx,.xls" onchange="handleTaslakFile(this.files[0])">
-          <div class="drop-icon" style="font-size:24px;">📂</div>
-          <h3 style="font-size:13px;">Taslak Excel'i sürükle</h3>
-          <p>Boş taslak dosyasını yükle</p>
-          <div class="file-badge" id="taslakFileName" style="display:none;"></div>
-        </div>
-      </div>
+      <!-- Taslak otomatik yükleniyor -->
+      <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
 
       <!-- İndir butonu -->
       <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()" style="display:none;margin-top:16px;">
