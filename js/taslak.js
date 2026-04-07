@@ -19,6 +19,58 @@ const TASLAK_ULKELER = {
       { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
+  ba: {
+    label:    'Bosna',
+    flag:     'ba',
+    template: 'templates/taslak_rs.xlsx',
+        alanlar: [
+      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    ]
+  },
+  ge: {
+    label:    'Gürcistan',
+    flag:     'ge',
+    template: 'templates/taslak_rs.xlsx',
+        alanlar: [
+      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    ]
+  },
+  xk: {
+    label:    'Kosova',
+    flag:     'xk',
+    template: 'templates/taslak_rs.xlsx',
+        alanlar: [
+      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    ]
+  },
+  mk: {
+    label:    'Makedonya',
+    flag:     'mk',
+    template: 'templates/taslak_rs.xlsx',
+        alanlar: [
+      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    ]
+  },
   // Diğer ülkeler buraya eklenecek
 };
 
