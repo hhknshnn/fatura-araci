@@ -146,14 +146,8 @@ function buildTaslakForm() {
     container.appendChild(div);
   });
 
-  // Template varsa drop zone'u gizle
-  const ulkeCfg = TASLAK_ULKELER[taslakUlke];
-  const hasTemplate = ulkeCfg && ulkeCfg.template;
-  document.getElementById('taslakDropZoneWrapper').style.display = hasTemplate ? 'none' : 'block';
-  document.getElementById('taslakExcelSection').style.display = 'block';
-
   // Template varsa indir butonunu göster
-  if (hasTemplate && taslakBytes) {
+  if (taslakBytes) {
     document.getElementById('taslakIndir').style.display = 'block';
   }
 }
