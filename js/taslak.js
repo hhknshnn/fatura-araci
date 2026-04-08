@@ -316,7 +316,9 @@ async function indirTaslak() {
       })
     });
 
-    const data = await resp.json();
+    const rawText = await resp.text();
+    console.log('API yanıtı:', rawText);
+    const data = JSON.parse(rawText);
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
     // İndir
