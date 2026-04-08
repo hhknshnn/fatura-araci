@@ -10,11 +10,9 @@ import openpyxl
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_config(ulke_kodu):
     """Ülkeye göre taslak config dosyasını yükle."""
-    config_path = os.path.join(
-        os.path.dirname(__file__),
-        '..', 'config',
-        f'taslak_{ulke_kodu}.json'
-    )
+    # Vercel'de çalışma dizini /var/task, config klasörü oradan erişilebilir
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(base_dir, 'config', f'taslak_{ulke_kodu}.json')
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
