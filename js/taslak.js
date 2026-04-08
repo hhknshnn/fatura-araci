@@ -508,7 +508,11 @@ async function indirTaslak() {
   }
 
   const formData = getTaslakFormData();
-  if (!formData || !formData.referansNo) {
+  if (!formData) {
+    showTaslakStatus('error', '⚠ Form verisi alınamadı.');
+    return;
+  }
+  if (!formData.referansNo && formData.referansNo !== 0) {
     showTaslakStatus('error', '⚠ Referans No zorunludur.');
     return;
   }
