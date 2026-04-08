@@ -477,6 +477,8 @@ function handleTaslakFile(file) {
 // ── FORM VERİLERİNİ TOPLA ────────────────────────────────────────────────────
 function getTaslakFormData() {
   if (!taslakUlke) return null;
+  // Kıbrıs özel form
+  if (TASLAK_ULKELER[taslakUlke]?.tip === 'kibris') return getKibrisFormData();
   const formDataCfg    = TASLAK_ULKELER[taslakUlke];
   const data   = {};
 
