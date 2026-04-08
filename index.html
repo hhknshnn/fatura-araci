@@ -364,16 +364,29 @@
     <!-- Menşe Ayrımı (Fatura Öncesi) -->
     <!-- Menşe → Taslak indirme -->
     <div id="menseTaslakSection" style="display:none;margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:500;margin-bottom:8px;">Taslağa Menşe Ekle</div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-        <input class="target-input" id="menseRefNo" placeholder="Referans No (örn: 100)" style="flex:1;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Taslağa Menşe Ekle</div>
+
+      <!-- Ülke seç -->
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-family:var(--mono);">ÜLKE</div>
+      <div class="country-grid" id="menseUlkeGrid" style="margin-bottom:14px;"></div>
+
+      <!-- Referans No -->
+      <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Referans No</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">2026-</span>
+        <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
       </div>
-      <div class="drop-zone" id="menseTaslakDropZone" style="padding:20px;margin-bottom:10px;">
-        <input type="file" accept=".xlsx,.xls" onchange="handleTaslakFile(this.files[0])">
-        <div class="drop-icon" style="font-size:20px;">📂</div>
-        <h3 style="font-size:12px;">Daha önce indirilen taslağı yükle</h3>
-        <div class="file-badge" id="taslakFileName2" style="display:none;"></div>
+      <div class="file-badge" id="menseTaslakYuklendi" style="display:none;margin-bottom:12px;"></div>
+
+      <!-- Doldurulmuş taslağı yükle -->
+      <div class="drop-zone" id="menseTaslakDropZone" style="padding:20px;margin-bottom:12px;">
+        <input type="file" accept=".xlsx,.xls" onchange="handleMenseTaslakFile(this.files[0])">
+        <div class="drop-icon" style="font-size:22px;">📂</div>
+        <h3 style="font-size:13px;">Doldurulmuş taslağı yükle</h3>
+        <p style="font-size:11px;">Taslak Doldur'dan indirdiğin dosyayı yükle</p>
+        <div class="file-badge" id="menseTaslakDosya" style="display:none;"></div>
       </div>
+
       <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">
         ⬇ Menşe Taslak İndir
       </button>

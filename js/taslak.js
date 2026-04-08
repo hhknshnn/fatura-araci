@@ -77,7 +77,8 @@ const TASLAK_ULKELER = {
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let taslakUlke     = null;   // seçili ülke kodu
 let taslakBytes    = null;   // yüklenen taslak Excel'in binary verisi
-let taslakDepoTipi = null;   // 'serbest' | 'antrepo'
+let taslakDepoTipi   = null;
+let menseTaslakBytes = null;   // menşe adımında yüklenen doldurulmuş taslak
 
 // ── TASLAK PANELI BAŞLAT ──────────────────────────────────────────────────────
 function initTaslakPanel() {
@@ -232,6 +233,15 @@ function initTaslakDropZone() {
   });
 }
 
+function handleMenseTaslakFile(file) {
+  if (!file) return;
+  const badge = document.getElementById('menseTaslakDosya');
+  if (badge) { badge.textContent = '✓ ' + file.name; badge.style.display = 'inline-flex'; }
+  const r = new FileReader();
+  r.onload = e => { menseTaslakBytes = e.target.result; };
+  r.readAsArrayBuffer(file);
+}
+
 function handleTaslakFile(file) {
   if (!file) return;
   const badge = document.getElementById('taslakFileName');
@@ -338,7 +348,7 @@ async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
   btn.disabled = true;
 
   try {
-    const taslakB64 = arrayBufferToBase64(taslakBytes);
+    const taslakB64 = arrayBufferToBase64(menseTaslakBytes);
 
     const resp = await fetch('/api/taslak', {
       method: 'POST',
@@ -414,6 +424,8 @@ async function selectMenseUlke(kod) {
       const resp = await fetch('./' + cfg.template, { cache: 'no-store' });
       if (!resp.ok) throw new Error('Template bulunamadı');
       taslakBytes = await resp.arrayBuffer();
+      const badge = document.getElementById('menseTaslakYuklendi');
+      if (badge) { badge.textContent = '✓ ' + cfg.label + ' taslağı hazır'; badge.style.display = 'inline-flex'; }
     } catch(e) {
       console.warn('Menşe taslak yüklenemedi:', e);
     }
@@ -424,4 +436,15 @@ async function selectMenseUlke(kod) {
 document.addEventListener('DOMContentLoaded', () => {
   initTaslakDropZone();
   buildMenseUlkeGrid();
+
+  // Menşe taslak drop zone
+  const menseDZ = document.getElementById('menseTaslakDropZone');
+  if (menseDZ) {
+    menseDZ.addEventListener('dragover',  e => { e.preventDefault(); menseDZ.classList.add('dragover'); });
+    menseDZ.addEventListener('dragleave', ()  => menseDZ.classList.remove('dragover'));
+    menseDZ.addEventListener('drop',      e  => {
+      e.preventDefault(); menseDZ.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) handleMenseTaslakFile(e.dataTransfer.files[0]);
+    });
+  }
 });
