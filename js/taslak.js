@@ -105,12 +105,14 @@ function initTaslakPanel() {
 // ── ÜLKE GRİD ─────────────────────────────────────────────────────────────────
 function buildTaslakUlkeGrid() {
   const grid = document.getElementById('taslakUlkeGrid');
+  if (!grid) { console.error('taslakUlkeGrid elementi bulunamadı!'); return; }
   grid.innerHTML = '';
+  console.log('Ülke grid oluşturuluyor, ülke sayısı:', Object.keys(TASLAK_ULKELER).length);
   Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
     const btn = document.createElement('div');
     btn.className = 'country-btn';
     btn.id = 'taslak-ulke-' + kod;
-    btn.onclick = () => selectTaslakUlke(kod);
+    btn.addEventListener('click', () => selectTaslakUlke(kod));
     btn.innerHTML = `
       <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
       <div class="country-name">${cfg.label}</div>`;
