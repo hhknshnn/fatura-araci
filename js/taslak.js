@@ -71,6 +71,19 @@ const TASLAK_ULKELER = {
       { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
+  be: {
+    label:    'Belçika',
+    flag:     'be',
+    template: 'templates/taslak_be.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',     tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
   // Diğer ülkeler buraya eklenecek
 };
 
