@@ -117,7 +117,7 @@ const TASLAK_ULKELER = {
     alanlar: [
       { id: 'navlun',     label: 'Freight (USD)',     tip: 'number', placeholder: 'örn: 3100,00' },
       { id: 'sigorta',    label: 'Insurance (USD)',   tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Packages',          tip: 'number', placeholder: 'örn: 28' },
+      { id: 'kap',        label: 'Packages',          tip: 'text', placeholder: 'örn: 28' },
       { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },

@@ -5,7 +5,7 @@
   "alanlar": {
     "navlun": {
       "hucre": "D3",
-      "tip": "sayi",
+      "tip": "metin",
       "label": "Freight (USD)"
     },
     "sigorta": {
