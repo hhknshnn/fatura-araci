@@ -226,7 +226,9 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
             pass
 
     ws.row_dimensions[2].height = 28.0
-    ws.merge_cells('A2:I2')
+    lc = get_column_letter(col_count)
+    hc = get_column_letter(min(7, col_count))
+    ws.merge_cells(f'A2:{lc}2')
     c = ws['A2']
     c.value = sheet_title
     c.font = Font(name='Arial', bold=True, size=14, color='FFFFFF')
@@ -253,13 +255,13 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
         c.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
         c.border = brd()
 
-    ws.merge_cells('A3:G3')
+    ws.merge_cells(f'A3:{hc}3')
     hdr(ws, 3, 1, 'EXPORTER :', bg=MID_BLUE, align='left')
     info_label(3, 'INVOICE DATE :')
     info_val(3, str(fatura_date), bold=True)
 
     ws.row_dimensions[4].height = 32
-    ws.merge_cells('A4:G5')
+    ws.merge_cells(f'A4:{hc}5')
     c = ws['A4']
     c.value = ('DEHA MAGAZACILIK EV TEKSTILI URUNLERI SAN. VE TIC. A.S.\n'
                'Mecidiyeköy Mah. Oğuz Sok Rönesans Biz İş Merkezi No:4/14 K:4 34387 Şişli/İstanbul')
@@ -272,13 +274,13 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_label(5, 'PACKAGES :')
     info_val(5, str(pdf_fields.get('kap','')) if pdf_fields else '')
 
-    ws.merge_cells('A6:G6')
+    ws.merge_cells(f'A6:{hc}6')
     hdr(ws, 6, 1, 'IMPORTER :', bg=MID_BLUE, align='left')
     info_label(6, 'DESTINATION :')
     info_val(6, destination, bold=True)
 
     ws.row_dimensions[7].height = 32
-    ws.merge_cells('A7:G8')
+    ws.merge_cells(f'A7:{hc}8')
     c = ws['A7']
     c.value = f'{musteri}\n{musteri_adres}'
     c.font = Font(name='Arial', size=9, color='000000')
