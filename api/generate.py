@@ -63,6 +63,35 @@ PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
+
+# Bosna INV sütunları
+BA_INV_COLS = [
+    ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
+    ('MASTER ITEM CODE',  'Asorti Barkodu'),
+    ('ITEM CODE',         'SKU'),
+    ('ITEM DESCRIPTION',  'ALT GRUBU -EN'),
+    ('ITEM NAME',         'Ürün Açıklaması EN'),
+    ('QTY',               'Miktar'),
+    ('UNIT PRICE',        'Fiyat (D)'),
+    ('TOTAL AMOUNT TRY',  'Net Tutar (D)'),
+    ('HS CODE',           'GTİP'),
+    ('MATERIAL',          'MATERYAL -EN'),
+    ('COLOR',             'Renk Açıkmalası EN'),
+    ('DIMENSION',         'EBAT Açıklama'),
+]
+
+# Bosna PL sütunları
+BA_PL_COLS = [
+    ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
+    ('MASTER ITEM CODE',  'Asorti Barkodu'),
+    ('ITEM CODE',         'SKU'),
+    ('ITEM DESCRIPTION',  'ALT GRUBU -EN'),
+    ('ITEM NAME',         'Ürün Açıklaması EN'),
+    ('QTY',               'Miktar'),
+    ('GROSS WEIGHT',      '__BRUT__'),
+    ('NET WEIGHT',        '__NET__'),
+]
+
 def brd(c='BFBFBF'):
     s = Side(style='thin', color=c)
     return Border(left=s, right=s, top=s, bottom=s)
@@ -158,7 +187,7 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
             net_list.append(round(hedef_net_serbest - toplam_net, 2))
     return brut_list, net_list
 
-def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None):
+def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None, destination='SERBIA', incoterm='CIP'):
     last_col = get_column_letter(col_count)
     col_widths = {'A':16,'B':14,'C':14,'D':18,'E':33,'F':6,'G':7,'H':26,'I':22,'J':13,'K':12,'L':16,'M':9,'N':9,'O':10}
     for col, w in col_widths.items():
@@ -246,7 +275,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     ws.merge_cells('A6:G6')
     hdr(ws, 6, 1, 'IMPORTER :', bg=MID_BLUE, align='left')
     info_label(6, 'DESTINATION :')
-    info_val(6, 'SERBIA', bold=True)
+    info_val(6, destination, bold=True)
 
     ws.row_dimensions[7].height = 32
     ws.merge_cells('A7:G8')
@@ -259,7 +288,7 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
     info_label(7, 'COUNTRY OF EXPORTATION :')
     info_val(7, 'TURKEY')
     info_label(8, 'INCOTERM :')
-    info_val(8, 'CIP')
+    info_val(8, incoterm)
 
 def build_footer(ws, footer_start, col_count):
     pass  # Footer kaldırıldı
@@ -273,6 +302,160 @@ def set_print(ws, print_area):
     ws.page_setup.fitToHeight = 0
     ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3)
     ws.print_title_rows = '1:2'
+
+
+def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+    """Bosna INV + PL üretimi."""
+    df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(lambda x: 'PCS' if str(x).strip()=='AD' else x)
+    df['GTİP'] = df['GTİP'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
+    df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
+
+    fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_date  = df['Fatura Tarihi'].iloc[0]
+    if hasattr(fatura_date,'date'): fatura_date = fatura_date.date()
+    musteri      = 'Madame Coco BH d.o.o.'
+    musteri_adres= 'Ulica Vrbanja Br. 1 (SCC)-Saraybosna, Saraybosna Centar'
+    destination  = 'Bosnia and Herzegovina'
+    incoterm     = 'CIP'
+
+    brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
+    if depo_tipi == 'antrepo' and hedef_net > 0:
+        toplam_brut = sum(brut_list)
+        if toplam_brut > 0:
+            net_list_new = []
+            toplam_net = 0.0
+            for i, b in enumerate(brut_list):
+                if i < len(brut_list)-1:
+                    val = round((b/toplam_brut)*hedef_net, 2)
+                    net_list_new.append(val)
+                    toplam_net += val
+                else:
+                    net_list_new.append(round(hedef_net-toplam_net, 2))
+            net_list = net_list_new
+
+    wb = Workbook()
+    DS = 9  # DATA_START
+
+    # ── INV ──────────────────────────────────────────────────────────────────
+    ws_inv = wb.active
+    ws_inv.title = 'INV'
+    build_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date,
+                 musteri, musteri_adres, len(BA_INV_COLS), logo_bytes, pdf_fields,
+                 destination=destination, incoterm=incoterm)
+
+    ws_inv.row_dimensions[DS].height = 35
+    for i,(hd,_) in enumerate(BA_INV_COLS):
+        hdr(ws_inv,DS,i+1,hd,bg=DARK_BLUE,size=9,align='center')
+
+    for r_idx,(_,row) in enumerate(df.iterrows()):
+        er=DS+1+r_idx; ws_inv.row_dimensions[er].height=None
+        bg='FFFFFF' if r_idx%2==0 else 'EBF3FB'
+        for c_idx,(out_col,src_col) in enumerate(BA_INV_COLS):
+            cn=c_idx+1
+            if out_col=='QTY':
+                dat(ws_inv,er,cn,parse_num(row.get(src_col,0)),bg=bg,align='right',fmt='#,##0')
+            elif out_col in('UNIT PRICE','TOTAL AMOUNT TRY'):
+                dat(ws_inv,er,cn,parse_num(row.get(src_col,0)),bg=bg,align='right',fmt='#,##0.00')
+            elif out_col in('MASTER ITEM CODE','HS CODE'):
+                dat(ws_inv,er,cn,str(row.get(src_col,'') or ''),bg=bg,align='left')
+            else:
+                dat(ws_inv,er,cn,row.get(src_col,''),bg=bg,align='left')
+
+    # Sütun genişlikleri
+    col_widths_inv = {'A':16,'B':14,'C':14,'D':18,'E':26,'F':7,'G':12,'H':14,'I':14,'J':15,'K':14,'L':12}
+    for col,w in col_widths_inv.items():
+        if column_index_from_string(col) <= len(BA_INV_COLS):
+            ws_inv.column_dimensions[col].width = w
+
+    last_inv=DS+len(df)
+    tr,fr,ir,gr=last_inv+1,last_inv+2,last_inv+3,last_inv+4
+    for r in[tr,fr,ir,gr]: ws_inv.row_dimensions[r].height=22
+    ws_inv.row_dimensions[gr].height=28
+
+    H,I=len(BA_INV_COLS)-1, len(BA_INV_COLS)  # UNIT PRICE ve TOTAL sütunları
+    ws_inv.merge_cells(f'A{tr}:{get_column_letter(H-1)}{tr}')
+    c=ws_inv.cell(row=tr,column=H,value='TOTAL')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=10)
+    c.fill=PatternFill('solid',fgColor=DARK_BLUE)
+    c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
+    total_col=get_column_letter(I)
+    c=ws_inv.cell(row=tr,column=I,value=f'=SUM({total_col}{DS+1}:{total_col}{last_inv})')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=10)
+    c.fill=PatternFill('solid',fgColor=DARK_BLUE)
+    c.alignment=Alignment(horizontal='right',vertical='center')
+    c.number_format='#,##0.00'; c.border=brd()
+
+    ws_inv.merge_cells(f'A{fr}:{get_column_letter(H-1)}{fr}')
+    dat(ws_inv,fr,H,'FREIGHT',bold=True,align='center')
+    dat(ws_inv,fr,I,float(pdf_fields.get('navlun',0)) if pdf_fields else 0,fmt='#,##0.00',align='right')
+    ws_inv.merge_cells(f'A{ir}:{get_column_letter(H-1)}{ir}')
+    dat(ws_inv,ir,H,'INSURANCE',bold=True,align='center')
+    dat(ws_inv,ir,I,float(pdf_fields.get('sigorta',0)) if pdf_fields else 0,fmt='#,##0.00',align='right')
+    ws_inv.merge_cells(f'A{gr}:{get_column_letter(H-1)}{gr}')
+    c=ws_inv.cell(row=gr,column=H,value='GRAND TOTAL')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
+    c.fill=PatternFill('solid',fgColor=GOLD)
+    c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
+    c=ws_inv.cell(row=gr,column=I,value=f'=I{tr}+I{fr}+I{ir}')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
+    c.fill=PatternFill('solid',fgColor=GOLD)
+    c.alignment=Alignment(horizontal='right',vertical='center')
+    c.number_format='#,##0.00'; c.border=brd()
+
+    # Yazdırma: TOTAL AMOUNT TRY sütununa kadar
+    inv_last_col = get_column_letter(len(BA_INV_COLS))
+    set_print(ws_inv, f'A1:{inv_last_col}{gr}')
+
+    # ── PL ───────────────────────────────────────────────────────────────────
+    ws_pl = wb.create_sheet('PL')
+    pl_widths = {'A':16,'B':14,'C':14,'D':18,'E':26,'F':7,'G':14,'H':14}
+    for col,w in pl_widths.items(): ws_pl.column_dimensions[col].width=w
+
+    build_header(ws_pl, 'PACKING LIST', fatura_no, fatura_date,
+                 musteri, musteri_adres, len(BA_PL_COLS), logo_bytes,
+                 destination=destination, incoterm=incoterm)
+
+    ws_pl.row_dimensions[DS].height=35
+    for i,(hd,_) in enumerate(BA_PL_COLS):
+        hdr(ws_pl,DS,i+1,hd,bg=DARK_BLUE,size=9,align='center')
+
+    for r_idx,(_,row) in enumerate(df.iterrows()):
+        er=DS+1+r_idx; ws_pl.row_dimensions[er].height=None
+        bg='FFFFFF' if r_idx%2==0 else 'EBF3FB'
+        for c_idx,(out_col,src_col) in enumerate(BA_PL_COLS):
+            cn=c_idx+1
+            if src_col=='__BRUT__':
+                dat(ws_pl,er,cn,round(brut_list[r_idx],2),bg=bg,align='right',fmt='#,##0.00')
+            elif src_col=='__NET__':
+                dat(ws_pl,er,cn,round(net_list[r_idx],2),bg=bg,align='right',fmt='#,##0.00')
+            elif out_col=='QTY':
+                dat(ws_pl,er,cn,parse_num(row.get(src_col,0)),bg=bg,align='right',fmt='#,##0')
+            elif out_col=='MASTER ITEM CODE':
+                dat(ws_pl,er,cn,str(row.get(src_col,'') or ''),bg=bg,align='left')
+            else:
+                dat(ws_pl,er,cn,row.get(src_col,''),bg=bg,align='left')
+
+    last_pl=DS+len(df)
+    pl_gr=last_pl+1
+    ws_pl.row_dimensions[pl_gr].height=28
+    ws_pl.merge_cells(f'A{pl_gr}:E{pl_gr}')
+    c=ws_pl.cell(row=pl_gr,column=5,value='GRAND TOTAL')
+    c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
+    c.fill=PatternFill('solid',fgColor=GOLD)
+    c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
+    for cn,fmt in[(6,'#,##0'),(7,'#,##0.00'),(8,'#,##0.00')]:
+        cl=get_column_letter(cn)
+        c=ws_pl.cell(row=pl_gr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+        c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
+        c.fill=PatternFill('solid',fgColor=GOLD)
+        c.alignment=Alignment(horizontal='right',vertical='center')
+        c.number_format=fmt; c.border=brd()
+
+    set_print(ws_pl, f'A1:H{pl_gr}')
+
+    buf=io.BytesIO()
+    wb.save(buf); buf.seek(0)
+    return buf.getvalue(), fatura_no
 
 def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(
@@ -451,10 +634,17 @@ class handler(BaseHTTPRequestHandler):
                 pdf_bytes_data = base64.b64decode(pdf_b64)
                 pdf_fields = parse_pdf(pdf_bytes_data)
 
+            ulke_kodu = body.get('ulkeKodu', 'rs')
             df = pd.read_excel(io.BytesIO(excel_bytes))
-            excel_out, fatura_no = generate_excel(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                hedef_net=hedef_net, depo_tipi=depo_tipi)
+
+            if ulke_kodu == 'ba':
+                excel_out, fatura_no = generate_excel_ba(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                    hedef_net=hedef_net, depo_tipi=depo_tipi)
+            else:
+                excel_out, fatura_no = generate_excel(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                    hedef_net=hedef_net, depo_tipi=depo_tipi)
 
             result = json.dumps({
                 'success':   True,

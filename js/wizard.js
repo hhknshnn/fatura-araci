@@ -426,7 +426,7 @@ function showStatus(type, html) {
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
   // Sırbistan → şablonlu INV+PL (Python backend)
-  if (currentCountry === 'rs') { await downloadRS(); return; }
+  if (['rs','ba'].includes(currentCountry)) { await downloadRS(); return; }
 
   // Diğer ülkeler → JS ile üretilmiş workbook
   if (!processedWB) return;
@@ -467,6 +467,7 @@ async function downloadRS() {
         excel:         excelB64,
         logo:          logoB64,
         pdf:           pdfB64,
+        ulkeKodu:      currentCountry,
         hedefBrut:     hedefBrut,
         hedefNet:      workingRows.reduce((s,r) => s+(r['NET']||0), 0),
         depoTipi:      selectedDepo,
