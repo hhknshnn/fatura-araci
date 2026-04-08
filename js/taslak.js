@@ -409,7 +409,7 @@ function buildMenseUlkeGrid() {
     const btn = document.createElement('div');
     btn.className = 'country-btn';
     btn.id = 'mense-ulke-' + kod;
-    btn.onclick = () => selectMenseUlke(kod);
+    btn.addEventListener('click', () => selectMenseUlke(kod));
     btn.innerHTML = `
       <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
       <div class="country-name">${cfg.label}</div>`;
