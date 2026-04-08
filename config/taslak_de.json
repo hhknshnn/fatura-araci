@@ -1,0 +1,41 @@
+{
+  "ulke": "Almanya",
+  "dosyaAdi": "Almanya",
+  "sheet": "taslak_de",
+  "alanlar": {
+    "kap": {
+      "hucre": "D3",
+      "tip": "tam",
+      "label": "Kap Sayısı"
+    },
+    "brutKg": {
+      "hucre": "D4",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)",
+      "oninput": "hesaplaNet()"
+    },
+    "netKg": {
+      "hucre": "D5",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=D4*0.9"
+    },
+    "navlun": {
+      "hucre": "D7",
+      "tip": "sayi",
+      "label": "Navlun (EUR)"
+    },
+    "sigorta": {
+      "hucre": "D8",
+      "tip": "sayi",
+      "label": "Sigorta (EUR)"
+    },
+    "referansNo": {
+      "hucre": "D10",
+      "tip": "metin",
+      "label": "Referans No",
+      "prefix": "2026-"
+    }
+  },
+  "menseAlanlar": {}
+}
