@@ -440,12 +440,15 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     last_pl=DS+len(df)
     pl_gr=last_pl+1
     ws_pl.row_dimensions[pl_gr].height=28
-    ws_pl.merge_cells(f'A{pl_gr}:E{pl_gr}')
+    # A-D boş, E'ye GRAND TOTAL yaz, F merge
+    for col_idx in range(1, 5):
+        ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+    ws_pl.merge_cells(f'E{pl_gr}:F{pl_gr}')
     c=ws_pl.cell(row=pl_gr,column=5,value='GRAND TOTAL')
     c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
     c.fill=PatternFill('solid',fgColor=GOLD)
     c.alignment=Alignment(horizontal='center',vertical='center'); c.border=brd()
-    for cn,fmt in[(6,'#,##0'),(7,'#,##0.00'),(8,'#,##0.00')]:
+    for cn,fmt in[(7,'#,##0.00'),(8,'#,##0.00')]:
         cl=get_column_letter(cn)
         c=ws_pl.cell(row=pl_gr,column=cn,value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
         c.font=Font(name='Arial',bold=True,color='FFFFFF',size=11)
