@@ -445,7 +445,9 @@ function getKibrisFormData() {
       data[g + '_netKg']  = parseFloat(net.replace(',','.'))  || 0;
     }
   });
-  data['referansNo'] = document.getElementById('kibris_referansNo')?.value?.trim() || '';
+  // referansNo her zaman ekle — grup dolup dolmadığından bağımsız
+  const refEl = document.getElementById('kibris_referansNo');
+  data['referansNo'] = refEl ? refEl.value.trim() : '';
   return data;
 }
 
