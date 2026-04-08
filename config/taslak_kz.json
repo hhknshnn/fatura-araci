@@ -1,0 +1,41 @@
+{
+  "ulke": "Kazakistan",
+  "dosyaAdi": "Kazakistan",
+  "sheet": "taslak_kz",
+  "alanlar": {
+    "navlun": {
+      "hucre": "D3",
+      "tip": "sayi",
+      "label": "Freight (EUR)"
+    },
+    "sigorta": {
+      "hucre": "D4",
+      "tip": "sayi",
+      "label": "Insurance (EUR)"
+    },
+    "kap": {
+      "hucre": "D5",
+      "tip": "tam",
+      "label": "Packages"
+    },
+    "brutKg": {
+      "hucre": "D6",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)",
+      "oninput": "hesaplaNet()"
+    },
+    "netKg": {
+      "hucre": "D7",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=D6*0.9"
+    },
+    "referansNo": {
+      "hucre": "D10",
+      "tip": "metin",
+      "label": "Referans No",
+      "prefix": "2026-"
+    }
+  },
+  "menseAlanlar": {}
+}

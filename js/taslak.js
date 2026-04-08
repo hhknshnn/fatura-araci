@@ -110,6 +110,19 @@ const TASLAK_ULKELER = {
       { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
+  kz: {
+    label:    'Kazakistan',
+    flag:     'kz',
+    template: 'templates/taslak_kz.xlsx',
+    alanlar: [
+      { id: 'navlun',     label: 'Freight (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Insurance (EUR)',   tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Packages',          tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
   // Diğer ülkeler buraya eklenecek
 };
 
