@@ -134,7 +134,7 @@ function selectCountry(c) {
   document.getElementById('kzModeSection').classList.toggle('visible', c === 'kz');
 
   // PDF drop zone sadece Sırbistan'da
-  document.getElementById('pdfDropZone').style.display = c === 'rs' ? 'block' : 'none';
+  document.getElementById('pdfDropZone').style.display = ['rs','ba'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
