@@ -17,6 +17,43 @@ def load_config(ulke_kodu):
         return json.load(f)
 
 # ── TASLAK DOLDUR ─────────────────────────────────────────────────────────────
+def doldur_kibris(taslak_bytes, config, form_data):
+    """Kıbrıs özel: 3 grup dinamik doldurma."""
+    wb = openpyxl.load_workbook(io.BytesIO(taslak_bytes))
+    ws = wb[config.get('sheet', wb.sheetnames[0])]
+
+    gruplar   = config.get('gruplar', {})
+    dosya_cfg = config.get('dosyaNo', {})
+
+    for grup_id, grup_cfg in gruplar.items():
+        kap_val   = form_data.get(grup_id + '_kap',   '')
+        brut_val  = form_data.get(grup_id + '_brutKg', '')
+        net_val   = form_data.get(grup_id + '_netKg',  '')
+
+        # Grup boşsa tüm hücreleri temizle
+        if not kap_val and not brut_val:
+            ws[grup_cfg['kap']]    = ''
+            ws[grup_cfg['brutKg']] = ''
+            ws[grup_cfg['netKg']]  = ''
+        else:
+            ws[grup_cfg['kap']] = kap_val
+            try:    ws[grup_cfg['brutKg']] = float(str(brut_val).replace(',','.'))
+            except: ws[grup_cfg['brutKg']] = brut_val
+            try:    ws[grup_cfg['netKg']]  = float(str(net_val).replace(',','.'))
+            except: ws[grup_cfg['netKg']]  = net_val
+
+    # Dosya no — her 3 sütuna da yaz (A8, D8, G8)
+    ref_no = str(form_data.get('referansNo', ''))
+    prefix = dosya_cfg.get('prefix', '')
+    for hucre in ['B8', 'E8', 'H8']:
+        ws[hucre] = prefix + ref_no
+
+    dosya_adi = f"{config['dosyaAdi']}_{prefix}{ref_no}_taslak.xlsx"
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue(), dosya_adi
+
 def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
     """
     Taslak Excel'e form ve menşe verilerini yaz.
@@ -127,9 +164,12 @@ class handler(BaseHTTPRequestHandler):
             # Config yükle
             config = load_config(ulke_kodu)
 
-            # Doldur
-            excel_out, dosya_adi = doldur_taslak(
-                taslak_bytes, config, form_data, mense_data)
+            # Doldur - Kıbrıs özel mantık
+            if config.get('tip') == 'kibris':
+                excel_out, dosya_adi = doldur_kibris(taslak_bytes, config, form_data)
+            else:
+                excel_out, dosya_adi = doldur_taslak(
+                    taslak_bytes, config, form_data, mense_data)
 
             result = json.dumps({
                 'success':  True,

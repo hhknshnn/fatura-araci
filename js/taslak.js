@@ -124,6 +124,12 @@ const TASLAK_ULKELER = {
     ]
   },
   // ── FRANCHISE ÜLKELER ──────────────────────────────────────────────────────
+  cy: {
+    grup: 'franchise', label: 'Kıbrıs', flag: 'cy',
+    template: 'templates/taslak_cy.xlsx',
+    tip: 'kibris',
+    alanlar: [] // Özel form - buildKibrisForm ile oluşturulur
+  },
   iq: {
     grup: 'franchise', label: 'Irak', flag: 'iq',
     template: 'templates/taslak_iq.xlsx',
@@ -296,6 +302,13 @@ function buildTaslakForm() {
   const container = document.getElementById('taslakFormAlanlari');
   container.innerHTML = '';
 
+  // Kıbrıs özel form
+  if (formCfg.tip === 'kibris') {
+    buildKibrisForm(container);
+    if (taslakBytes) document.getElementById('taslakIndir').style.display = 'block';
+    return;
+  }
+
   formCfg.alanlar.forEach(alan => {
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
@@ -358,6 +371,82 @@ function initTaslakDropZone() {
     e.preventDefault(); dz.classList.remove('dragover');
     if (e.dataTransfer.files[0]) handleTaslakFile(e.dataTransfer.files[0]);
   });
+}
+
+// ── KIBRIS ÖZEL FORM ──────────────────────────────────────────────────────────
+function buildKibrisForm(container) {
+  const gruplar = [
+    { id: 'tekstil',     label: 'Tekstil' },
+    { id: 'tekstilDisi', label: 'Tekstil Dışı' },
+    { id: 'kozmetik',    label: 'Kozmetik' },
+  ];
+
+  // 3 grup yan yana
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;';
+
+  gruplar.forEach(g => {
+    const col = document.createElement('div');
+    col.innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:10px;
+                  padding:6px 10px;background:var(--surface2);border-radius:6px;text-align:center;">
+        ${g.label}
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Kap</div>
+      <input class="target-input" id="kibris_${g.id}_kap"
+        style="margin-bottom:10px;font-size:12px;padding:8px 10px;"
+        placeholder="örn: 10 koli">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">BRÜT (kg)</div>
+      <input class="target-input" id="kibris_${g.id}_brutKg"
+        type="text" inputmode="decimal"
+        style="margin-bottom:10px;font-size:12px;padding:8px 10px;"
+        oninput="kibrisHesaplaNet('${g.id}')"
+        placeholder="örn: 1200,00">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">NET (kg)</div>
+      <input class="target-input" id="kibris_${g.id}_netKg"
+        type="text" inputmode="decimal"
+        style="font-size:12px;padding:8px 10px;"
+        placeholder="Otomatik">`;
+    grid.appendChild(col);
+  });
+  container.appendChild(grid);
+
+  // Referans No
+  const refDiv = document.createElement('div');
+  refDiv.innerHTML = `
+    <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Referans No</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">2026-</span>
+      <input class="target-input" id="kibris_referansNo" placeholder="örn: 100" style="flex:1;">
+    </div>`;
+  container.appendChild(refDiv);
+}
+
+function kibrisHesaplaNet(grupId) {
+  const brut = parseFloat(
+    (document.getElementById(`kibris_${grupId}_brutKg`)?.value || '').replace(',','.')
+  );
+  const netEl = document.getElementById(`kibris_${grupId}_netKg`);
+  if (netEl && !isNaN(brut) && brut > 0) {
+    netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', {minimumFractionDigits:2});
+  }
+}
+
+function getKibrisFormData() {
+  const gruplar = ['tekstil', 'tekstilDisi', 'kozmetik'];
+  const data = {};
+  gruplar.forEach(g => {
+    const kap  = document.getElementById(`kibris_${g}_kap`)?.value?.trim() || '';
+    const brut = document.getElementById(`kibris_${g}_brutKg`)?.value?.trim() || '';
+    const net  = document.getElementById(`kibris_${g}_netKg`)?.value?.trim() || '';
+    if (kap || brut) {
+      data[g + '_kap']    = kap;
+      data[g + '_brutKg'] = parseFloat(brut.replace(',','.')) || 0;
+      data[g + '_netKg']  = parseFloat(net.replace(',','.'))  || 0;
+    }
+  });
+  data['referansNo'] = document.getElementById('kibris_referansNo')?.value?.trim() || '';
+  return data;
 }
 
 function handleMenseTaslakFile(file) {

@@ -1,0 +1,32 @@
+{
+  "ulke": "Kıbrıs",
+  "dosyaAdi": "Kibris",
+  "sheet": "taslak_cy",
+  "tip": "kibris",
+  "gruplar": {
+    "tekstil": {
+      "label": "Tekstil",
+      "kap": "B3",
+      "brutKg": "B4",
+      "netKg": "B5"
+    },
+    "tekstilDisi": {
+      "label": "Tekstil Dışı",
+      "kap": "E3",
+      "brutKg": "E4",
+      "netKg": "E5"
+    },
+    "kozmetik": {
+      "label": "Kozmetik",
+      "kap": "H3",
+      "brutKg": "H4",
+      "netKg": "H5"
+    }
+  },
+  "dosyaNo": {
+    "etiket_hucre": "A8",
+    "deger_hucre": "B8",
+    "prefix": "2026-"
+  },
+  "menseAlanlar": {}
+}
