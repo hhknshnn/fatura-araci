@@ -113,6 +113,8 @@ class handler(BaseHTTPRequestHandler):
             mense_data = body.get('menseData', None)
 
             # Taslak Excel bytes
+            if not taslak_b64:
+                raise ValueError('Taslak Excel verisi boş geldi (taslak_b64 empty)')
             taslak_bytes = base64.b64decode(taslak_b64)
 
             # Config yükle

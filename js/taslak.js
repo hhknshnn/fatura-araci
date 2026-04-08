@@ -302,7 +302,9 @@ async function indirTaslak() {
   btn.disabled = true;
 
   try {
+    if (!taslakBytes) throw new Error('Taslak yüklenmemiş');
     const taslakB64 = arrayBufferToBase64(taslakBytes);
+    if (!taslakB64) throw new Error('Base64 dönüşümü başarısız');
 
     const resp = await fetch('/api/taslak', {
       method: 'POST',
@@ -448,3 +450,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+function arrayBufferToBase64(buf) {
+  const b = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
