@@ -105,9 +105,9 @@ function initTaslakPanel() {
 // ── ÜLKE GRİD ─────────────────────────────────────────────────────────────────
 function buildTaslakUlkeGrid() {
   const grid = document.getElementById('taslakUlkeGrid');
-  if (!grid) { console.error('taslakUlkeGrid elementi bulunamadı!'); return; }
+  if (!grid) {
+ return; }
   grid.innerHTML = '';
-  console.log('Ülke grid oluşturuluyor, ülke sayısı:', Object.keys(TASLAK_ULKELER).length);
   Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
     const btn = document.createElement('div');
     btn.className = 'country-btn';
@@ -319,7 +319,6 @@ async function indirTaslak() {
     });
 
     const rawText = await resp.text();
-    console.log('API yanıtı:', rawText);
     const data = JSON.parse(rawText);
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
@@ -433,7 +432,6 @@ async function selectMenseUlke(kod) {
       const badge = document.getElementById('menseTaslakYuklendi');
       if (badge) { badge.textContent = '✓ ' + cfg.label + ' taslağı hazır'; badge.style.display = 'inline-flex'; }
     } catch(e) {
-      console.warn('Menşe taslak yüklenemedi:', e);
     }
   }
 }
