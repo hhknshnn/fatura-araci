@@ -1,0 +1,30 @@
+{
+  "ulke": "Irak",
+  "dosyaAdi": "Irak",
+  "sheet": "taslak_iq",
+  "alanlar": {
+    "kap": {
+      "hucre": "D4",
+      "tip": "metin",
+      "label": "Packages"
+    },
+    "brutKg": {
+      "hucre": "D5",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)"
+    },
+    "netKg": {
+      "hucre": "D6",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=D5*0.9"
+    },
+    "referansNo": {
+      "hucre": "D9",
+      "tip": "metin",
+      "label": "Referans No",
+      "prefix": "2026-"
+    }
+  },
+  "menseAlanlar": {}
+}

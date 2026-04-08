@@ -115,15 +115,75 @@ const TASLAK_ULKELER = {
     flag:     'kz',
     template: 'templates/taslak_kz.xlsx',
     alanlar: [
-      { id: 'navlun',     label: 'Freight (USD)',     tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta',    label: 'Insurance (USD)',   tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Packages',          tip: 'text', placeholder: 'örn: 28' },
+      { id: 'navlun',     label: 'Freight (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Insurance (EUR)',   tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Packages',          tip: 'number', placeholder: 'örn: 28' },
       { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
-  // Diğer ülkeler buraya eklenecek
+  // ── FRANCHISE ÜLKELER ──────────────────────────────────────────────────────
+  iq: {
+    grup: 'franchise', label: 'Irak', flag: 'iq',
+    template: 'templates/taslak_iq.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 43 (33 palet + 10 Koli)' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  lr: {
+    grup: 'franchise', label: 'Liberya', flag: 'lr',
+    template: 'templates/taslak_lr.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  ly: {
+    grup: 'franchise', label: 'Libya', flag: 'ly',
+    template: 'templates/taslak_ly.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  lb: {
+    grup: 'franchise', label: 'Lübnan', flag: 'lb',
+    template: 'templates/taslak_lb.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  uz: {
+    grup: 'franchise', label: 'Özbekistan', flag: 'uz',
+    template: 'templates/taslak_uz.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  ru: {
+    grup: 'franchise', label: 'Rusya', flag: 'ru',
+    template: 'templates/taslak_ru.xlsx',
+    alanlar: [
+      { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -157,19 +217,32 @@ function initTaslakPanel() {
 // ── ÜLKE GRİD ─────────────────────────────────────────────────────────────────
 function buildTaslakUlkeGrid() {
   const grid = document.getElementById('taslakUlkeGrid');
-  if (!grid) {
- return; }
+  if (!grid) { return; }
   grid.innerHTML = '';
-  Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
-    const btn = document.createElement('div');
-    btn.className = 'country-btn';
-    btn.id = 'taslak-ulke-' + kod;
-    btn.addEventListener('click', () => selectTaslakUlke(kod));
-    btn.innerHTML = `
-      <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
-      <div class="country-name">${cfg.label}</div>`;
-    grid.appendChild(btn);
-  });
+
+  const corporate = Object.entries(TASLAK_ULKELER).filter(([k,v]) => !v.grup || v.grup === 'corporate');
+  const franchise  = Object.entries(TASLAK_ULKELER).filter(([k,v]) => v.grup === 'franchise');
+
+  const addGroup = (title, entries) => {
+    if (!entries.length) return;
+    const label = document.createElement('div');
+    label.style.cssText = 'grid-column:1/-1;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:4px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px;font-family:var(--mono);';
+    label.textContent = title;
+    grid.appendChild(label);
+    entries.forEach(([kod, cfg]) => {
+      const btn = document.createElement('div');
+      btn.className = 'country-btn';
+      btn.id = 'taslak-ulke-' + kod;
+      btn.addEventListener('click', () => selectTaslakUlke(kod));
+      btn.innerHTML = `
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
+        <div class="country-name">${cfg.label}</div>`;
+      grid.appendChild(btn);
+    });
+  };
+
+  addGroup('Corporate Ülkeler', corporate);
+  addGroup('Franchise Ülkeler', franchise);
 }
 
 // ── ÜLKE SEÇ ──────────────────────────────────────────────────────────────────

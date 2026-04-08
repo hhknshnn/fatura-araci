@@ -1,0 +1,30 @@
+{
+  "ulke": "Libya",
+  "dosyaAdi": "Libya",
+  "sheet": "taslak_ly",
+  "alanlar": {
+    "kap": {
+      "hucre": "D3",
+      "tip": "metin",
+      "label": "Packages"
+    },
+    "brutKg": {
+      "hucre": "D4",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)"
+    },
+    "netKg": {
+      "hucre": "D5",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=D4*0.9"
+    },
+    "referansNo": {
+      "hucre": "D8",
+      "tip": "metin",
+      "label": "Referans No",
+      "prefix": "2026-"
+    }
+  },
+  "menseAlanlar": {}
+}
