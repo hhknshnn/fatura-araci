@@ -151,7 +151,8 @@ def parse_pdf(pdf_bytes):
             text = last_page.extract_text() or ''
             m = re.search(r'NAVLUN:\s*TRY\s*([\d.,]+)', text)
             if m: result['navlun'] = float(m.group(1).replace('.','').replace(',','.'))
-            m = re.search(r'S[\u0130I]G\.:\s*TRY\s*([\d.,]+)', text)
+            # re.IGNORECASE eklendi — PDF'deki büyük/küçük harf farkını tolere eder
+            m = re.search(r'S[İI\u0130]G\.?\s*:?\s*TRY\s*([\d.,]+)', text, re.IGNORECASE)
             if m: result['sigorta'] = float(m.group(1).replace('.','').replace(',','.'))
             m = re.search(r'KAP:\s*(\d+)', text)
             if m: result['kap'] = m.group(1)
@@ -586,7 +587,6 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     """Gürcistan INV + PL üretimi — ref_ge.xlsx şablonu üzerinden."""
  
-    # Veri temizleme — Bosna ile aynı pattern, encoding sorunu yok
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
@@ -597,7 +597,6 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
  
-    # Ortak ağırlık motoru
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
  
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -614,31 +613,33 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                     net_list_new.append(round(hedef_net - toplam_net, 2))
             net_list = net_list_new
  
-    INV_TOTAL_COL = 8   # H — TOTAL AMOUNT TRY
-    PL_GROSS_COL  = 7   # G — GROSS WEIGHT
-    PL_NET_COL    = 8   # H — NET WEIGHT
+    INV_TOTAL_COL = 8   # H
+    PL_GROSS_COL  = 7   # G
+    PL_NET_COL    = 8   # H
+    TRY_FMT       = '#,##0.00 "TRY"'  # [DÜZ.3] tüm para hücreleri bu format
  
-    # Şablonu yükle, eski veri satırlarını temizle
     wb = openpyxl.load_workbook(find_ge_template_path())
     ws_inv = wb['INV']
     ws_pl  = wb['PL']
-    DS = 9  # R9 = kolon başlığı; veri R10'dan başlar
+    DS = 9
  
     if ws_inv.max_row > DS:
         ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
     if ws_pl.max_row > DS:
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
  
-    # Header — sadece değişken alanlar (müşteri/adres/destination şablonda sabit)
+    # [DÜZ.1] PACKAGES: pdf_fields'tan kap değerini string olarak al
     packages_str = str((pdf_fields or {}).get('kap', ''))
+ 
     apply_ge_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_ge_template_header(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
  
-    # ── INV ──────────────────────────────────────────────────────────────────
+    # ── INV kolon başlıkları ─────────────────────────────────────────────────
     ws_inv.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(GE_INV_COLS):
         hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
  
+    # ── INV veri satırları ───────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_inv.row_dimensions[er].height = 23
@@ -648,36 +649,35 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             if out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
             elif out_col in ('UNIT PRICE', 'TOTAL AMOUNT TRY'):
-                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0.00')
+                # [DÜZ.3] veri satırları da TRY formatında
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt=TRY_FMT)
             elif out_col in ('MASTER ITEM CODE', 'HS CODE', 'BARCODE'):
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
  
     last_inv = DS + len(df)
- 
-    # Footer: TOTAL + FREIGHT + INSURANCE + GRAND TOTAL TRY (referans şablonla aynı)
     tr, fr, ir, gr = last_inv+1, last_inv+2, last_inv+3, last_inv+4
     for r, h in [(tr, 22), (fr, 22), (ir, 22), (gr, 28)]:
         ws_inv.row_dimensions[r].height = h
  
     G, H = 7, 8
+    tc = get_column_letter(INV_TOTAL_COL)
  
-    # TOTAL — koyu mavi
+    # TOTAL — koyu mavi, [DÜZ.3] TRY format
     c = ws_inv.cell(row=tr, column=G, value='TOTAL')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    tc = get_column_letter(INV_TOTAL_COL)
     c = ws_inv.cell(row=tr, column=H, value=f'=SUM({tc}{DS+1}:{tc}{last_inv})')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = TRY_FMT
     c.border = brd()
  
-    # FREIGHT — beyaz
+    # FREIGHT — beyaz, [DÜZ.3] TRY format
     c = ws_inv.cell(row=fr, column=G, value='FREIGHT')
     c.font = Font(name='Arial', bold=True, color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
@@ -687,10 +687,10 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = TRY_FMT
     c.border = brd()
  
-    # INSURANCE — beyaz
+    # INSURANCE — beyaz, [DÜZ.2+DÜZ.3] değer + TRY format
     c = ws_inv.cell(row=ir, column=G, value='INSURANCE')
     c.font = Font(name='Arial', bold=True, color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
@@ -700,10 +700,10 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = TRY_FMT  # [DÜZ.2] eksik format eklendi
     c.border = brd()
  
-    # GRAND TOTAL TRY — altın
+    # GRAND TOTAL TRY — altın, [DÜZ.3] TRY format
     c = ws_inv.cell(row=gr, column=G, value='GRAND TOTAL TRY')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
@@ -713,16 +713,17 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = TRY_FMT
     c.border = brd()
  
     set_print(ws_inv, f'A1:L{gr}')
  
-    # ── PL ───────────────────────────────────────────────────────────────────
+    # ── PL kolon başlıkları ──────────────────────────────────────────────────
     ws_pl.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(GE_PL_COLS):
         hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
  
+    # ── PL veri satırları ────────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_pl.row_dimensions[er].height = 23
@@ -741,8 +742,6 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                 dat(ws_pl, er, cn, row.get(src_col, ''), bg=bg, align='left')
  
     last_pl = DS + len(df)
- 
-    # PL footer: F=TOTAL KG: | G=GROSS SUM | H=NET SUM (referans şablonla aynı)
     pl_gr = last_pl + 1
     ws_pl.row_dimensions[pl_gr].height = 28
  
@@ -750,7 +749,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     for col_idx in range(1, 6):
         ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
  
-    # F: TOTAL KG: etiketi — GOLD, sağa yasalı
+    # F: TOTAL KG: — GOLD, sağa yasalı
     c = ws_pl.cell(row=pl_gr, column=6, value='TOTAL KG:')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
