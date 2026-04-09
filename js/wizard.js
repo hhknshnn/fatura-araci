@@ -133,8 +133,8 @@ function selectCountry(c) {
   document.getElementById('eurSection').classList.toggle('visible', c === 'be');
   document.getElementById('kzModeSection').classList.toggle('visible', c === 'kz');
 
-  // PDF drop zone sadece Sırbistan'da
-  document.getElementById('pdfDropZone').style.display = ['rs','ba'].includes(c) ? 'block' : 'none';
+  // PDF drop zone şablonlu backend ülkelerinde gösterilir
+  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -392,8 +392,8 @@ function showMenseAyrim() {
 function buildAndDownloadReady() {
   if (!workingRows) return;
 
-  // Sırbistan → Python backend'e gönderilecek, burada sadece butonu göster
-  if (currentCountry === 'rs') {
+  // Şablonlu backend ülkeleri → Python backend'e gönderilecek
+  if (['rs','ba','ge'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -425,8 +425,8 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  // Sırbistan → şablonlu INV+PL (Python backend)
-  if (['rs','ba'].includes(currentCountry)) { await downloadRS(); return; }
+  // Şablonlu backend ülkeleri → INV+PL (Python backend)
+  if (['rs','ba','ge'].includes(currentCountry)) { await downloadRS(); return; }
 
   // Diğer ülkeler → JS ile üretilmiş workbook
   if (!processedWB) return;
