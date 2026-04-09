@@ -121,6 +121,33 @@ GE_PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
+# Override GE kolonlari with stable source headers.
+GE_INV_COLS = [
+    ('COUNTRY OF ORIGIN', 'MENÅžEÄ° -EN'),
+    ('MASTER ITEM CODE',  'Asorti Barkodu'),
+    ('ITEM CODE',         'SKU'),
+    ('HS CODE',           'GTÄ°P'),
+    ('ITEM NAME',         'ÃœrÃ¼n AÃ§Ä±klamasÄ± EN'),
+    ('QTY',               'Miktar'),
+    ('UNIT PRICE',        'Fiyat (D)'),
+    ('TOTAL AMOUNT TRY',  'Net Tutar (D)'),
+    ('ITEM DESCRIPTION',  'ALT GRUBU -EN'),
+    ('BARCODE',           'Asorti Barkodu'),
+    ('MATERIAL',          'MATERYAL -EN'),
+    ('DIMENSION',         'EBAT AÃ§Ä±klama'),
+]
+
+GE_PL_COLS = [
+    ('COUNTRY OF ORIGIN', 'MENÅžEÄ° -EN'),
+    ('MASTER ITEM CODE',  'Asorti Barkodu'),
+    ('ITEM CODE',         'SKU'),
+    ('HS CODE',           'GTÄ°P'),
+    ('ITEM NAME',         'ÃœrÃ¼n AÃ§Ä±klamasÄ± EN'),
+    ('QTY',               'Miktar'),
+    ('GROSS WEIGHT',      '__BRUT__'),
+    ('NET WEIGHT',        '__NET__'),
+]
+
 def brd(c='BFBFBF'):
     s = Side(style='thin', color=c)
     return Border(left=s, right=s, top=s, bottom=s)
@@ -170,6 +197,31 @@ def parse_num(v):
         s = s.replace(',','.')
     try: return float(s)
     except: return 0.0
+
+
+def rename_input_columns(df):
+    alias_groups = [
+        ['GTÄ°P', 'GTİP'],
+        ['E-Fatura Seri NumarasÄ±', 'E-Fatura Seri Numarası'],
+        ['ÃœrÃ¼n AÃ§Ä±klamasÄ± EN', 'Ürün Açıklaması EN'],
+        ['EBAT AÃ§Ä±klama', 'EBAT Açıklama'],
+        ['MENÅžEÄ° -EN', 'MENŞEİ -EN'],
+        ['ÃœRÃœN ARA GRUBU', 'ÜRÜN ARA GRUBU'],
+        ['ÃœrÃ¼n AÄŸÄ±rlÄ±ÄŸÄ± (KG)', 'Ürün Ağırlığı (KG)'],
+        ['MÃ¼ÅŸteri Firma AdÄ±', 'Müşteri Firma Adı'],
+    ]
+    rename_map = {}
+    for aliases in alias_groups:
+        target = aliases[0]
+        if target in df.columns:
+            continue
+        for alias in aliases[1:]:
+            if alias in df.columns:
+                rename_map[alias] = target
+                break
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    return df
 
 def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     ham_list = []
@@ -584,6 +636,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
 def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+    df = rename_input_columns(df)
     df['GTÄ°P'] = df['GTÄ°P'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
