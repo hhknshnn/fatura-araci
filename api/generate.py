@@ -342,14 +342,15 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     PL_NET_COL    = 8   # H — NET WEIGHT
 
     wb = Workbook()
-    DS = 9  # Data başlangıç satırı (header row)
+    DS = 9  # Kolon başlığı satırı; veri DS+1'den başlar
 
     # ── INV ──────────────────────────────────────────────────────────────────
     ws_inv = wb.active
     ws_inv.title = 'INV'
 
-    # Sütun genişlikleri — Excel'den ölçülen değerler
-    for col, w in [('A',16),('B',14),('C',13),('D',18),('E',26),('F',7),('G',20),('H',17),('I',17),('J',15),('K',14),('L',12)]:
+    # Sütun genişlikleri (referans Excel'den alınan değerler)
+    for col, w in [('A',16),('B',14),('C',13),('D',18),('E',33),('F',6),
+                   ('G',20.36),('H',26),('I',22),('J',13),('K',12),('L',16)]:
         if column_index_from_string(col) <= len(BA_INV_COLS):
             ws_inv.column_dimensions[col].width = w
 
@@ -358,15 +359,15 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                  destination=destination, incoterm=incoterm,
                  info_start_col=INV_UNIT_COL)
 
-    # Kolon başlıkları (satır 9)
+    # Kolon başlıkları
     ws_inv.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(BA_INV_COLS):
         hdr(ws_inv, DS, i+1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # Veri satırları
+    # Veri satırları — yükseklik sabit 23pt (referans Excel)
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
-        ws_inv.row_dimensions[er].height = None
+        ws_inv.row_dimensions[er].height = 23
         bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
         for c_idx, (out_col, src_col) in enumerate(BA_INV_COLS):
             cn = c_idx + 1
@@ -381,12 +382,11 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     last_inv = DS + len(df)
 
-    # GRAND TOTAL — tek satır, TOTAL satırı yok (Excel'indeki yapı)
+    # GRAND TOTAL — tek satır, A-F transparent, G=etiket, H=formül
     gr = last_inv + 1
     ws_inv.row_dimensions[gr].height = 28
 
-    # A-F: boş (transparent), border yok
-    # G: "GRAND TOTAL TRY" etiketi
+    # G: "GRAND TOTAL TRY" — GOLD, beyaz yazı, ortalı
     c = ws_inv.cell(row=gr, column=INV_UNIT_COL, value='GRAND TOTAL TRY')
     c.font      = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill      = PatternFill('solid', fgColor=GOLD)
@@ -397,23 +397,26 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     tc = get_column_letter(INV_TOTAL_COL)
     c = ws_inv.cell(row=gr, column=INV_TOTAL_COL,
                     value=f'=SUM({tc}{DS+1}:{tc}{last_inv})')
-    c.font         = Font(name='Arial', bold=True, color='FFFFFF', size=11)
-    c.fill         = PatternFill('solid', fgColor=GOLD)
-    c.alignment    = Alignment(horizontal='right', vertical='center')
+    c.font          = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill          = PatternFill('solid', fgColor=GOLD)
+    c.alignment     = Alignment(horizontal='right', vertical='center')
     c.number_format = '#,##0.00'
-    c.border       = brd()
+    c.border        = brd()
 
     set_print(ws_inv, f'A1:H{gr}')
 
     # ── PL ───────────────────────────────────────────────────────────────────
     ws_pl = wb.create_sheet('PL')
 
-    # Sütun genişlikleri — Excel'den ölçülen değerler
-    for col, w in [('A',16),('B',14),('C',13),('D',18),('E',33),('F',6),('G',14),('H',26)]:
+    # Sütun genişlikleri (referans Excel'den alınan değerler)
+    for col, w in [('A',16),('B',14),('C',13),('D',18.18),('E',33),('F',6),
+                   ('G',15.54),('H',20.91)]:
         ws_pl.column_dimensions[col].width = w
 
+    # PL'de PACKAGES değeri boş kalır (pdf_fields=None geçilir)
     build_header(ws_pl, 'PACKING LIST', fatura_no, fatura_date,
                  musteri, musteri_adres, len(BA_PL_COLS), logo_bytes,
+                 pdf_fields=None,
                  destination=destination, incoterm=incoterm,
                  info_start_col=PL_GROSS_COL)
 
@@ -422,10 +425,10 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     for i, (hd, _) in enumerate(BA_PL_COLS):
         hdr(ws_pl, DS, i+1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # Veri satırları
+    # Veri satırları — yükseklik sabit 23pt
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
-        ws_pl.row_dimensions[er].height = None
+        ws_pl.row_dimensions[er].height = 23
         bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
         for c_idx, (out_col, src_col) in enumerate(BA_PL_COLS):
             cn = c_idx + 1
@@ -442,34 +445,32 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     last_pl = DS + len(df)
 
-    # GRAND TOTAL — Excel'indeki yapı:
-    # A-D: beyaz fill | E: etiket (GOLD) | F: boş | G: GROSS SUM | H: NET SUM
+    # GRAND TOTAL — A-D beyaz, E-F transparent, G=etiket, H=NET SUM
     pl_gr = last_pl + 1
     ws_pl.row_dimensions[pl_gr].height = 28
 
-    # A-D beyaz
+    # A-D: beyaz fill
     for col_idx in range(1, 5):
         ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
-    # E: GRAND TOTAL etiketi (merge yok, sadece E)
-    c = ws_pl.cell(row=pl_gr, column=5, value='GRAND TOTAL')
+    # E-F: transparent (hiçbir şey atanmıyor)
+
+    # G: "GRAND TOTAL" — GOLD, beyaz yazı, halign=None (referans Excel'deki gibi)
+    c = ws_pl.cell(row=pl_gr, column=PL_GROSS_COL, value='GRAND TOTAL')
     c.font      = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill      = PatternFill('solid', fgColor=GOLD)
-    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.alignment = Alignment(vertical='center')  # horizontal kasıtlı None
     c.border    = brd()
 
-    # F: boş (QTY toplamı yok — Excel'indeki gibi)
-
-    # G: GROSS WEIGHT toplamı, H: NET WEIGHT toplamı
-    for cn, fmt in [(PL_GROSS_COL, '#,##0.00'), (PL_NET_COL, '#,##0.00')]:
-        cl = get_column_letter(cn)
-        c = ws_pl.cell(row=pl_gr, column=cn,
-                       value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
-        c.font         = Font(name='Arial', bold=True, color='FFFFFF', size=11)
-        c.fill         = PatternFill('solid', fgColor=GOLD)
-        c.alignment    = Alignment(horizontal='right', vertical='center')
-        c.number_format = fmt
-        c.border       = brd()
+    # H: NET WEIGHT toplamı
+    cl = get_column_letter(PL_NET_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_NET_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font          = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill          = PatternFill('solid', fgColor=GOLD)
+    c.alignment     = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border        = brd()
 
     set_print(ws_pl, f'A1:H{pl_gr}')
 
@@ -477,7 +478,6 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue(), fatura_no
-
 
 
 def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
