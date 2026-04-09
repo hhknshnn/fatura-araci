@@ -637,6 +637,10 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     df = rename_input_columns(df)
+    if 'GTÄ°P' in df.columns and 'GTÃ„Â°P' not in df.columns:
+        df['GTÃ„Â°P'] = df['GTÄ°P']
+    if 'E-Fatura Seri NumarasÄ±' in df.columns and 'E-Fatura Seri NumarasÃ„Â±' not in df.columns:
+        df['E-Fatura Seri NumarasÃ„Â±'] = df['E-Fatura Seri NumarasÄ±']
     df['GTÄ°P'] = df['GTÄ°P'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
@@ -694,7 +698,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             if out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
             elif out_col in ('UNIT PRICE', 'TOTAL AMOUNT TRY'):
-                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0.00')
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0.00 "TRY"')
             elif out_col in ('MASTER ITEM CODE', 'HS CODE', 'BARCODE'):
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
@@ -721,7 +725,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = '#,##0.00 "TRY"'
     c.border = brd()
 
     c = ws_inv.cell(row=fr, column=g_col, value='FREIGHT')
@@ -733,7 +737,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = '#,##0.00 "TRY"'
     c.border = brd()
 
     c = ws_inv.cell(row=ir, column=g_col, value='INSURANCE')
@@ -745,7 +749,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = '#,##0.00 "TRY"'
     c.border = brd()
 
     c = ws_inv.cell(row=gr, column=g_col, value='GRAND TOTAL TRY')
@@ -757,10 +761,10 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = '#,##0.00 "TRY"'
     c.border = brd()
 
-    set_print(ws_inv, f'A1:L{gr}')
+    set_print(ws_inv, f'A1:H{gr}')
 
     ws_pl.row_dimensions[ds].height = 35
     for i, (hd, _) in enumerate(GE_PL_COLS):
