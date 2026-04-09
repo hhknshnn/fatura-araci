@@ -411,7 +411,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             if out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
             elif out_col in ('UNIT PRICE', 'TOTAL AMOUNT TRY'):
-                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0.00')
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0.00 "TRY"')
             elif out_col in ('MASTER ITEM CODE', 'HS CODE'):
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
@@ -430,6 +430,10 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border    = brd()
 
+    # G: GROSS WEIGHT toplamÄ±
+
+    # G: GROSS WEIGHT toplamÄ±
+
     # H: SUM formülü
     tc = get_column_letter(INV_TOTAL_COL)
     c = ws_inv.cell(row=gr, column=INV_TOTAL_COL,
@@ -437,7 +441,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.font          = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill          = PatternFill('solid', fgColor=GOLD)
     c.alignment     = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00'
+    c.number_format = '#,##0.00 "TRY"'
     c.border        = brd()
 
     set_print(ws_inv, f'A1:H{gr}')
@@ -453,7 +457,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     apply_ba_template_header(
         ws_pl, 'PACKING LIST', fatura_no, fatura_date,
         musteri, musteri_adres, destination, incoterm,
-        packages=''
+        packages=str((pdf_fields or {}).get('kap', ''))
     )
 
     # Kolon başlıkları
@@ -485,20 +489,32 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     pl_gr = last_pl + 1
     ws_pl.row_dimensions[pl_gr].height = 28
 
-    # A-D: beyaz fill
-    for col_idx in range(1, 5):
+    # A-E: beyaz fill
+    for col_idx in range(1, 6):
         ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
     # E-F: transparent (hiçbir şey atanmıyor)
 
     # G: "GRAND TOTAL" — GOLD, beyaz yazı, halign=None (referans Excel'deki gibi)
-    c = ws_pl.cell(row=pl_gr, column=PL_GROSS_COL, value='GRAND TOTAL')
+    c = ws_pl.cell(row=pl_gr, column=6, value='TOTAL KG:')
     c.font      = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill      = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(vertical='center')  # horizontal kasıtlı None
     c.border    = brd()
 
     # H: NET WEIGHT toplamı
+    c.alignment = Alignment(horizontal='right', vertical='center')
+
+    # G: GROSS WEIGHT toplamÄ±
+    cl = get_column_letter(PL_GROSS_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_GROSS_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font          = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill          = PatternFill('solid', fgColor=GOLD)
+    c.alignment     = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border        = brd()
+
     cl = get_column_letter(PL_NET_COL)
     c = ws_pl.cell(row=pl_gr, column=PL_NET_COL,
                    value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
