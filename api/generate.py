@@ -322,6 +322,20 @@ def apply_ba_template_header(ws, sheet_title, fatura_no, fatura_date, musteri, m
     ws['A7'] = f'{musteri}\n{musteri_adres}'
 
 
+def find_ba_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_ba.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_ba.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_ba.xlsx'),
+        os.path.join(os.getcwd(), 'ref_ba.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError(f'ref_ba.xlsx not found. Checked: {candidates}')
+
+
 def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     """Bosna INV + PL üretimi."""
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(lambda x: 'PCS' if str(x).strip()=='AD' else x)
@@ -357,10 +371,8 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     PL_GROSS_COL  = 7   # G — GROSS WEIGHT
     PL_NET_COL    = 8   # H — NET WEIGHT
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    template_path = os.path.join(base_dir, 'ref_ba.zip')
-    with open(template_path, 'rb') as template_file:
-        wb = openpyxl.load_workbook(io.BytesIO(template_file.read()))
+    template_path = find_ba_template_path()
+    wb = openpyxl.load_workbook(template_path)
     DS = 9  # Kolon başlığı satırı; veri DS+1'den başlar
 
     # ── INV ──────────────────────────────────────────────────────────────────
