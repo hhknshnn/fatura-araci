@@ -147,14 +147,13 @@ def parse_pdf(pdf_bytes):
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            last_page = pdf.pages[-1]
-            text = last_page.extract_text() or ''
+            text = '\n'.join((page.extract_text() or '') for page in pdf.pages)
             m = re.search(r'NAVLUN:\s*TRY\s*([\d.,]+)', text)
             if m: result['navlun'] = float(m.group(1).replace('.','').replace(',','.'))
             # re.IGNORECASE eklendi — PDF'deki büyük/küçük harf farkını tolere eder
             m = re.search(r'S[İI\u0130]G\.?\s*:?\s*TRY\s*([\d.,]+)', text, re.IGNORECASE)
             if m: result['sigorta'] = float(m.group(1).replace('.','').replace(',','.'))
-            m = re.search(r'KAP:\s*(\d+)', text)
+            m = re.search(r'\bKAP(?:\s+SAYISI)?\s*:?\s*(\d+)\b', text, re.IGNORECASE)
             if m: result['kap'] = m.group(1)
     except Exception as e:
         pass
@@ -171,6 +170,69 @@ def parse_num(v):
         s = s.replace(',','.')
     try: return float(s)
     except: return 0.0
+
+
+def _normalize_pdf_text(text):
+    return re.sub(r'\s+', ' ', (text or '').replace('\u00a0', ' ')).strip()
+
+
+def _extract_pdf_amount(text, patterns):
+    def _parse_pdf_amount(value):
+        s = str(value).strip().replace(' ', '').replace('\u00a0', '')
+        if '.' in s and ',' in s:
+            if s.rfind(',') > s.rfind('.'):
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                s = s.replace(',', '')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        try:
+            return float(s)
+        except Exception:
+            return parse_num(value)
+
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return _parse_pdf_amount(m.group(1))
+    return 0.0
+
+
+def _extract_pdf_packages(text):
+    patterns = [
+        r'\bKAP(?:\s+SAYISI|\s+ADEDI)?\b\s*[:.]?\s*(\d+)\b',
+        r'\bPACKAGES?\b\s*[:.]?\s*(\d+)\b',
+        r'\bCOLL[Iİ]\b\s*[:.]?\s*(\d+)\b',
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return ''
+
+
+def parse_pdf(pdf_bytes):
+    """PDF'den navlun, sigorta ve kap değerlerini çek."""
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages]
+            text = ' '.join(part for part in page_texts if part).strip()
+            if not text:
+                return result
+
+            result['navlun'] = _extract_pdf_amount(text, [
+                r'\bNAVLUN\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+                r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+            ])
+            result['sigorta'] = _extract_pdf_amount(text, [
+                r'\bS[İI]G(?:ORTA)?\.?\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+                r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+            ])
+            result['kap'] = _extract_pdf_packages(text)
+    except Exception:
+        pass
+    return result
 
 def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     ham_list = []
@@ -629,10 +691,14 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
  
     # [DÜZ.1] PACKAGES: pdf_fields'tan kap değerini string olarak al
-    packages_str = str((pdf_fields or {}).get('kap', ''))
+    packages_str = str((pdf_fields or {}).get('kap', '') or '')
+    freight_value = parse_num((pdf_fields or {}).get('navlun', 0))
+    insurance_value = parse_num((pdf_fields or {}).get('sigorta', 0))
  
     apply_ge_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_ge_template_header(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
+    ws_inv['H5'] = packages_str
+    ws_pl['H5'] = packages_str
  
     # ── INV kolon başlıkları ─────────────────────────────────────────────────
     ws_inv.row_dimensions[DS].height = 35
@@ -683,7 +749,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    c = ws_inv.cell(row=fr, column=H, value=float((pdf_fields or {}).get('navlun', 0)))
+    c = ws_inv.cell(row=fr, column=H, value=freight_value)
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
@@ -696,7 +762,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    c = ws_inv.cell(row=ir, column=H, value=float((pdf_fields or {}).get('sigorta', 0)))
+    c = ws_inv.cell(row=ir, column=H, value=insurance_value)
     c.font = Font(name='Arial', color='000000', size=9)
     c.fill = PatternFill('solid', fgColor='FFFFFF')
     c.alignment = Alignment(horizontal='right', vertical='center')
