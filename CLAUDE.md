@@ -1,135 +1,104 @@
-# Proje: Excel Fatura ve Evrak Hazırlama Uygulaması
-
-## Amaç
-Excel verilerini kullanarak otomatik olarak INV (Invoice) ve PL (Packing List) evrakları oluşturmak.
-
----
+# Proje: Excel Fatura ve Evrak Hazırlama Uygulaması (fatura-araci)
 
 ## Genel Kurallar
-
 - Mevcut çalışan kodu ASLA bozma
-- Gereksiz refactor yapma
 - Minimum değişiklik ile ilerle
+- Gereksiz refactor / optimizasyon yapma
 - Yeni bağımlılık ekleme
-- Kod sade ve okunabilir olsun
-- Aynı işi tekrar eden kod yazma
+- Büyük değişiklik öncesi plan sun, onay al
 
 ---
 
-## Uygulama Akışı
+## Dosya Yapısı
 
-Kullanıcı seçim yapar:
-
-1. Fatura Öncesi / Fatura Sonrası
-2. Serbest Depo / Antrepo
-3. Menşe ayrımı var / yok
-4. Ülke seçimi
-
----
-
-## Ülke Grupları
-
-### Menşe ayrımı gerekmeyen:
-- Bosna
-- Gürcistan
-- Kosova
-- Makedonya
-- Sırbistan
-
-### Diğer ülkeler:
-- Standart akış
+```
+fatura-araci/
+├── api/
+│   └── generate.py        # Ana backend — tüm Excel üretimi burada
+├── js/
+│   ├── countries.js       # Ülke tanımları ve kolon mapping
+│   ├── wizard.js          # Kullanıcı akışı (adım adım seçim)
+│   ├── processor.js       # Frontend işleme mantığı
+│   └── sku.js             # İstisna SKU yönetimi
+├── templates/
+│   ├── ref_ba.xlsx        # Bosna referans şablonu
+│   └── ref_ge.xlsx        # Gürcistan referans şablonu
+├── css/
+├── config/
+├── index.html
+└── CLAUDE.md
+```
 
 ---
 
-## Evrak Tipleri
+## Mimari — 3 Katman
 
-- INV (Invoice)
-- PL (Packing List)
+### 1. Frontend (wizard.js, countries.js)
+- Kullanıcı ülke seçer, Excel/PDF yükler
+- `ulkeKodu`, `hedefBrut`, `grupKilolari`, `exceptionSkus` backend'e gönderilir
 
-Her ülkenin:
-- kolon yapısı farklı olabilir
-- mapping farklı olabilir
+### 2. Ortak Backend Motoru (generate.py)
+- `calculate_weights()` — brüt/net dağıtımı, DOKUNMA
+- `parse_pdf()` — PDF'den kap/navlun/sigorta, DOKUNMA
+- `parse_num()`, `brd()`, `hdr()`, `dat()` — yardımcılar, DOKUNMA
+- `build_header()` — template tabanlı olmayan ülkeler için
+- `set_print()` — yazdırma ayarları
 
----
+### 3. Ülkeye Özel Üreticiler (generate.py içinde)
+- `generate_excel()` → Sırbistan (varsayılan)
+- `generate_excel_ba()` → Bosna (`ref_ba.xlsx` şablonu)
+- `generate_excel_ge()` → Gürcistan (`ref_ge.xlsx` şablonu)
 
-## Veri Kaynağı
-
-- Excel dosyası kullanıcı tarafından seçilir
-- Kaynak sheet adı sabit olmayabilir
-- Header kopyalanmaz
-- Veri belirli kolonlardan alınır
-
----
-
-## Mapping Mantığı
-
-- Kolonlar sabit hücrelere yazılır
-- Örnek:
-  - AC → B13
-  - AJ → C13
-  - E → D13
-  - AE → E13
-  - Y → F13
-  - J → G13
-  - K → H13
-  - L → I13
-  - R → K13
-  - AB → L13
-  - AR → M13
-  - AS → N13
-  - AT → O13
-  - AL → P13
+Handler routing:
+```python
+if ulke_kodu == 'ba':   → generate_excel_ba()
+elif ulke_kodu == 'ge': → generate_excel_ge()
+else:                   → generate_excel()
+```
 
 ---
 
-## Hesaplamalar
-
-- Bazı kolonlar formül içerir
-- Örnek:
-  - J sütunu = H * I
-
----
-
-## UI Kuralları
-
-- Basit ve modern arayüz
-- Dropdown ile seçim
-- Kullanıcıyı yönlendiren yapı
-- Gereksiz karmaşıklık yok
+## Yeni Ülke Ekleme Adımları
+1. `templates/ref_xx.xlsx` referans dosyasını al
+2. `generate.py`'ye ekle:
+   - `XX_INV_COLS`, `XX_PL_COLS` — kolon mapping listesi
+   - `find_xx_template_path()` — şablon path bulucu
+   - `apply_xx_template_header()` — değişken alanları doldur
+   - `generate_excel_xx()` — üretici fonksiyon
+3. Handler'a `elif ulke_kodu == 'xx':` routing ekle
+4. `countries.js`'e ülke tanımı ekle
 
 ---
 
-## Dosya İşleme
-
-- Kullanıcı dosya seçer
-- Çıktı otomatik oluşturulur
-- Dosya indirilebilir olmalı
-
----
-
-## Geliştirme Prensibi
-
-Claude şu şekilde çalışmalı:
-
-1. Önce ilgili dosyaları bul
-2. Tüm projeyi analiz etme (sadece gerekli kısım)
-3. Küçük ve güvenli değişiklik yap
-4. Gereksiz dosyaya dokunma
-5. Büyük değişiklik yapmadan önce plan sun
+## Kolon Mapping Formatı
+```python
+XX_INV_COLS = [
+    ('Excel başlık adı', 'Kaynak kolon adı'),
+    ('QTY',              'Miktar'),
+    ('UNIT PRICE',       'Fiyat (D)'),
+    ('GROSS WEIGHT',     '__BRUT__'),   # hesaplanan
+    ('NET WEIGHT',       '__NET__'),    # hesaplanan
+    ('TOTAL AMOUNT TRY', '__CALC__'),   # hesaplanan
+]
+```
 
 ---
 
-## Yasaklar
-
-- Tüm projeyi baştan yazma
-- Gereksiz optimizasyon yapma
-- UI’yı durduk yere değiştirme
-- Mapping mantığını bozma
+## Sabitler (generate.py)
+```
+DARK_BLUE  = '1F3864'   # Kolon başlığı
+MID_BLUE   = '2F5496'   # Header etiket
+LIGHT_BLUE = 'D6E4F0'   # Header değer
+GOLD       = 'C9A84C'   # Grand Total
+LIGHT_GRAY = 'F2F2F2'   # Exporter/Importer kutusu
+```
 
 ---
 
-## Hedef
-
-- Modüler yapı
-- Ülke bazlı config sistemi
-- Tek kod → çok ülke desteği
+## Önemli Notlar
+- Data satır yüksekliği: `23pt` (sabit)
+- Header satırları: R1=27, R2=28, R3-R8=22, R4=32, R7=32, R9=35
+- Zebra: çift satır `FFFFFF`, tek satır `EBF3FB`
+- Template tabanlı ülkelerde `delete_rows(DS+1, ...)` ile eski veri silinir
+- `DS = 9` — kolon başlığı satırı, veri `DS+1`'den başlar
+- Vercel deploy: GitHub push → otomatik
