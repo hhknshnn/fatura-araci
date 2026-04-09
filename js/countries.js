@@ -86,24 +86,7 @@ const SIMPLE_MAPS = {
     { out: 'NET',                src: 'NET'                 },
   ],
 
-  // 🇬🇪 Gürcistan — 12 sütun
-  ge: [
-    { out: 'MENŞEİ -EN',         src: 'MENŞEİ -EN'         },
-    { out: 'Asorti Barkodu',     src: 'Asorti Barkodu'      },
-    { out: 'SKU',                src: 'SKU'                 },
-    { out: 'GTİP',               src: 'GTİP'                },
-    { out: 'Ürün Açıklaması EN', src: 'Ürün Açıklaması EN'  },
-    { out: 'Miktar',             src: 'Miktar'              },
-    { out: 'Fiyat',              src: 'Fiyat'               },
-    { out: 'Miktar X Fiyat',     src: '__CALC__'            },
-    { out: 'ALT GRUBU -EN',      src: 'ALT GRUBU -EN'       },
-    { out: 'Barkod',             src: 'Barkod'              },
-    { out: 'MATERYAL -EN',       src: 'MATERYAL -EN'        },
-    { out: 'EBAT Açıklama',      src: 'EBAT Açıklama'       },
-    { out: 'BRÜT',               src: 'BRÜT'                },
-    { out: 'NET',                src: 'NET'                 },
-  ],
-
+  
   // 🇨🇾 KKTC — 8 sütun
   cy: [
     { out: 'MENŞEİ Açıklama',        src: 'MENŞEİ Açıklama'       },
