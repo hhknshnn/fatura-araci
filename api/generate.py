@@ -200,9 +200,12 @@ def _extract_pdf_amount(text, patterns):
 
 def _extract_pdf_packages(text):
     patterns = [
-        r'\bKAP(?:\s+SAYISI|\s+ADEDI)?\b\s*[:.]?\s*(\d+)\b',
-        r'\bPACKAGES?\b\s*[:.]?\s*(\d+)\b',
-        r'\bCOLL[Iİ]\b\s*[:.]?\s*(\d+)\b',
+        r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+)',   # * KAP ADETİ: 25
+        r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+)',       # * KAP SAYISI: 25
+        r'[*\-]?\s*KAP\s+ADEDI\s*[:.]?\s*(\d+)',        # * KAP ADEDI: 25
+        r'[*\-]?\s*KAP\s*[:.]?\s*(\d+)',                # * KAP: 25
+        r'\bPACKAGES?\s*[:.]?\s*(\d+)',
+        r'\bCOLL[Iİ]\s*[:.]?\s*(\d+)',
     ]
     for pattern in patterns:
         m = re.search(pattern, text, re.IGNORECASE)
