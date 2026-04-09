@@ -359,7 +359,8 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     template_path = os.path.join(base_dir, 'ref_ba.zip')
-    wb = openpyxl.load_workbook(template_path)
+    with open(template_path, 'rb') as template_file:
+        wb = openpyxl.load_workbook(io.BytesIO(template_file.read()))
     DS = 9  # Kolon başlığı satırı; veri DS+1'den başlar
 
     # ── INV ──────────────────────────────────────────────────────────────────
