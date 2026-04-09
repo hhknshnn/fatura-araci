@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import base64
 import io
+import os
 import re
 import traceback
 import pdfplumber
@@ -194,6 +195,12 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
         if column_index_from_string(col) <= col_count:
             ws.column_dimensions[col].width = w
 
+    if info_start_col is None:
+        info_start_col = min(8, max(1, col_count - 1))
+    info_value_col = min(col_count, info_start_col + 1)
+    title_end_col = get_column_letter(info_value_col)
+    hc = get_column_letter(max(1, info_start_col - 1))
+
     ws.row_dimensions[1].height = 27.0
     ws.merge_cells(f'A1:{last_col}1')
     ws['A1'].fill = PatternFill('solid', fgColor='FFFFFF')
@@ -226,30 +233,27 @@ def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres
             pass
 
     ws.row_dimensions[2].height = 28.0
-    lc = get_column_letter(col_count)
-    hc = get_column_letter(min(7, col_count))
-    ws.merge_cells(f'A2:{lc}2')
+    ws.merge_cells(f'A2:{title_end_col}2')
     c = ws['A2']
     c.value = sheet_title
     c.font = Font(name='Arial', bold=True, size=14, color='FFFFFF')
     c.fill = PatternFill('solid', fgColor=DARK_BLUE)
     c.alignment = Alignment(horizontal='center', vertical='center')
-    # J-O beyaz
-    for col_idx in range(10, column_index_from_string(last_col)+1):
+    for col_idx in range(info_value_col + 1, column_index_from_string(last_col)+1):
         ws.cell(row=2, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
     for i in range(3, 9):
         ws.row_dimensions[i].height = 22
 
     def info_label(r, txt):
-        c = ws.cell(row=r, column=8, value=txt)
+        c = ws.cell(row=r, column=info_start_col, value=txt)
         c.font = Font(name='Arial', bold=True, color='FFFFFF', size=9)
         c.fill = PatternFill('solid', fgColor=MID_BLUE)
         c.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
         c.border = brd()
 
     def info_val(r, val, bold=False):
-        c = ws.cell(row=r, column=9, value=val)
+        c = ws.cell(row=r, column=info_value_col, value=val)
         c.font = Font(name='Arial', bold=bold, color='000000', size=9)
         c.fill = PatternFill('solid', fgColor=LIGHT_BLUE)
         c.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
@@ -306,6 +310,18 @@ def set_print(ws, print_area):
     ws.print_title_rows = '1:2'
 
 
+def apply_ba_template_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres,
+                             destination, incoterm, packages=''):
+    ws['A2'] = sheet_title
+    ws['H3'] = str(fatura_date)
+    ws['H4'] = fatura_no
+    ws['H5'] = packages
+    ws['H6'] = destination
+    ws['H7'] = 'TURKEY'
+    ws['H8'] = incoterm
+    ws['A7'] = f'{musteri}\n{musteri_adres}'
+
+
 def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
     """Bosna INV + PL üretimi."""
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(lambda x: 'PCS' if str(x).strip()=='AD' else x)
@@ -341,23 +357,31 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     PL_GROSS_COL  = 7   # G — GROSS WEIGHT
     PL_NET_COL    = 8   # H — NET WEIGHT
 
-    wb = Workbook()
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    template_path = os.path.join(base_dir, 'ref_ba.zip')
+    wb = openpyxl.load_workbook(template_path)
     DS = 9  # Kolon başlığı satırı; veri DS+1'den başlar
 
     # ── INV ──────────────────────────────────────────────────────────────────
-    ws_inv = wb.active
-    ws_inv.title = 'INV'
+    ws_inv = wb['INV']
+    ws_pl = wb['PL']
 
     # Sütun genişlikleri (referans Excel'den alınan değerler)
-    for col, w in [('A',16),('B',14),('C',13),('D',18),('E',33),('F',6),
-                   ('G',20.36),('H',26),('I',22),('J',13),('K',12),('L',16)]:
-        if column_index_from_string(col) <= len(BA_INV_COLS):
-            ws_inv.column_dimensions[col].width = w
+    if ws_inv.max_row > DS:
+        ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
+    if ws_pl.max_row > DS:
+        ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
 
-    build_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date,
-                 musteri, musteri_adres, len(BA_INV_COLS), logo_bytes, pdf_fields,
-                 destination=destination, incoterm=incoterm,
-                 info_start_col=INV_UNIT_COL)
+    apply_ba_template_header(
+        ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date,
+        musteri, musteri_adres, destination, incoterm,
+        packages=str((pdf_fields or {}).get('kap', ''))
+    )
+    apply_ba_template_header(
+        ws_pl, 'PACKING LIST', fatura_no, fatura_date,
+        musteri, musteri_adres, destination, incoterm,
+        packages=''
+    )
 
     # Kolon başlıkları
     ws_inv.row_dimensions[DS].height = 35
@@ -406,7 +430,6 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     set_print(ws_inv, f'A1:H{gr}')
 
     # ── PL ───────────────────────────────────────────────────────────────────
-    ws_pl = wb.create_sheet('PL')
 
     # Sütun genişlikleri (referans Excel'den alınan değerler)
     for col, w in [('A',16),('B',14),('C',13),('D',18.18),('E',33),('F',6),
@@ -414,11 +437,11 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         ws_pl.column_dimensions[col].width = w
 
     # PL'de PACKAGES değeri boş kalır (pdf_fields=None geçilir)
-    build_header(ws_pl, 'PACKING LIST', fatura_no, fatura_date,
-                 musteri, musteri_adres, len(BA_PL_COLS), logo_bytes,
-                 pdf_fields=None,
-                 destination=destination, incoterm=incoterm,
-                 info_start_col=PL_GROSS_COL)
+    apply_ba_template_header(
+        ws_pl, 'PACKING LIST', fatura_no, fatura_date,
+        musteri, musteri_adres, destination, incoterm,
+        packages=''
+    )
 
     # Kolon başlıkları
     ws_pl.row_dimensions[DS].height = 35
