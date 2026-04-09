@@ -452,6 +452,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     for col, w in [('A',16),('B',14),('C',13),('D',18.18),('E',33),('F',6),
                    ('G',15.54),('H',20.91)]:
         ws_pl.column_dimensions[col].width = w
+    ws_pl.column_dimensions['F'].width = max(ws_pl.column_dimensions['F'].width or 0, len('TOTAL KG:') + 2)
 
     # PL'de PACKAGES değeri boş kalır (pdf_fields=None geçilir)
     apply_ba_template_header(
