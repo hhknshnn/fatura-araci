@@ -1044,7 +1044,7 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='center', vertical='center')
     c.border = brd()
-    c = ws_inv.cell(row=gr, column=I, value=f'=I{tr}+I{fr}+I{ir}')
+    c = ws_inv.cell(row=gr, H, value=f'=H{tr}+H{fr}+H{ir}')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='right', vertical='center')
