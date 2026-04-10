@@ -73,7 +73,6 @@
     </div>
   </div>
 
-
   <!-- ── TASLAK DOLDUR PANELİ ─────────────────────────────────────────────── -->
   <div class="panel" id="stepTaslak" style="display:none;">
     <div class="panel-label">Taslak Doldur</div>
@@ -82,11 +81,9 @@
 
     <div class="status-box" id="taslakStatus"></div>
 
-    <!-- Ülke seç -->
     <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Ülke</div>
     <div class="country-grid" id="taslakUlkeGrid" style="margin-bottom:20px;"></div>
 
-    <!-- Depo tipi -->
     <div id="taslakDepoSection" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Depo Tipi</div>
       <div class="mode-options" style="margin-bottom:20px;">
@@ -107,15 +104,10 @@
       </div>
     </div>
 
-    <!-- Form alanları -->
     <div id="taslakFormSection" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">Bilgileri Girin</div>
       <div id="taslakFormAlanlari"></div>
-
-      <!-- Taslak otomatik yükleniyor -->
       <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
-
-      <!-- İndir butonu -->
       <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()" style="display:none;margin-top:16px;">
         ⬇ Taslak İndir
       </button>
@@ -130,7 +122,7 @@
     </div>
   </div>
 
-  <!-- ── ADIM 2: DEPO TİPİ (sadece Fatura Sonrası) ──────────────────────── -->
+  <!-- ── ADIM 2: DEPO TİPİ ──────────────────────────────────────────────── -->
   <div class="panel" id="step2" style="display:none;">
     <div class="panel-label">Adım 2</div>
     <div class="panel-title" id="step2Title">Depo Tipi</div>
@@ -157,7 +149,7 @@
     </div>
   </div>
 
-  <!-- ── ADIM 3: ÜLKE (sadece Fatura Sonrası) ───────────────────────────── -->
+  <!-- ── ADIM 3: ÜLKE ───────────────────────────────────────────────────── -->
   <div class="panel" id="step3" style="display:none;">
     <div class="panel-label">Adım 3</div>
     <div class="panel-title">Ülke Seç</div>
@@ -208,31 +200,36 @@
         <div class="country-name">Kosova</div>
         <div class="country-sub">INV + PL</div>
       </div>
+      <div class="country-btn" id="country-mk" onclick="selectCountry('mk')">
+        <div class="country-flag"><img src="https://flagcdn.com/40x30/mk.png"></div>
+        <div class="country-name">Makedonya</div>
+        <div class="country-sub">INV + PL</div>
+      </div>
     </div>
 
-    <!-- EUR kur (sadece Belçika) -->
+    <!-- EUR kur + Freight/Insurance (Belçika, Kosova, Makedonya) -->
     <div class="eur-section" id="eurSection">
       <div class="eur-label">Euro Kur (TRY/EUR)</div>
-      <div style="display:flex;gap:10px;align-items:center;">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
         <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
           placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
         <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
       </div>
-      <!-- Kosova için manuel freight/insurance -->
-    <div id="koFreightSection" style="display:none;">
-      <div class="eur-label" style="margin-top:8px;">Freight (EUR)</div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
-        <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
-          placeholder="örn: 2353,44" style="flex:1;">
-        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+      <!-- Freight / Insurance: Kosova ve Makedonya -->
+      <div id="koFreightSection" style="display:none;">
+        <div class="eur-label">Freight (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+          <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+            placeholder="örn: 2353,44" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
+        <div class="eur-label">Insurance (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+            placeholder="örn: 0,00" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
       </div>
-      <div class="eur-label">Insurance (EUR)</div>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
-          placeholder="örn: 0,00" style="flex:1;">
-        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-      </div>
-    </div>
     </div>
 
     <!-- KZ gruplandırma modu -->
@@ -268,7 +265,6 @@
     <div class="panel-title" id="step4Title">Dosya Yükle</div>
     <div class="panel-desc" id="step4Desc">Master Excel dosyasını yükleyin.</div>
 
-    <!-- Excel Drop Zone -->
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
       <div class="drop-icon">📊</div>
@@ -277,7 +273,6 @@
       <div class="file-badge" id="fileName" style="display:none;"></div>
     </div>
 
-    <!-- PDF Drop Zone (sadece Fatura Sonrası) -->
     <div class="drop-zone" id="pdfDropZone" style="display:none;border-color:#1E3A5F;">
       <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
       <div class="drop-icon">📄</div>
@@ -286,7 +281,6 @@
       <div class="file-badge" id="pdfFileName" style="display:none;"></div>
     </div>
 
-    <!-- PDF Değerleri -->
     <div class="pdf-info" id="pdfInfo">
       <div class="pdf-row">
         <span class="pdf-key">📦 PACKAGES</span>
@@ -314,10 +308,8 @@
     <div class="panel-title">Kilo Hesaplama</div>
     <div class="panel-desc">BRÜT/NET kilolarını hesaplayın.</div>
 
-    <!-- Durum mesajı -->
     <div class="status-box" id="statusBox"></div>
 
-    <!-- KG Tablosu (boş olanlar) -->
     <div class="kg-panel" id="kgPanel" style="display:none;">
       <div class="kg-header" onclick="toggleKgTable()">
         <div class="kg-header-title">
@@ -337,7 +329,6 @@
       </div>
     </div>
 
-    <!-- İstisna SKU -->
     <div class="sku-panel" id="skuPanel">
       <div class="sku-header" onclick="toggleExSku()">
         <div class="kg-header-title" style="font-size:12px;">⚠️ İstisna SKU Listesi</div>
@@ -353,12 +344,10 @@
       </div>
     </div>
 
-    <!-- Kiloları Uygula -->
     <button class="btn-secondary" onclick="applyGroupWeights()" style="width:100%;margin-bottom:12px;">
       ✓ Kiloları Uygula ve Hesapla
     </button>
 
-    <!-- Hedef KG -->
     <div id="adjustSection" style="display:none;">
       <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:8px;">
         Hesaplanan toplam BRÜT: <span id="calcTotal" style="color:var(--accent2);">—</span> kg
@@ -371,7 +360,6 @@
       <div class="adjust-result" id="adjustResult"></div>
     </div>
 
-    <!-- Antrepo: Hedef NET -->
     <div id="antrepoSection" style="display:none;margin-top:14px;">
       <div style="font-size:13px;font-weight:500;margin-bottom:8px;">Hedef NET (kg)</div>
       <div class="target-row">
@@ -381,24 +369,16 @@
       <div class="adjust-result" id="netResult"></div>
     </div>
 
-    <!-- Menşe Ayrımı (Fatura Öncesi) -->
-    <!-- Menşe → Taslak indirme -->
     <div id="menseTaslakSection" style="display:none;margin-bottom:12px;">
       <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Taslağa Menşe Ekle</div>
-
-      <!-- Ülke seç -->
       <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-family:var(--mono);">ÜLKE</div>
       <div class="country-grid" id="menseUlkeGrid" style="margin-bottom:14px;"></div>
-
-      <!-- Referans No -->
       <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Referans No</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
         <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">2026-</span>
         <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
       </div>
       <div class="file-badge" id="menseTaslakYuklendi" style="display:none;margin-bottom:12px;"></div>
-
-      <!-- Doldurulmuş taslağı yükle -->
       <div class="drop-zone" id="menseTaslakDropZone" style="padding:20px;margin-bottom:12px;">
         <input type="file" accept=".xlsx,.xls" onchange="handleMenseTaslakFile(this.files[0])">
         <div class="drop-icon" style="font-size:22px;">📂</div>
@@ -406,7 +386,6 @@
         <p style="font-size:11px;">Taslak Doldur'dan indirdiğin dosyayı yükle</p>
         <div class="file-badge" id="menseTaslakDosya" style="display:none;"></div>
       </div>
-
       <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">
         ⬇ Menşe Taslak İndir
       </button>
@@ -439,7 +418,6 @@
       <button class="btn-ghost" onclick="goStep(4)">← Geri</button>
     </div>
 
-    <!-- İndir butonu -->
     <button class="btn-primary" id="downloadBtn" onclick="downloadResult()">
       ⬇ INV + PL İndir
     </button>
