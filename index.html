@@ -218,6 +218,21 @@
           placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
         <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
       </div>
+      <!-- Kosova için manuel freight/insurance -->
+    <div id="koFreightSection" style="display:none;">
+      <div class="eur-label" style="margin-top:8px;">Freight (EUR)</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+        <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+          placeholder="örn: 2353,44" style="flex:1;">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+      </div>
+      <div class="eur-label">Insurance (EUR)</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+          placeholder="örn: 0,00" style="flex:1;">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+      </div>
+    </div>
     </div>
 
     <!-- KZ gruplandırma modu -->
