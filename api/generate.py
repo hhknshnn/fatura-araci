@@ -896,14 +896,13 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         for c_idx, (out_col, src_col) in enumerate(KO_INV_COLS):
             cn = c_idx + 1
             if src_col == '__EUR__':
-                # Birim fiyat: TL fiyat / EUR kuru
                 birim_eur = parse_num(row.get('Fiyat', 0)) / eur_kuru
-                dat(ws_inv, er, cn, round(birim_eur, 4), bg=bg, align='right', fmt=EUR_FMT)
+                dat(ws_inv, er, cn, birim_eur, bg=bg, align='right', fmt=EUR_FMT)
             elif src_col == '__EUR_CALC__':
                 # Toplam: Miktar × (Fiyat / kur)
                 miktar    = parse_num(row.get('Miktar', 0))
                 birim_eur = parse_num(row.get('Fiyat', 0)) / eur_kuru
-                dat(ws_inv, er, cn, round(miktar * birim_eur, 2), bg=bg, align='right', fmt=EUR_FMT)
+                dat(ws_inv, er, cn, miktar * birim_eur, bg=bg, align='right', fmt=EUR_FMT)
             elif out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
             elif out_col in ('MASTER ITEM CODE', 'HS CODE', 'BARCODE'):
