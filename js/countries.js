@@ -12,6 +12,7 @@ const COUNTRIES = {
   ru: { label: 'Rusya',      suffix: '_rusya'        },
   ba: { label: 'Bosna',      suffix: '_bosna'        },
   be: { label: 'Belçika',    suffix: '_belcika'      },
+  xk: { label: 'Kosova',     suffix: '_kosova' },
 };
 
 // Kazakistan için çıktıya alınacak sütunlar — sıra önemlidir!

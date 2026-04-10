@@ -130,11 +130,11 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // Ülkeye göre ek alanları göster/gizle
-  document.getElementById('eurSection').classList.toggle('visible', c === 'be');
+  document.getElementById('eurSection').classList.toggle('visible', c === 'be' || c === 'xk');
   document.getElementById('kzModeSection').classList.toggle('visible', c === 'kz');
 
   // PDF drop zone şablonlu backend ülkelerinde gösterilir
-  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge'].includes(c) ? 'block' : 'none';
+  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge', 'xk'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -393,7 +393,7 @@ function buildAndDownloadReady() {
   if (!workingRows) return;
 
   // Şablonlu backend ülkeleri → Python backend'e gönderilecek
-  if (['rs','ba','ge'].includes(currentCountry)) {
+  if (['rs','ba','ge', 'xk'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -473,6 +473,8 @@ async function downloadRS() {
         depoTipi:      selectedDepo,
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
+        eurKuru:       getEurRate() || 1.0,
+
       })
     });
 
