@@ -101,7 +101,7 @@ GE_INV_COLS = [
     ('HS CODE',           'GTİP'),
     ('ITEM NAME',         'Ürün Açıklaması EN'),
     ('QTY',               'Miktar'),
-    ('UNIT PRICE',        'Fiyat (D)'),
+    ('UNIT PRICE',        'Fiyat'),
     ('TOTAL AMOUNT TRY',  'Net Tutar (D)'),
     ('ITEM DESCRIPTION',  'ALT GRUBU -EN'),
     ('BARCODE',           'Asorti Barkodu'),
