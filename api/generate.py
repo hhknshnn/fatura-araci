@@ -941,9 +941,9 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             net_list = net_list_new
 
     EUR_FMT       = '#,##0.00 "EUR"'  # para formatı
-    INV_TOTAL_COL = 8   # H — TOTAL AMOUNT EUR (Gürcistan'da H, Kosova'da da H)
-    PL_GROSS_COL  = 7   # G
-    PL_NET_COL    = 8   # H — PL I'ya kadar, NET H sütununda
+    INV_TOTAL_COL = 9   #I — ref_ko'da değerler I sütununda
+    PL_GROSS_COL  = 8   # H
+    PL_NET_COL    = 9   # I 
 
     wb = openpyxl.load_workbook(find_ko_template_path())
     ws_inv = wb['INV']
@@ -996,7 +996,7 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     for r, h in [(tr, 22), (fr, 22), (ir, 22), (gr, 28)]:
         ws_inv.row_dimensions[r].height = h
 
-    G, H = 7, 8  # TOTAL etiket G, değer H sütununda
+    G, H = 8, 9  # TOTAL etiket H, değer I
     tc = get_column_letter(INV_TOTAL_COL)
 
     # TOTAL satırı
@@ -1085,7 +1085,7 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
     # F: TOTAL KG etiketi
-    c = ws_pl.cell(row=pl_gr, column=6, value='TOTAL KG:')
+    c = ws_pl.cell(row=pl_gr, column=7, value='TOTAL KG:')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='right', vertical='center')
@@ -1111,7 +1111,7 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.number_format = '#,##0.00'
     c.border = brd()
 
-    set_print(ws_pl, f'A1:H{pl_gr}')
+    set_print(ws_pl, f'A1:I{pl_gr}')
 
     buf = io.BytesIO()
     wb.save(buf)
