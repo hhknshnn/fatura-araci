@@ -967,7 +967,7 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.number_format = EUR_FMT
     c.border = brd()
 
-    set_print(ws_inv, f'A1:L{gr}')
+    set_print(ws_inv, f'A1:I{gr}')
 
     ws_pl.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(KO_PL_COLS):
