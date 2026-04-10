@@ -905,7 +905,8 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     return buf.getvalue(), fatura_no
 
 def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0,
+                      ko_freight=0, ko_insurance=0):
     """Kosova INV + PL üretimi — ref_ko.xlsx şablonu üzerinden."""
 
     # GTİP ve barkod temizliği
@@ -957,8 +958,8 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
 
     packages_str    = str((pdf_fields or {}).get('kap', '') or '')
-    freight_value   = round(parse_num((pdf_fields or {}).get('navlun', 0)) / eur_kuru, 2)
-    insurance_value = round(parse_num((pdf_fields or {}).get('sigorta', 0)) / eur_kuru, 2)
+    freight_value   = round(ko_freight, 2)
+    insurance_value = round(ko_insurance, 2)
 
     apply_ko_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_ko_template_header(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
@@ -1307,8 +1308,14 @@ class handler(BaseHTTPRequestHandler):
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi)
             elif ulke_kodu == 'xk':
-                eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no = generate_excel_ko(
+                    eur_kuru    = float(body.get('eurKuru', 1.0))
+                    ko_freight  = float(body.get('koFreight', 0))
+                    ko_insurance= float(body.get('koInsurance', 0))
+                    excel_out, fatura_no = generate_excel_ko(
+                        df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                        hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                        ko_freight=ko_freight, ko_insurance=ko_insurance)
+                    excel_out, fatura_no = generate_excel_ko(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)    
             else:

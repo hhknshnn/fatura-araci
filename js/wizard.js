@@ -131,7 +131,7 @@ function selectCountry(c) {
 
   // Ülkeye göre ek alanları göster/gizle
   document.getElementById('eurSection').classList.toggle('visible', c === 'be' || c === 'xk');
-  document.getElementById('kzModeSection').classList.toggle('visible', c === 'kz');
+  document.getElementById('koFreightSection').style.display = c === 'xk' ? 'block' : 'none';
 
   // PDF drop zone şablonlu backend ülkelerinde gösterilir
   document.getElementById('pdfDropZone').style.display = ['rs','ba','ge', 'xk'].includes(c) ? 'block' : 'none';
@@ -474,6 +474,8 @@ async function downloadRS() {
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
         eurKuru:       getEurRate() || 1.0,
+        koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
+        koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
 
       })
     });
