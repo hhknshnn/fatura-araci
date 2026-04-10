@@ -426,7 +426,7 @@ function showStatus(type, html) {
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
   // Şablonlu backend ülkeleri → INV+PL (Python backend)
-  if (['rs','ba','ge'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge', 'xk'].includes(currentCountry)) { await downloadRS(); return; }
 
   // Diğer ülkeler → JS ile üretilmiş workbook
   if (!processedWB) return;
