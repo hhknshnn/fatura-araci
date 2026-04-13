@@ -268,7 +268,7 @@ def parse_pdf(pdf_bytes):
                 r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
             ])
             result['sigorta'] = _extract_pdf_amount(text, [
-                r'\bS[İI]G(?:ORTA)?\.?\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+                r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
                 r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
             ])
             result['kap'] = _extract_pdf_packages(text)
