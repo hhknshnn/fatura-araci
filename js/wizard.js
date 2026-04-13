@@ -120,7 +120,7 @@ function selectCountry(c) {
   // EUR section: Belçika, Kosova, Makedonya
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
   // Freight/Insurance inputları: sadece Kosova ve Makedonya
-  document.getElementById('koFreightSection').style.display = (c === 'xk' || c === 'mk') ? 'block' : 'none';
+  document.getElementById('koFreightSection').style.display = 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
   document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl'].includes(c) ? 'block' : 'none';

@@ -772,25 +772,27 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
 
 
 def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0,
-                      ko_freight=0, ko_insurance=0):
-    """Kosova INV + PL üretimi."""
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
+    """Kosova INV + PL üretimi — freight/insurance PDF'ten okunur."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
-        ko_freight, ko_insurance,
+        freight_value, insurance_value,
         find_ko_template_path, apply_ko_template_header
     )
 
 
 def generate_excel_mk(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0,
-                      mk_freight=0, mk_insurance=0):
-    """Makedonya INV + PL üretimi."""
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
+    """Makedonya INV + PL üretimi — freight/insurance PDF'ten okunur."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
-        mk_freight, mk_insurance,
+        freight_value, insurance_value,
         find_mk_template_path, apply_mk_template_header
     )
 def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
@@ -1372,21 +1374,15 @@ class handler(BaseHTTPRequestHandler):
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi)
             elif ulke_kodu == 'xk':
-                eur_kuru     = float(body.get('eurKuru', 1.0))
-                ko_freight   = float(body.get('koFreight', 0))
-                ko_insurance = float(body.get('koInsurance', 0))
+                eur_kuru = float(body.get('eurKuru', 1.0))
                 excel_out, fatura_no = generate_excel_ko(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
-                    ko_freight=ko_freight, ko_insurance=ko_insurance)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
             elif ulke_kodu == 'mk':
-                eur_kuru     = float(body.get('eurKuru', 1.0))
-                mk_freight   = float(body.get('koFreight', 0))
-                mk_insurance = float(body.get('koInsurance', 0))
+                eur_kuru = float(body.get('eurKuru', 1.0))
                 excel_out, fatura_no = generate_excel_mk(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
-                    mk_freight=mk_freight, mk_insurance=mk_insurance)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
             elif ulke_kodu == 'be':
                 eur_kuru = float(body.get('eurKuru', 1.0))  # EUR kuru frontend'den gelir
                 excel_out, fatura_no = generate_excel_be(
