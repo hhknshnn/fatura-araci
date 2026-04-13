@@ -118,13 +118,12 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Kosova, Makedonya
-  document.getElementById('eurSection').classList.toggle('visible', c === 'be' || c === 'xk' || c === 'mk');
-
+  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
   // Freight/Insurance inputları: sadece Kosova ve Makedonya
   document.getElementById('koFreightSection').style.display = (c === 'xk' || c === 'mk') ? 'block' : 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
-  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk'].includes(c) ? 'block' : 'none';
+  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -363,7 +362,7 @@ function buildAndDownloadReady() {
   if (!workingRows) return;
 
   // Şablonlu backend ülkeleri — rs, ba, ge, xk, mk
-  if (['rs','ba','ge','xk','mk'].includes(currentCountry)) {
+  if (['rs','ba','ge','xk','mk','be','de','nl'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -394,7 +393,7 @@ function showStatus(type, html) {
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
   // Şablonlu backend ülkeleri — rs, ba, ge, xk, mk
-  if (['rs','ba','ge','xk','mk'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge','xk','mk','be','de','nl'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);

@@ -11,6 +11,8 @@ const COUNTRIES = {
   ru: { label: 'Rusya',      suffix: '_rusya'        },
   ba: { label: 'Bosna',      suffix: '_bosna'        },
   be: { label: 'Belçika',    suffix: '_belcika'      },
+  de: { label: 'Almanya',  suffix: '_almanya'  },
+  nl: { label: 'Hollanda', suffix: '_hollanda' },
   xk: { label: 'Kosova',     suffix: '_kosova'       },
   mk: { label: 'Makedonya',  suffix: '_makedonya'    },
 };
@@ -143,4 +145,37 @@ const SIMPLE_MAPS = {
     { out: 'BRÜT',                   src: 'BRÜT'                    },
     { out: 'NET',                    src: 'NET'                     },
   ],
+
+  de: [
+    { out: 'MENŞEİ -EN',             src: 'MENŞEİ -EN'            },
+    { out: 'E-Fatura Seri Numarası', src: 'E-Fatura Seri Numarası' },
+    { out: 'Asorti Barkodu',         src: 'Asorti Barkodu'         },
+    { out: 'SKU',                    src: 'SKU'                    },
+    { out: 'ALT GRUBU -EN',          src: 'ALT GRUBU -EN'          },
+    { out: 'Ürün Açıklaması EN',     src: 'Ürün Açıklaması EN'     },
+    { out: 'Miktar',                 src: 'Miktar'                 },
+    { out: 'UNIT PRICE EUR',         src: '__EUR__'                },
+    { out: 'TOTAL AMOUNT EUR',       src: '__EUR_TOTAL__'          },
+    { out: 'GTİP',                   src: 'GTİP'                   },
+    { out: 'MATERYAL -EN',           src: 'MATERYAL -EN'           },
+    { out: 'BRÜT',                   src: 'BRÜT'                   },
+    { out: 'NET',                    src: 'NET'                    },
+  ],
+
+  nl: [
+    { out: 'MENŞEİ -EN',             src: 'MENŞEİ -EN'            },
+    { out: 'E-Fatura Seri Numarası', src: 'E-Fatura Seri Numarası' },
+    { out: 'Asorti Barkodu',         src: 'Asorti Barkodu'         },
+    { out: 'SKU',                    src: 'SKU'                    },
+    { out: 'ALT GRUBU -EN',          src: 'ALT GRUBU -EN'          },
+    { out: 'Ürün Açıklaması EN',     src: 'Ürün Açıklaması EN'     },
+    { out: 'Miktar',                 src: 'Miktar'                 },
+    { out: 'UNIT PRICE EUR',         src: '__EUR__'                },
+    { out: 'TOTAL AMOUNT EUR',       src: '__EUR_TOTAL__'          },
+    { out: 'GTİP',                   src: 'GTİP'                   },
+    { out: 'MATERYAL -EN',           src: 'MATERYAL -EN'           },
+    { out: 'BRÜT',                   src: 'BRÜT'                   },
+    { out: 'NET',                    src: 'NET'                    },
+  ],
+
 };
