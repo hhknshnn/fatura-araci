@@ -796,8 +796,8 @@ def generate_excel_mk(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
     """Belçika INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0)  # PDF navlun
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)  # PDF sigorta
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
@@ -810,8 +810,8 @@ def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
     """Almanya INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0)
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
@@ -824,8 +824,8 @@ def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
     """Hollanda INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0)
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
