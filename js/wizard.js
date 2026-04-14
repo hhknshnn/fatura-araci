@@ -125,7 +125,7 @@ function selectCountry(c) {
   document.getElementById('kzModeSection').style.display = 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
-  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(c) ? 'block' : 'none';
+  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -364,7 +364,7 @@ function buildAndDownloadReady() {
   if (!workingRows) return;
 
   // Şablonlu backend ülkeleri
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(currentCountry)) {
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -389,7 +389,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);

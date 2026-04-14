@@ -209,6 +209,12 @@ DE_PL_COLS  = BE_PL_COLS
 NL_INV_COLS = BE_INV_COLS
 NL_PL_COLS  = BE_PL_COLS
 
+RU_INV_COLS = KZ_INV_COLS  # Rusya — Kazakistan ile aynı yapı
+RU_PL_COLS  = KZ_PL_COLS
+
+UZ_INV_COLS = KZ_INV_COLS  # Özbekistan — Kazakistan ile aynı yapı
+UZ_PL_COLS  = KZ_PL_COLS
+
 
 def brd(c='BFBFBF'):
     s = Side(style='thin', color=c)
@@ -650,6 +656,41 @@ def find_kz_template_path():
         if os.path.exists(path): return path
     raise FileNotFoundError(f'ref_kz.xlsx not found. Checked: {candidates}')
 
+def find_ru_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_ru.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_ru.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_ru.xlsx'),
+        os.path.join(os.getcwd(), 'ref_ru.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_ru.xlsx not found. Checked: {candidates}')
+
+def find_uz_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_uz.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_uz.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_uz.xlsx'),
+        os.path.join(os.getcwd(), 'ref_uz.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_uz.xlsx not found. Checked: {candidates}')
+
+def apply_ru_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
+    ws['A2'] = sheet_title
+    ws['L3'] = str(fatura_date)
+    ws['L4'] = fatura_no
+    ws['L5'] = packages
+
+def apply_uz_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
+    ws['A2'] = sheet_title
+    ws['L3'] = str(fatura_date)
+    ws['L4'] = fatura_no
+    ws['L5'] = packages
 
 # ── EUR tabanlı INV+PL ortak üretim motoru ────────────────────────────────────
 def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
@@ -1131,6 +1172,364 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
+def generate_excel_ru(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
+    """Rusya INV + PL üretimi — TRY bazlı, freight/insurance yok."""
+    df['GTİP'] = df['GTİP'].apply(
+        lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+    df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
+        lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    df = _sku_grupla(df)
+
+    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_date = df['Fatura Tarihi'].iloc[0]
+    if hasattr(fatura_date, 'date'):
+        fatura_date = fatura_date.date()
+
+    brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
+
+    if depo_tipi == 'antrepo' and hedef_net > 0:
+        toplam_brut = sum(brut_list)
+        if toplam_brut > 0:
+            net_list_new = []
+            toplam_net = 0.0
+            for i, b in enumerate(brut_list):
+                if i < len(brut_list) - 1:
+                    val = round((b / toplam_brut) * hedef_net, 2)
+                    net_list_new.append(val)
+                    toplam_net += val
+                else:
+                    net_list_new.append(round(hedef_net - toplam_net, 2))
+            net_list = net_list_new
+
+    TRY_FMT = '#,##0.00 "TRY"'
+    INV_TOTAL_COL = 12  # L
+    PL_GROSS_COL  = 11  # K
+    PL_NET_COL    = 12  # L
+
+    wb = openpyxl.load_workbook(find_ru_template_path())
+    ws_inv = wb['INV']
+    ws_pl  = wb['PL']
+    DS = 9
+
+    if ws_inv.max_row > DS:
+        ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
+    if ws_pl.max_row > DS:
+        ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
+
+    packages_str = str((pdf_fields or {}).get('kap', '') or '')
+    apply_ru_template_header(ws_inv, 'COMMERCIAL INVOICE  / СЧЕТ-ФАКТУРА', fatura_no, fatura_date, packages_str)
+    apply_ru_template_header(ws_pl,  'PACKING LIST  / ТОВАРНАЯ НАКЛАДНАЯ', fatura_no, fatura_date, packages_str)
+
+    ws_inv.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(RU_INV_COLS):
+        hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    for r_idx, (_, row) in enumerate(df.iterrows()):
+        er = DS + 1 + r_idx
+        ws_inv.row_dimensions[er].height = None
+        bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
+        for c_idx, (out_col, src_col) in enumerate(RU_INV_COLS):
+            cn = c_idx + 1
+            if src_col == '__CALC__':
+                dat(ws_inv, er, cn,
+                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                    bg=bg, align='right', fmt=TRY_FMT)
+            elif out_col == 'UNIT':
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+            elif out_col == 'UNIT PRICE':
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt=TRY_FMT)
+            elif out_col in ('Master Carton Code', 'HS CODE'):
+                dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+            else:
+                val = row.get(src_col, '')
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_inv, er, cn, val, bg=bg, align='left')
+
+    # ── INV footer — sadece TOTAL + GRAND TOTAL (freight/insurance yok) ──────
+    last_inv = DS + len(df)
+    tr, gr = last_inv + 1, last_inv + 2
+    ws_inv.row_dimensions[tr].height = 22
+    ws_inv.row_dimensions[gr].height = 28
+
+    K, L = 11, 12
+    tc = get_column_letter(INV_TOTAL_COL)
+
+    c = ws_inv.cell(row=tr, column=K, value='TOTAL')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    c.fill = PatternFill('solid', fgColor=DARK_BLUE)
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = brd()
+    c = ws_inv.cell(row=tr, column=L, value=f'=SUM({tc}{DS+1}:{tc}{last_inv})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    c.fill = PatternFill('solid', fgColor=DARK_BLUE)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = TRY_FMT
+    c.border = brd()
+
+    c = ws_inv.cell(row=gr, column=K, value='GRAND TOTAL TRY')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = brd()
+    c = ws_inv.cell(row=gr, column=L, value=f'=L{tr}')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = TRY_FMT
+    c.border = brd()
+
+    set_print(ws_inv, f'A1:P{gr}')
+
+    ws_pl.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(RU_PL_COLS):
+        hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    for r_idx, (_, row) in enumerate(df.iterrows()):
+        er = DS + 1 + r_idx
+        ws_pl.row_dimensions[er].height = None
+        bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
+        for c_idx, (out_col, src_col) in enumerate(RU_PL_COLS):
+            cn = c_idx + 1
+            if src_col == '__BRUT__':
+                dat(ws_pl, er, cn, round(brut_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+            elif src_col == '__NET__':
+                dat(ws_pl, er, cn, round(net_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+            elif out_col == 'UNIT':
+                dat(ws_pl, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+            elif out_col in ('Master Carton Code', 'HS CODE'):
+                dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+            else:
+                val = row.get(src_col, '')
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_pl, er, cn, val, bg=bg, align='left')
+
+    last_pl = DS + len(df)
+    pl_gr = last_pl + 1
+    ws_pl.row_dimensions[pl_gr].height = 28
+
+    for col_idx in range(1, 10):
+        ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+
+    c = ws_pl.cell(row=pl_gr, column=10, value='TOTAL KG:')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.border = brd()
+
+    cl = get_column_letter(PL_GROSS_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_GROSS_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    cl = get_column_letter(PL_NET_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_NET_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    set_print(ws_pl, f'A1:L{pl_gr}')
+    ws_inv.sheet_view.topLeftCell = 'A1'
+    ws_pl.sheet_view.topLeftCell  = 'A1'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    return buf.getvalue(), fatura_no, master_out
+
+
+def generate_excel_uz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
+    """Özbekistan INV + PL üretimi — TRY bazlı, freight/insurance yok."""
+    df['GTİP'] = df['GTİP'].apply(
+        lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+    df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
+        lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    df = _sku_grupla(df)
+
+    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_date = df['Fatura Tarihi'].iloc[0]
+    if hasattr(fatura_date, 'date'):
+        fatura_date = fatura_date.date()
+
+    brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
+
+    if depo_tipi == 'antrepo' and hedef_net > 0:
+        toplam_brut = sum(brut_list)
+        if toplam_brut > 0:
+            net_list_new = []
+            toplam_net = 0.0
+            for i, b in enumerate(brut_list):
+                if i < len(brut_list) - 1:
+                    val = round((b / toplam_brut) * hedef_net, 2)
+                    net_list_new.append(val)
+                    toplam_net += val
+                else:
+                    net_list_new.append(round(hedef_net - toplam_net, 2))
+            net_list = net_list_new
+
+    TRY_FMT = '#,##0.00 "TRY"'
+    INV_TOTAL_COL = 12  # L
+    PL_GROSS_COL  = 11  # K
+    PL_NET_COL    = 12  # L
+
+    wb = openpyxl.load_workbook(find_uz_template_path())
+    ws_inv = wb['INV']
+    ws_pl  = wb['PL']
+    DS = 9
+
+    if ws_inv.max_row > DS:
+        ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
+    if ws_pl.max_row > DS:
+        ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
+
+    packages_str = str((pdf_fields or {}).get('kap', '') or '')
+    apply_uz_template_header(ws_inv, 'COMMERCIAL INVOICE  / СЧЕТ-ФАКТУРА', fatura_no, fatura_date, packages_str)
+    apply_uz_template_header(ws_pl,  'PACKING LIST  / ТОВАРНАЯ НАКЛАДНАЯ', fatura_no, fatura_date, packages_str)
+
+    ws_inv.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(UZ_INV_COLS):
+        hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    for r_idx, (_, row) in enumerate(df.iterrows()):
+        er = DS + 1 + r_idx
+        ws_inv.row_dimensions[er].height = None
+        bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
+        for c_idx, (out_col, src_col) in enumerate(UZ_INV_COLS):
+            cn = c_idx + 1
+            if src_col == '__CALC__':
+                dat(ws_inv, er, cn,
+                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                    bg=bg, align='right', fmt=TRY_FMT)
+            elif out_col == 'UNIT':
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+            elif out_col == 'UNIT PRICE':
+                dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt=TRY_FMT)
+            elif out_col in ('Master Carton Code', 'HS CODE'):
+                dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+            else:
+                val = row.get(src_col, '')
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_inv, er, cn, val, bg=bg, align='left')
+
+    # ── INV footer — sadece TOTAL + GRAND TOTAL ───────────────────────────────
+    last_inv = DS + len(df)
+    tr, gr = last_inv + 1, last_inv + 2
+    ws_inv.row_dimensions[tr].height = 22
+    ws_inv.row_dimensions[gr].height = 28
+
+    K, L = 11, 12
+    tc = get_column_letter(INV_TOTAL_COL)
+
+    c = ws_inv.cell(row=tr, column=K, value='TOTAL')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    c.fill = PatternFill('solid', fgColor=DARK_BLUE)
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = brd()
+    c = ws_inv.cell(row=tr, column=L, value=f'=SUM({tc}{DS+1}:{tc}{last_inv})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    c.fill = PatternFill('solid', fgColor=DARK_BLUE)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = TRY_FMT
+    c.border = brd()
+
+    c = ws_inv.cell(row=gr, column=K, value='GRAND TOTAL TRY')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = brd()
+    c = ws_inv.cell(row=gr, column=L, value=f'=L{tr}')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = TRY_FMT
+    c.border = brd()
+
+    set_print(ws_inv, f'A1:P{gr}')
+
+    ws_pl.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(UZ_PL_COLS):
+        hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    for r_idx, (_, row) in enumerate(df.iterrows()):
+        er = DS + 1 + r_idx
+        ws_pl.row_dimensions[er].height = None
+        bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
+        for c_idx, (out_col, src_col) in enumerate(UZ_PL_COLS):
+            cn = c_idx + 1
+            if src_col == '__BRUT__':
+                dat(ws_pl, er, cn, round(brut_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+            elif src_col == '__NET__':
+                dat(ws_pl, er, cn, round(net_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+            elif out_col == 'UNIT':
+                dat(ws_pl, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+            elif out_col in ('Master Carton Code', 'HS CODE'):
+                dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+            else:
+                val = row.get(src_col, '')
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_pl, er, cn, val, bg=bg, align='left')
+
+    last_pl = DS + len(df)
+    pl_gr = last_pl + 1
+    ws_pl.row_dimensions[pl_gr].height = 28
+
+    for col_idx in range(1, 10):
+        ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+
+    c = ws_pl.cell(row=pl_gr, column=10, value='TOTAL KG:')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.border = brd()
+
+    cl = get_column_letter(PL_GROSS_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_GROSS_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    cl = get_column_letter(PL_NET_COL)
+    c = ws_pl.cell(row=pl_gr, column=PL_NET_COL,
+                   value=f'=SUM({cl}{DS+1}:{cl}{last_pl})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    set_print(ws_pl, f'A1:L{pl_gr}')
+    ws_inv.sheet_view.topLeftCell = 'A1'
+    ws_pl.sheet_view.topLeftCell  = 'A1'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    return buf.getvalue(), fatura_no, master_out
 
 def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
@@ -1717,6 +2116,14 @@ class handler(BaseHTTPRequestHandler):
                 excel_out, fatura_no, master_out = generate_excel_kz(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
+            elif ulke_kodu == 'ru':
+                excel_out, fatura_no, master_out = generate_excel_ru(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
+            elif ulke_kodu == 'uz':
+                excel_out, fatura_no, master_out = generate_excel_uz(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)    
             elif ulke_kodu == 'be':
                 eur_kuru = float(body.get('eurKuru', 1.0))
                 excel_out, fatura_no, master_out = generate_excel_be(

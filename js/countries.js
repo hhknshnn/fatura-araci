@@ -15,6 +15,8 @@ const COUNTRIES = {
   nl: { label: 'Hollanda', suffix: '_hollanda' },
   xk: { label: 'Kosova',     suffix: '_kosova'       },
   mk: { label: 'Makedonya',  suffix: '_makedonya'    },
+  ru: { label: 'Rusya',      suffix: '_rusya'      },
+  uz: { label: 'Özbekistan', suffix: '_ozbekistan' },
 };
 
 const KZ_COLS = [
