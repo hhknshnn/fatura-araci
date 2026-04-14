@@ -121,6 +121,8 @@ function selectCountry(c) {
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
   // Freight/Insurance inputları: sadece Kosova ve Makedonya
   document.getElementById('koFreightSection').style.display = 'none';
+  // KZ gruplandırma modu — sadece Kazakistan'da göster
+  document.getElementById('kzModeSection').style.display = c === 'kz' ? 'block' : 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
   document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(c) ? 'block' : 'none';
