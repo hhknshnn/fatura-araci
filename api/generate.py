@@ -64,7 +64,6 @@ PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
-# Bosna INV sütunları
 BA_INV_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -80,7 +79,6 @@ BA_INV_COLS = [
     ('DIMENSION',         'EBAT Açıklama'),
 ]
 
-# Bosna PL sütunları
 BA_PL_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -92,7 +90,6 @@ BA_PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
-# Gürcistan INV sütunları
 GE_INV_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -108,7 +105,6 @@ GE_INV_COLS = [
     ('DIMENSION',         'EBAT Açıklama'),
 ]
 
-# Gürcistan PL sütunları
 GE_PL_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -120,7 +116,6 @@ GE_PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
-# Kosova & Makedonya INV sütunları (aynı yapı)
 KO_INV_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -136,7 +131,6 @@ KO_INV_COLS = [
     ('DIMENSION',         'EBAT Açıklama'),
 ]
 
-# Kosova & Makedonya PL sütunları (aynı yapı)
 KO_PL_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -149,7 +143,6 @@ KO_PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
-# Belçika / Almanya / Hollanda INV sütunları (aynı yapı)
 BE_INV_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -165,7 +158,6 @@ BE_INV_COLS = [
     ('DIMENSION',         'EBAT Açıklama'),
 ]
 
-# Belçika / Almanya / Hollanda PL sütunları (aynı yapı)
 BE_PL_COLS = [
     ('COUNTRY OF ORIGIN', 'MENŞEİ -EN'),
     ('MASTER ITEM CODE',  'Asorti Barkodu'),
@@ -178,7 +170,6 @@ BE_PL_COLS = [
     ('NET WEIGHT',        '__NET__'),
 ]
 
-# Kazakistan INV sütunları
 KZ_INV_COLS = [
     ('COUNTRY OF ORIGIN',    'MENŞEİ -EN'),
     ('СТРАНА ПРОИСХОЖДЕНИЯ', 'MENŞEİ -RU'),
@@ -198,7 +189,6 @@ KZ_INV_COLS = [
     ('DIMENSION',            'EBAT Açıklama'),
 ]
 
-# Kazakistan PL sütunları
 KZ_PL_COLS = [
     ('COUNTRY OF ORIGIN',    'MENŞEİ -EN'),
     ('СТРАНА ПРОИСХОЖДЕНИЯ', 'MENŞEİ -RU'),
@@ -214,10 +204,9 @@ KZ_PL_COLS = [
     ('NET WEIGHT',           '__NET__'),
 ]
 
-DE_INV_COLS = BE_INV_COLS  # Almanya — aynı yapı
+DE_INV_COLS = BE_INV_COLS
 DE_PL_COLS  = BE_PL_COLS
-
-NL_INV_COLS = BE_INV_COLS  # Hollanda — aynı yapı
+NL_INV_COLS = BE_INV_COLS
 NL_PL_COLS  = BE_PL_COLS
 
 
@@ -293,7 +282,6 @@ def _extract_pdf_packages(text):
     return ''
 
 def parse_pdf(pdf_bytes):
-    """PDF'den navlun, sigorta ve kap değerlerini çek."""
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -358,29 +346,28 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
 def _sku_grupla(df):
     """SKU bazında gruplandırma — tüm ülkeler için ortak."""
     agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
-    agg_dict['Miktar'] = 'sum'  # aynı SKU'ların miktarlarını topla
+    agg_dict['Miktar'] = 'sum'
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
 def generate_master_excel(df_original, brut_list, net_list):
     """
     Orijinal master Excel'e BRÜT ve NET sütunları ekler.
-    Ürün Ağırlığı (KG) sütunundan sonra BRÜT ve NET gelir.
+    brut_list/net_list orijinal df ile aynı uzunlukta olmalı.
     BRÜT / Miktar → Ürün Ağırlığı (KG) sütununa yazılır.
     """
-    df = df_original.copy()                          # orijinali bozmayalım
-    df['BRÜT'] = brut_list                           # BRÜT sütunu ekle
-    df['NET']  = net_list                            # NET sütunu ekle
+    df = df_original.copy()
+    df['BRÜT'] = brut_list
+    df['NET']  = net_list
 
     def calc_ag(row):
         miktar = parse_num(row.get('Miktar', 0))
         brut   = parse_num(row.get('BRÜT', 0))
         if miktar > 0:
-            return round(brut / miktar, 6)           # 6 ondalık — hassas ağırlık
+            return round(brut / miktar, 6)
         return 0.0
 
-    df['Ürün Ağırlığı (KG)'] = df.apply(calc_ag, axis=1)  # AG sütununu güncelle
+    df['Ürün Ağırlığı (KG)'] = df.apply(calc_ag, axis=1)
 
-    # Sütun sırası: Ürün Ağırlığı (KG)'den hemen sonra BRÜT ve NET
     cols = list(df.columns)
     ag_idx = cols.index('Ürün Ağırlığı (KG)')
     cols.remove('BRÜT')
@@ -678,7 +665,11 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
 
-    # SKU bazında gruplandırma
+    # Orijinal df için ağırlık hesapla — master Excel için (gruplandırma öncesi)
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
@@ -689,6 +680,7 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     if not eur_kuru or eur_kuru <= 0:
         eur_kuru = 1.0
 
+    # Gruplandırılmış df için ağırlık hesapla — INV+PL için
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -706,9 +698,9 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
             net_list = net_list_new
 
     EUR_FMT       = '#,##0.00 "EUR"'
-    INV_TOTAL_COL = 9   # I
-    PL_GROSS_COL  = 8   # H
-    PL_NET_COL    = 9   # I
+    INV_TOTAL_COL = 9
+    PL_GROSS_COL  = 8
+    PL_NET_COL    = 9
 
     wb = openpyxl.load_workbook(find_template_fn())
     ws_inv = wb['INV']
@@ -863,13 +855,12 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
 
 def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
-    """Kosova INV + PL üretimi."""
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
@@ -880,10 +871,8 @@ def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
-
 def generate_excel_mk(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
-    """Makedonya INV + PL üretimi."""
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
@@ -894,10 +883,8 @@ def generate_excel_mk(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
-
 def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
-    """Belçika INV + PL üretimi."""
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
@@ -909,10 +896,8 @@ def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
-
 def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
-    """Almanya INV + PL üretimi."""
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
@@ -924,10 +909,8 @@ def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
-
 def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
-    """Hollanda INV + PL üretimi."""
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
@@ -942,13 +925,17 @@ def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
 def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
-    """Kazakistan INV + PL üretimi — TRY bazlı, her zaman gruplandırılır."""
+    """Kazakistan INV + PL üretimi."""
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
 
-    # SKU bazında gruplandırma — her zaman
+    # Orijinal df için ağırlık hesapla — master Excel için
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
@@ -956,6 +943,7 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
 
+    # Gruplandırılmış df için ağırlık hesapla
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -976,9 +964,9 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)
     TRY_FMT = '#,##0.00 "TRY"'
 
-    INV_TOTAL_COL = 12  # L
-    PL_GROSS_COL  = 11  # K
-    PL_NET_COL    = 12  # L
+    INV_TOTAL_COL = 12
+    PL_GROSS_COL  = 11
+    PL_NET_COL    = 12
 
     wb = openpyxl.load_workbook(find_kz_template_path())
     ws_inv = wb['INV']
@@ -1140,7 +1128,7 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1151,7 +1139,11 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     df['GTİP'] = df['GTİP'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
 
-    # SKU bazında gruplandırma
+    # Orijinal df için ağırlık hesapla — master Excel için
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
 
     fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
@@ -1162,6 +1154,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     destination  = 'Bosnia and Herzegovina'
     incoterm     = 'CIP'
 
+    # Gruplandırılmış df için ağırlık hesapla
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -1305,7 +1298,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1317,7 +1310,11 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
 
-    # SKU bazında gruplandırma
+    # Orijinal df için ağırlık hesapla — master Excel için
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
@@ -1325,6 +1322,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
 
+    # Gruplandırılmış df için ağırlık hesapla
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -1503,7 +1501,7 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1517,7 +1515,11 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
 
-    # SKU bazında gruplandırma
+    # Orijinal df için ağırlık hesapla — master Excel için
+    df_for_master = df_original if df_original is not None else df
+    brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+
+    # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
 
     fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
@@ -1527,6 +1529,8 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     musteri_adres= 'Gospodar Jovanova 73, Belgrade'
 
     if pdf_fields is None: pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
+
+    # Gruplandırılmış df için ağırlık hesapla
     brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
 
     if depo_tipi == 'antrepo' and hedef_net > 0:
@@ -1652,7 +1656,7 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf=io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1687,7 +1691,7 @@ class handler(BaseHTTPRequestHandler):
 
             ulke_kodu   = body.get('ulkeKodu', 'rs')
             df          = pd.read_excel(io.BytesIO(excel_bytes))
-            df_original = df.copy()  # gruplandırma öncesi orijinal — master Excel için
+            df_original = df.copy()
 
             if ulke_kodu == 'ba':
                 excel_out, fatura_no, master_out = generate_excel_ba(
@@ -1739,7 +1743,7 @@ class handler(BaseHTTPRequestHandler):
             result = json.dumps({
                 'success':   True,
                 'excel':     base64.b64encode(excel_out).decode('utf-8'),
-                'master':    base64.b64encode(master_out).decode('utf-8'),  # master Excel
+                'master':    base64.b64encode(master_out).decode('utf-8'),
                 'faturaNo':  fatura_no,
                 'pdfFields': pdf_fields,
             })
