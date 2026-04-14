@@ -277,17 +277,17 @@ def _extract_pdf_amount(text, patterns):
 
 def _extract_pdf_packages(text):
     patterns = [
-        r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+)',
-        r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+)',
-        r'[*\-]?\s*KAP\s+ADEDI\s*[:.]?\s*(\d+)',
-        r'[*\-]?\s*KAP\s*[:.]?\s*(\d+)',
-        r'\bPACKAGES?\s*[:.]?\s*(\d+)',
-        r'\bCOLL[Iİ]\s*[:.]?\s*(\d+)',
+        r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s+ADEDI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'\bCOLL[Iİ]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
     ]
     for pattern in patterns:
         m = re.search(pattern, text, re.IGNORECASE)
         if m:
-            return m.group(1)
+            return m.group(1).strip()
     return ''
 
 def parse_pdf(pdf_bytes):
@@ -890,7 +890,7 @@ def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     )
 
 def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', gruplandirma='grouped'):
     """Kazakistan INV + PL üretimi — TRY bazlı, freight/insurance PDF'ten okunur."""
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
@@ -963,7 +963,11 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             elif out_col in ('Master Carton Code', 'HS CODE'):
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
-                dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
+                val = row.get(src_col, '')
+                # описание товаров boşsa ALT GRUBU -RU ile doldur
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_inv, er, cn, val, bg=bg, align='left')
 
     # ── INV footer ───────────────────────────────────────────────────────────
     last_inv = DS + len(df)
@@ -1045,7 +1049,11 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             elif out_col in ('Master Carton Code', 'HS CODE'):
                 dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
-                dat(ws_pl, er, cn, row.get(src_col, ''), bg=bg, align='left')
+                val = row.get(src_col, '')
+                # описание товаров boşsa ALT GRUBU -RU ile doldur
+                if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
+                    val = row.get('ALT GRUBU -RU', '')
+                dat(ws_pl, er, cn, val, bg=bg, align='left')
 
     # ── PL footer ────────────────────────────────────────────────────────────
     last_pl = DS + len(df)
@@ -1253,6 +1261,12 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+    # SKU bazında gruplandırma
+    if gruplandirma == 'grouped':
+        agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
+        agg_dict['Miktar'] = 'sum'  # aynı SKU'ların miktarlarını topla
+        df = df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date = df['Fatura Tarihi'].iloc[0]
@@ -1634,9 +1648,10 @@ class handler(BaseHTTPRequestHandler):
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
             elif ulke_kodu == 'kz':
+                gruplandirma = body.get('gruplandirma', 'grouped')  # varsayılan gruplu
                 excel_out, fatura_no = generate_excel_kz(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, gruplandirma=gruplandirma)
             elif ulke_kodu == 'be':
                 eur_kuru = float(body.get('eurKuru', 1.0))  # EUR kuru frontend'den gelir
                 excel_out, fatura_no = generate_excel_be(

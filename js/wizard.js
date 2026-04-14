@@ -440,6 +440,7 @@ async function downloadRS() {
         eurKuru:       getEurRate() || 1.0,
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
+        gruplandirma:  currentCountry === 'kz' ? currentMode : 'none',  // KZ gruplandırma modu
       })
     });
 
