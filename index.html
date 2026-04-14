@@ -276,19 +276,18 @@
     <div class="panel-desc" id="step4Desc">Master Excel dosyasını yükleyin.</div>
 
     <div class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf" multiple
+             onchange="handleMultiFile(this.files)">
       <div class="drop-icon">📊</div>
-      <h3>Master Excel</h3>
-      <p>xlsx veya xls formatında</p>
+      <h3>Master Excel + Fatura PDF</h3>
+      <p>xlsx/xls ve pdf dosyalarını buraya sürükleyin veya seçin</p>
       <div class="file-badge" id="fileName" style="display:none;"></div>
+      <div class="file-badge" id="pdfFileName" style="display:none;margin-top:6px;"></div>
     </div>
 
-    <div class="drop-zone" id="pdfDropZone" style="display:none;border-color:#1E3A5F;">
+    <!-- gizli — eski referanslar için -->
+    <div id="pdfDropZone" style="display:none;">
       <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
-      <div class="drop-icon">📄</div>
-      <h3>Fatura PDF</h3>
-      <p>PACKAGES, FREIGHT, INSURANCE otomatik okunur</p>
-      <div class="file-badge" id="pdfFileName" style="display:none;"></div>
     </div>
 
     <div class="pdf-info" id="pdfInfo">

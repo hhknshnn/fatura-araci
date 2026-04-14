@@ -32,6 +32,16 @@ function round2(n) {
 // ── DOSYA YÜKLEME ─────────────────────────────────────────────────────────────
 // handleFile ve handlePdf wizard.js'de tanımlı,
 // ama Excel okuma mantığı burada.
+function handleMultiFile(files) {
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+      handlePdf(file);           // PDF → navlun/sigorta/kap
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      handleFile(file);          // Excel → master rows
+    }
+  }
+}
 
 function handleFile(file) {
   if (!file) return;

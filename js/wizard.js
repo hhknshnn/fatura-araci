@@ -500,12 +500,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const dropZone = document.getElementById('dropZone');
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
   dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop',      e  => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
-
-  const pdfDropZone = document.getElementById('pdfDropZone');
-  pdfDropZone.addEventListener('dragover',  e => { e.preventDefault(); pdfDropZone.classList.add('dragover'); });
-  pdfDropZone.addEventListener('dragleave', ()  => pdfDropZone.classList.remove('dragover'));
-  pdfDropZone.addEventListener('drop',      e  => { e.preventDefault(); pdfDropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handlePdf(e.dataTransfer.files[0]); });
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files); });
+  
 
   document.getElementById('step4Next').onclick = () => {
     if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
