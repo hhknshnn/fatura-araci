@@ -431,7 +431,6 @@ async function downloadRS() {
 
     const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
 
-    console.log('gruplandirma:', currentCountry === 'kz' ? currentMode : 'none');
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -478,7 +477,7 @@ async function downloadRS() {
     showStatus('error', '⚠ ' + err.message);
   } finally {
     clearInterval(timer);
-    btn.textContent = '⬇ INV + PL İndir';
+    btn.textContent = `⬇ INV + PL İndir (${elapsed}s)`;
     btn.disabled = false;
   }
 }
