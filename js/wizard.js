@@ -409,8 +409,13 @@ async function downloadRS() {
     return;
   }
   const btn = document.getElementById('downloadBtn');
-  btn.textContent = '⏳ Hazırlanıyor...';
-  btn.disabled = true;
+    btn.textContent = '⏳ Hazırlanıyor... (0s)';
+    btn.disabled = true;
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      elapsed++;
+      btn.textContent = `⏳ Hazırlanıyor... (${elapsed}s)`;
+    }, 1000);
 
   try {
     const excelB64 = arrayBufferToBase64(lastFileData);
@@ -426,6 +431,7 @@ async function downloadRS() {
 
     const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
 
+    console.log('gruplandirma:', currentCountry === 'kz' ? currentMode : 'none');
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -442,10 +448,9 @@ async function downloadRS() {
         eurKuru:       getEurRate() || 1.0,
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
-        gruplandirma:  currentCountry === 'kz' ? currentMode : 'none',  // KZ gruplandırma modu
+        gruplandirma:  currentCountry === 'kz' ? currentMode : 'none',
       })
     });
-
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
@@ -472,6 +477,7 @@ async function downloadRS() {
   } catch(err) {
     showStatus('error', '⚠ ' + err.message);
   } finally {
+    clearInterval(timer);
     btn.textContent = '⬇ INV + PL İndir';
     btn.disabled = false;
   }
