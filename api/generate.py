@@ -1031,7 +1031,7 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.number_format = TRY_FMT
     c.border = brd()
 
-    set_print(ws_inv, f'A1:P{gr}')
+    set_print(ws_inv, f'A1:L{gr}')
 
     # ── PL kolon başlıkları ──────────────────────────────────────────────────
     ws_pl.row_dimensions[DS].height = 35
@@ -1093,6 +1093,8 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.border = brd()
 
     set_print(ws_pl, f'A1:L{pl_gr}')
+    ws_inv.sheet_view.topLeftCell = 'A1'
+    ws_pl.sheet_view.topLeftCell = 'A1'
 
     buf = io.BytesIO()
     wb.save(buf)
