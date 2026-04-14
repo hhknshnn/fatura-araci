@@ -1269,12 +1269,6 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
 
-    # SKU bazında gruplandırma
-    if gruplandirma == 'grouped':
-        agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
-        agg_dict['Miktar'] = 'sum'  # aynı SKU'ların miktarlarını topla
-        df = df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
-
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
