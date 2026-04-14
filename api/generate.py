@@ -219,6 +219,8 @@ DE_PL_COLS  = BE_PL_COLS
 
 NL_INV_COLS = BE_INV_COLS  # Hollanda — aynı yapı
 NL_PL_COLS  = BE_PL_COLS
+
+
 def brd(c='BFBFBF'):
     s = Side(style='thin', color=c)
     return Border(left=s, right=s, top=s, bottom=s)
@@ -352,6 +354,46 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
         else:
             net_list.append(round(hedef_net_serbest - toplam_net, 2))
     return brut_list, net_list
+
+def _sku_grupla(df):
+    """SKU bazında gruplandırma — tüm ülkeler için ortak."""
+    agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
+    agg_dict['Miktar'] = 'sum'  # aynı SKU'ların miktarlarını topla
+    return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
+
+def generate_master_excel(df_original, brut_list, net_list):
+    """
+    Orijinal master Excel'e BRÜT ve NET sütunları ekler.
+    Ürün Ağırlığı (KG) sütunundan sonra BRÜT ve NET gelir.
+    BRÜT / Miktar → Ürün Ağırlığı (KG) sütununa yazılır.
+    """
+    df = df_original.copy()                          # orijinali bozmayalım
+    df['BRÜT'] = brut_list                           # BRÜT sütunu ekle
+    df['NET']  = net_list                            # NET sütunu ekle
+
+    def calc_ag(row):
+        miktar = parse_num(row.get('Miktar', 0))
+        brut   = parse_num(row.get('BRÜT', 0))
+        if miktar > 0:
+            return round(brut / miktar, 6)           # 6 ondalık — hassas ağırlık
+        return 0.0
+
+    df['Ürün Ağırlığı (KG)'] = df.apply(calc_ag, axis=1)  # AG sütununu güncelle
+
+    # Sütun sırası: Ürün Ağırlığı (KG)'den hemen sonra BRÜT ve NET
+    cols = list(df.columns)
+    ag_idx = cols.index('Ürün Ağırlığı (KG)')
+    cols.remove('BRÜT')
+    cols.remove('NET')
+    cols.insert(ag_idx + 1, 'BRÜT')
+    cols.insert(ag_idx + 2, 'NET')
+    df = df[cols]
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    buf.seek(0)
+    return buf.getvalue()
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None, destination='SERBIA', incoterm='CIP', info_start_col=None):
     last_col = get_column_letter(col_count)
@@ -500,11 +542,12 @@ def apply_mk_template_header(ws, sheet_title, fatura_no, fatura_date, packages='
     ws['I3'] = str(fatura_date)
     ws['I4'] = fatura_no
     ws['I5'] = packages
+
 def apply_be_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
-    ws['A2'] = sheet_title       # Başlık (COMMERCIAL INVOICE / PACKING LIST)
-    ws['I3'] = str(fatura_date)  # Fatura tarihi
-    ws['I4'] = fatura_no         # Fatura numarası
-    ws['I5'] = packages          # Kap sayısı
+    ws['A2'] = sheet_title
+    ws['I3'] = str(fatura_date)
+    ws['I4'] = fatura_no
+    ws['I5'] = packages
 
 def apply_de_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
     ws['A2'] = sheet_title
@@ -518,58 +561,12 @@ def apply_nl_template_header(ws, sheet_title, fatura_no, fatura_date, packages='
     ws['I4'] = fatura_no
     ws['I5'] = packages
 
-def find_be_template_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_be.xlsx'),
-        os.path.join(current_dir, 'templates', 'ref_be.xlsx'),
-        os.path.join(os.path.dirname(current_dir), 'ref_be.xlsx'),
-        os.path.join(os.getcwd(), 'ref_be.xlsx'),
-    ]
-    for path in candidates:
-        if os.path.exists(path): return path
-    raise FileNotFoundError(f'ref_be.xlsx not found. Checked: {candidates}')
-
-def find_de_template_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_de.xlsx'),
-        os.path.join(current_dir, 'templates', 'ref_de.xlsx'),
-        os.path.join(os.path.dirname(current_dir), 'ref_de.xlsx'),
-        os.path.join(os.getcwd(), 'ref_de.xlsx'),
-    ]
-    for path in candidates:
-        if os.path.exists(path): return path
-    raise FileNotFoundError(f'ref_de.xlsx not found. Checked: {candidates}')
-
-def find_nl_template_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_nl.xlsx'),
-        os.path.join(current_dir, 'templates', 'ref_nl.xlsx'),
-        os.path.join(os.path.dirname(current_dir), 'ref_nl.xlsx'),
-        os.path.join(os.getcwd(), 'ref_nl.xlsx'),
-    ]
-    for path in candidates:
-        if os.path.exists(path): return path
-    raise FileNotFoundError(f'ref_nl.xlsx not found. Checked: {candidates}')
-def find_kz_template_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_kz.xlsx'),
-        os.path.join(current_dir, 'templates', 'ref_kz.xlsx'),
-        os.path.join(os.path.dirname(current_dir), 'ref_kz.xlsx'),
-        os.path.join(os.getcwd(), 'ref_kz.xlsx'),
-    ]
-    for path in candidates:
-        if os.path.exists(path): return path
-    raise FileNotFoundError(f'ref_kz.xlsx not found. Checked: {candidates}')
-
 def apply_kz_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
-    ws['A2'] = sheet_title       # Başlık
-    ws['L3'] = str(fatura_date)  # Fatura tarihi
-    ws['L4'] = fatura_no         # Fatura numarası
-    ws['L5'] = packages          # Kap sayısı
+    ws['A2'] = sheet_title
+    ws['L3'] = str(fatura_date)
+    ws['L4'] = fatura_no
+    ws['L5'] = packages
+
 def find_ba_template_path():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -618,19 +615,71 @@ def find_mk_template_path():
         if os.path.exists(path): return path
     raise FileNotFoundError(f'ref_mk.xlsx not found. Checked: {candidates}')
 
+def find_be_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_be.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_be.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_be.xlsx'),
+        os.path.join(os.getcwd(), 'ref_be.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_be.xlsx not found. Checked: {candidates}')
 
-# ── EUR tabanlı INV+PL ortak üretim motoru (Kosova & Makedonya) ───────────────
+def find_de_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_de.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_de.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_de.xlsx'),
+        os.path.join(os.getcwd(), 'ref_de.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_de.xlsx not found. Checked: {candidates}')
+
+def find_nl_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_nl.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_nl.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_nl.xlsx'),
+        os.path.join(os.getcwd(), 'ref_nl.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_nl.xlsx not found. Checked: {candidates}')
+
+def find_kz_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_kz.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_kz.xlsx'),
+        os.path.join(os.path.dirname(current_dir), 'ref_kz.xlsx'),
+        os.path.join(os.getcwd(), 'ref_kz.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'ref_kz.xlsx not found. Checked: {candidates}')
+
+
+# ── EUR tabanlı INV+PL ortak üretim motoru ────────────────────────────────────
 def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
                         pdf_fields, hedef_net, depo_tipi, eur_kuru,
                         freight_value, insurance_value,
                         find_template_fn, apply_header_fn,
-                        inv_cols=None, pl_cols=None):
-    if inv_cols is None: inv_cols = KO_INV_COLS  # geriye dönük uyumluluk — KO/MK için
+                        inv_cols=None, pl_cols=None, df_original=None):
+    if inv_cols is None: inv_cols = KO_INV_COLS
     if pl_cols  is None: pl_cols  = KO_PL_COLS
+
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+    # SKU bazında gruplandırma
+    df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date = df['Fatura Tarihi'].iloc[0]
@@ -657,7 +706,7 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
             net_list = net_list_new
 
     EUR_FMT       = '#,##0.00 "EUR"'
-    INV_TOTAL_COL = 9   # I — TOTAL AMOUNT EUR
+    INV_TOTAL_COL = 9   # I
     PL_GROSS_COL  = 8   # H
     PL_NET_COL    = 9   # I
 
@@ -672,16 +721,13 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
 
     packages_str = str((pdf_fields or {}).get('kap', '') or '')
-
     apply_header_fn(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_header_fn(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
 
-    # ── INV kolon başlıkları ─────────────────────────────────────────────────
     ws_inv.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(inv_cols):
         hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # ── INV veri satırları ───────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_inv.row_dimensions[er].height = 23
@@ -689,11 +735,9 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
         for c_idx, (out_col, src_col) in enumerate(inv_cols):
             cn = c_idx + 1
             if src_col == '__EUR__':
-                # Birim fiyat: TL / kur — yuvarlama yok, format gösterimde 2 hane
                 birim_eur = parse_num(row.get('Fiyat', 0)) / eur_kuru
                 dat(ws_inv, er, cn, birim_eur, bg=bg, align='right', fmt=EUR_FMT)
             elif src_col == '__EUR_CALC__':
-                # Toplam: Miktar × (Fiyat / kur) — yuvarlama yok
                 miktar    = parse_num(row.get('Miktar', 0))
                 birim_eur = parse_num(row.get('Fiyat', 0)) / eur_kuru
                 dat(ws_inv, er, cn, miktar * birim_eur, bg=bg, align='right', fmt=EUR_FMT)
@@ -709,8 +753,8 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     for r, h in [(tr, 22), (fr, 22), (ir, 22), (gr, 28)]:
         ws_inv.row_dimensions[r].height = h
 
-    G, H = 8, 9  # etiket H(8), değer I(9)
-    tc = get_column_letter(INV_TOTAL_COL)  # → 'I'
+    G, H = 8, 9
+    tc = get_column_letter(INV_TOTAL_COL)
 
     c = ws_inv.cell(row=tr, column=G, value='TOTAL')
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
@@ -762,12 +806,10 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
 
     set_print(ws_inv, f'A1:L{gr}')
 
-    # ── PL kolon başlıkları ──────────────────────────────────────────────────
     ws_pl.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(pl_cols):
         hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # ── PL veri satırları ────────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_pl.row_dimensions[er].height = 23
@@ -821,86 +863,93 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue(), fatura_no
+    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    return buf.getvalue(), fatura_no, master_out
 
 
 def generate_excel_ko(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
-    """Kosova INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
+    """Kosova INV + PL üretimi."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
-        find_ko_template_path, apply_ko_template_header
+        find_ko_template_path, apply_ko_template_header,
+        df_original=df_original
     )
 
 
 def generate_excel_mk(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
-    """Makedonya INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
+    """Makedonya INV + PL üretimi."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
-        find_mk_template_path, apply_mk_template_header
+        find_mk_template_path, apply_mk_template_header,
+        df_original=df_original
     )
+
+
 def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
-    """Belçika INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
+    """Belçika INV + PL üretimi."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
         find_be_template_path, apply_be_template_header,
-        inv_cols=BE_INV_COLS, pl_cols=BE_PL_COLS
+        inv_cols=BE_INV_COLS, pl_cols=BE_PL_COLS,
+        df_original=df_original
     )
 
 
 def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
-    """Almanya INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
+    """Almanya INV + PL üretimi."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
         find_de_template_path, apply_de_template_header,
-        inv_cols=DE_INV_COLS, pl_cols=DE_PL_COLS
+        inv_cols=DE_INV_COLS, pl_cols=DE_PL_COLS,
+        df_original=df_original
     )
 
 
 def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0):
-    """Hollanda INV + PL üretimi — freight/insurance PDF'ten okunur."""
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru  # TRY → EUR
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru  # TRY → EUR
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
+    """Hollanda INV + PL üretimi."""
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
     return _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
         find_nl_template_path, apply_nl_template_header,
-        inv_cols=NL_INV_COLS, pl_cols=NL_PL_COLS
+        inv_cols=NL_INV_COLS, pl_cols=NL_PL_COLS,
+        df_original=df_original
     )
 
+
 def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', gruplandirma='grouped'):
-    """Kazakistan INV + PL üretimi — TRY bazlı, freight/insurance PDF'ten okunur."""
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
+    """Kazakistan INV + PL üretimi — TRY bazlı, her zaman gruplandırılır."""
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
-    # SKU bazında gruplandırma
-    if gruplandirma == 'grouped':
-        agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
-        agg_dict['Miktar'] = 'sum'  # aynı SKU'ların miktarlarını topla
-        df = df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
+
+    # SKU bazında gruplandırma — her zaman
+    df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date = df['Fatura Tarihi'].iloc[0]
@@ -923,8 +972,8 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                     net_list_new.append(round(hedef_net - toplam_net, 2))
             net_list = net_list_new
 
-    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0)  # TRY direkt
-    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)  # TRY direkt
+    freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0)
+    insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0)
     TRY_FMT = '#,##0.00 "TRY"'
 
     INV_TOTAL_COL = 12  # L
@@ -945,15 +994,13 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     apply_kz_template_header(ws_inv, 'COMMERCIAL INVOICE  / СЧЕТ-ФАКТУРА', fatura_no, fatura_date, packages_str)
     apply_kz_template_header(ws_pl,  'PACKING LIST  / ТОВАРНАЯ НАКЛАДНАЯ', fatura_no, fatura_date, packages_str)
 
-    # ── INV kolon başlıkları ─────────────────────────────────────────────────
     ws_inv.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(KZ_INV_COLS):
         hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # ── INV veri satırları ───────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
-        ws_inv.row_dimensions[er].height = None  # otomatik yükseklik
+        ws_inv.row_dimensions[er].height = None
         bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
         for c_idx, (out_col, src_col) in enumerate(KZ_INV_COLS):
             cn = c_idx + 1
@@ -969,12 +1016,10 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 val = row.get(src_col, '')
-                # описание товаров boşsa ALT GRUBU -RU ile doldur
                 if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
                     val = row.get('ALT GRUBU -RU', '')
                 dat(ws_inv, er, cn, val, bg=bg, align='left')
 
-    # ── INV footer ───────────────────────────────────────────────────────────
     last_inv = DS + len(df)
     tr, fr, ir, gr = last_inv+1, last_inv+2, last_inv+3, last_inv+4
     for r, h in [(tr, 22), (fr, 22), (ir, 22), (gr, 28)]:
@@ -1031,17 +1076,15 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.number_format = TRY_FMT
     c.border = brd()
 
-    set_print(ws_inv, f'A1:L{gr}')
+    set_print(ws_inv, f'A1:P{gr}')
 
-    # ── PL kolon başlıkları ──────────────────────────────────────────────────
     ws_pl.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(KZ_PL_COLS):
         hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # ── PL veri satırları ────────────────────────────────────────────────────
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
-        ws_pl.row_dimensions[er].height = None  # otomatik yükseklik
+        ws_pl.row_dimensions[er].height = None
         bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
         for c_idx, (out_col, src_col) in enumerate(KZ_PL_COLS):
             cn = c_idx + 1
@@ -1055,12 +1098,10 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                 dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 val = row.get(src_col, '')
-                # описание товаров boşsa ALT GRUBU -RU ile doldur
                 if src_col == 'Ürün Açıklaması RU' and (not val or str(val).strip() == ''):
                     val = row.get('ALT GRUBU -RU', '')
                 dat(ws_pl, er, cn, val, bg=bg, align='left')
 
-    # ── PL footer ────────────────────────────────────────────────────────────
     last_pl = DS + len(df)
     pl_gr = last_pl + 1
     ws_pl.row_dimensions[pl_gr].height = 28
@@ -1094,18 +1135,24 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     set_print(ws_pl, f'A1:L{pl_gr}')
     ws_inv.sheet_view.topLeftCell = 'A1'
-    ws_pl.sheet_view.topLeftCell = 'A1'
+    ws_pl.sheet_view.topLeftCell  = 'A1'
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue(), fatura_no
+    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    return buf.getvalue(), fatura_no, master_out
 
-def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+
+def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
     """Bosna INV + PL üretimi."""
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(lambda x: 'PCS' if str(x).strip()=='AD' else x)
     df['GTİP'] = df['GTİP'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
+
+    # SKU bazında gruplandırma
+    df = _sku_grupla(df)
 
     fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date  = df['Fatura Tarihi'].iloc[0]
@@ -1258,16 +1305,20 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue(), fatura_no
+    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    return buf.getvalue(), fatura_no, master_out
 
 
 def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
-                      pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+                      pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
     """Gürcistan INV + PL üretimi."""
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+    # SKU bazında gruplandırma
+    df = _sku_grupla(df)
 
     fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date = df['Fatura Tarihi'].iloc[0]
@@ -1452,16 +1503,22 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue(), fatura_no
+    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    return buf.getvalue(), fatura_no, master_out
 
 
-def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields=None, hedef_net=0, depo_tipi='serbest'):
+def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                   pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
+    """Sırbistan INV + PL üretimi."""
     df['Birim Cinsi (1)'] = df['Birim Cinsi (1)'].apply(
         lambda x: 'PCS' if str(x).strip()=='AD' else x)
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['','nan'] else '')
+
+    # SKU bazında gruplandırma
+    df = _sku_grupla(df)
 
     fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date  = df['Fatura Tarihi'].iloc[0]
@@ -1595,7 +1652,8 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pd
     buf=io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue(), fatura_no
+    master_out = generate_master_excel(df_original if df_original is not None else df, brut_list, net_list)
+    return buf.getvalue(), fatura_no, master_out
 
 
 # ── VERCEL HANDLER ────────────────────────────────────────────────────────────
@@ -1627,55 +1685,61 @@ class handler(BaseHTTPRequestHandler):
                 pdf_bytes_data = base64.b64decode(pdf_b64)
                 pdf_fields = parse_pdf(pdf_bytes_data)
 
-            ulke_kodu = body.get('ulkeKodu', 'rs')
-            df = pd.read_excel(io.BytesIO(excel_bytes))
+            ulke_kodu   = body.get('ulkeKodu', 'rs')
+            df          = pd.read_excel(io.BytesIO(excel_bytes))
+            df_original = df.copy()  # gruplandırma öncesi orijinal — master Excel için
 
             if ulke_kodu == 'ba':
-                excel_out, fatura_no = generate_excel_ba(
+                excel_out, fatura_no, master_out = generate_excel_ba(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
             elif ulke_kodu == 'ge':
-                excel_out, fatura_no = generate_excel_ge(
+                excel_out, fatura_no, master_out = generate_excel_ge(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
             elif ulke_kodu == 'xk':
                 eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no = generate_excel_ko(
+                excel_out, fatura_no, master_out = generate_excel_ko(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                    df_original=df_original)
             elif ulke_kodu == 'mk':
                 eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no = generate_excel_mk(
+                excel_out, fatura_no, master_out = generate_excel_mk(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                    df_original=df_original)
             elif ulke_kodu == 'kz':
-                gruplandirma = body.get('gruplandirma', 'grouped')  # varsayılan gruplu
-                excel_out, fatura_no = generate_excel_kz(
+                excel_out, fatura_no, master_out = generate_excel_kz(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, gruplandirma=gruplandirma)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
             elif ulke_kodu == 'be':
-                eur_kuru = float(body.get('eurKuru', 1.0))  # EUR kuru frontend'den gelir
-                excel_out, fatura_no = generate_excel_be(
+                eur_kuru = float(body.get('eurKuru', 1.0))
+                excel_out, fatura_no, master_out = generate_excel_be(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                    df_original=df_original)
             elif ulke_kodu == 'de':
                 eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no = generate_excel_de(
+                excel_out, fatura_no, master_out = generate_excel_de(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                    df_original=df_original)
             elif ulke_kodu == 'nl':
                 eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no = generate_excel_nl(
+                excel_out, fatura_no, master_out = generate_excel_nl(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
+                    df_original=df_original)
             else:
-                excel_out, fatura_no = generate_excel(
+                excel_out, fatura_no, master_out = generate_excel(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                    hedef_net=hedef_net, depo_tipi=depo_tipi)
+                    hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
 
             result = json.dumps({
                 'success':   True,
                 'excel':     base64.b64encode(excel_out).decode('utf-8'),
+                'master':    base64.b64encode(master_out).decode('utf-8'),  # master Excel
                 'faturaNo':  fatura_no,
                 'pdfFields': pdf_fields,
             })

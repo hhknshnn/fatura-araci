@@ -117,12 +117,12 @@ function selectCountry(c) {
   document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('country-' + c).classList.add('active');
 
-  // EUR section: Belçika, Kosova, Makedonya
+  // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
-  // Freight/Insurance inputları: sadece Kosova ve Makedonya
+  // Freight/Insurance inputları: kaldırıldı — tüm ülkeler PDF'ten okur
   document.getElementById('koFreightSection').style.display = 'none';
-  // KZ gruplandırma modu — sadece Kazakistan'da göster
-  document.getElementById('kzModeSection').style.display = c === 'kz' ? 'block' : 'none';
+  // KZ gruplandırma modu: kaldırıldı — her zaman gruplandırılır
+  document.getElementById('kzModeSection').style.display = 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
   document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(c) ? 'block' : 'none';
@@ -363,16 +363,11 @@ function showMenseAyrim() {
 function buildAndDownloadReady() {
   if (!workingRows) return;
 
-  // Şablonlu backend ülkeleri — rs, ba, ge, xk, mk
+  // Şablonlu backend ülkeleri
   if (['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
-    return;
-  }
-
-  if (currentCountry === 'be' && !getEurRate()) {
-    showStatus('error', '⚠ Euro kuru girin.');
     return;
   }
 
@@ -394,12 +389,10 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  // Şablonlu backend ülkeleri — rs, ba, ge, xk, mk
   if (['rs','ba','ge','xk','mk','be','de','nl','kz'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
-  if (currentCountry === 'kz') suffix += (currentMode === 'grouped' ? '_gruplu' : '_tum');
   XLSX.writeFile(processedWB, originalFileName + suffix + '.xlsx');
 }
 
@@ -409,13 +402,13 @@ async function downloadRS() {
     return;
   }
   const btn = document.getElementById('downloadBtn');
-    btn.textContent = '⏳ Hazırlanıyor... (0s)';
-    btn.disabled = true;
-    let elapsed = 0;
-    const timer = setInterval(() => {
-      elapsed++;
-      btn.textContent = `⏳ Hazırlanıyor... (${elapsed}s)`;
-    }, 1000);
+  btn.textContent = '⏳ Hazırlanıyor... (0s)';
+  btn.disabled = true;
+  let elapsed = 0;
+  const timer = setInterval(() => {
+    elapsed++;
+    btn.textContent = `⏳ Hazırlanıyor... (${elapsed}s)`;
+  }, 1000);
 
   try {
     const excelB64 = arrayBufferToBase64(lastFileData);
@@ -447,20 +440,34 @@ async function downloadRS() {
         eurKuru:       getEurRate() || 1.0,
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
-        gruplandirma:  currentCountry === 'kz' ? currentMode : 'none',
       })
     });
+
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
+    // INV+PL indir
     const bin   = atob(data.excel);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = originalFileName + '_INV_PL.xlsx'; a.click();
+    const depoSuffix = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
+    a.href = url; a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
     URL.revokeObjectURL(url);
+
+    // Master Excel indir
+    if (data.master) {
+      const mBin   = atob(data.master);
+      const mBytes = new Uint8Array(mBin.length);
+      for (let i = 0; i < mBin.length; i++) mBytes[i] = mBin.charCodeAt(i);
+      const mBlob = new Blob([mBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const mUrl  = URL.createObjectURL(mBlob);
+      const mA    = document.createElement('a');
+      mA.href = mUrl; mA.download = `${data.faturaNo}.xlsx`; mA.click();
+      URL.revokeObjectURL(mUrl);
+    }
 
     if (data.pdfFields) {
       const pf = data.pdfFields;
@@ -501,7 +508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
   dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
   dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files); });
-  
+
   document.getElementById('step4Next').onclick = () => {
     if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
     goStep(5);

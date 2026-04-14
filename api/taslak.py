@@ -48,7 +48,7 @@ def doldur_kibris(taslak_bytes, config, form_data):
     for hucre in ['B8', 'E8', 'H8']:
         ws[hucre] = prefix + ref_no
 
-    dosya_adi = f"{config['dosyaAdi']}_{prefix}{ref_no}_taslak.xlsx"
+    dosya_adi = f"Fatura Taslak_{config['dosyaAdi']} {prefix}{ref_no}.xlsx"
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -121,8 +121,7 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
     ref_no  = form_data.get('referansNo', '')
     prefix  = config['alanlar']['referansNo'].get('prefix', '')
     ulke    = config.get('dosyaAdi', 'Taslak')
-    dosya_adi = f"{ulke}_{prefix}{ref_no}_taslak.xlsx"
-
+    dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
     # ── BYTES OLARAK DÖNDÜR ───────────────────────────────────────────────────
     buf = io.BytesIO()
     wb.save(buf)
