@@ -152,11 +152,7 @@ function initStep4() {
   document.getElementById('step4Title').textContent = 'Dosya Yükle';
   document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
   document.getElementById('step4Back').onclick = () => goStep(3);
-  document.getElementById('step4Next').onclick = () => {
-    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
-    goStep(5);
-    initStep5();
-  };
+
 }
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
