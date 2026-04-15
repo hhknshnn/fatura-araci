@@ -82,6 +82,7 @@ function handlePdf(file) {
         body: JSON.stringify({ action: 'parsePdf', pdf: pdfB64 })
       });
       const data = await resp.json();
+      console.log('PDF parse sonucu:', data);
       if (data.success && data.pdfFields) {
         const pf = data.pdfFields;
 
