@@ -150,7 +150,7 @@ function onEurRateChanged() {
 }
 
 // ── ADIM 4: DOSYA YÜKLE ───────────────────────────────────────────────────────
-// YENİ
+// YENİ:
 function initStep4() {
   document.getElementById('step4Title').textContent = 'Dosya Yükle';
   document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
@@ -158,7 +158,8 @@ function initStep4() {
 
   const nextBtn = document.getElementById('step4Next');
   if (nextBtn) {
-    nextBtn.style.display = 'block'; // butonu göster
+    // masterRows zaten doluysa (geri gelindi) butonu göster, değilse gizle
+    nextBtn.style.display = masterRows ? 'block' : 'none';
     nextBtn.onclick = () => {
       if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
       goStep(5);
