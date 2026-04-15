@@ -6,6 +6,8 @@ import os
 import re
 import traceback
 import pdfplumber
+import time
+t0 = time.time()
 
 import pandas as pd
 import openpyxl
@@ -2369,7 +2371,8 @@ class handler(BaseHTTPRequestHandler):
             ulke_kodu   = body.get('ulkeKodu', 'rs')
             df          = pd.read_excel(io.BytesIO(excel_bytes))
             df_original = df.copy()
-
+            t1 = time.time()
+            print(f'TIMING generate: {t1-t0:.2f}s', flush=True)
             if ulke_kodu == 'ba':
                 excel_out, fatura_no, master_out = generate_excel_ba(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
@@ -2448,7 +2451,8 @@ class handler(BaseHTTPRequestHandler):
                 excel_out, fatura_no, master_out = generate_excel(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
-
+            t2 = time.time()
+            print(f'TIMING json/base64: {t2-t1:.2f}s', flush=True)
             result = json.dumps({
                 'success':   True,
                 'excel':     base64.b64encode(excel_out).decode('utf-8'),
