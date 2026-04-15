@@ -137,10 +137,12 @@ function handlePdf(file) {
     } catch(e) {
       console.warn('PDF parse hatası:', e);
     } finally {
-      clearInterval(timer);
-      // Parse bitti
-      badge.textContent = `✓ PDF okundu (${elapsed}s)`;
-      if (nextBtn) nextBtn.disabled = false;
+    clearInterval(timer);
+    badge.textContent = `✓ PDF okundu (${elapsed}s)`;
+    if (nextBtn) {
+      nextBtn.disabled = false;
+      if (masterRows) nextBtn.style.display = 'block';  // Excel zaten yüklüyse göster
+    }
     }
   };
   r.readAsArrayBuffer(file);
