@@ -162,15 +162,6 @@ function initStep5() {
   if (selectedMod === 'sonrasi') {
     document.getElementById('downloadBtn').style.display = 'none';
   }
-  // PDF'ten kilo geldiyse otomatik doldur
-  if (window._pdfBrutKg && window._pdfBrutKg > 0) {
-    const brutEl = document.getElementById('targetWeight');
-    if (brutEl) brutEl.value = window._pdfBrutKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  }
-  if (window._pdfNetKg && window._pdfNetKg > 0) {
-    const netEl = document.getElementById('targetNet');
-    if (netEl) netEl.value = window._pdfNetKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  }
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
@@ -265,16 +256,16 @@ function applyGroupWeights() {
   // PDF'ten kilo geldiyse otomatik doldur ve uygula
   if (window._pdfBrutKg && window._pdfBrutKg > 0) {
     const brutEl = document.getElementById('targetWeight');
-    if (brutEl) {
-      brutEl.value = window._pdfBrutKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-    }
-    // NET de varsa antrepo alanına yaz (applyWeightAdjust sonra tetikler)
-    if (window._pdfNetKg && window._pdfNetKg > 0) {
+    if (brutEl) brutEl.value = window._pdfBrutKg; // sayı direkt, parseNum okur
+
+    applyWeightAdjust(); // BRÜT dağıtımını uygula
+
+    // Antrepo modunda PDF'ten NET de geldiyse otomatik uygula
+    if (selectedDepo === 'antrepo' && window._pdfNetKg && window._pdfNetKg > 0) {
       const netEl = document.getElementById('targetNet');
-      if (netEl) netEl.value = window._pdfNetKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+      if (netEl) netEl.value = window._pdfNetKg;
+      applyNetAdjust(); // NET dağıtımını da uygula
     }
-    // Otomatik uygula
-    applyWeightAdjust();
   } else {
     showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
   }
