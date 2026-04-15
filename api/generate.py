@@ -429,11 +429,11 @@ def generate_master_excel(df_original, brut_list, net_list):
 
     t1 = time.time()
     # openpyxl doğrudan — pd.ExcelWriter overhead'i yok
-    wb = Workbook(write_only=True)  # write_only mod — çok daha hızlı
+    wb = Workbook(write_only=True)
     ws = wb.create_sheet()
-    ws.append(list(df.columns))  # header
-    for row in df.itertuples(index=False):
-        ws.append(list(row))
+    rows = [list(df.columns)] + df.values.tolist()
+    for row in rows:
+        ws.append(row)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
