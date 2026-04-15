@@ -17,8 +17,6 @@ let processedWB      = null;
 
 let groupWeights  = {};
 let exceptionSkus = {};
-let cyFileDataList = [];
-let cyFileNames    = [];
 
 // ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 async function loadSharedConfig() {
@@ -114,7 +112,6 @@ function selectDepo(depo) {
 
 // ── ADIM 3: ÜLKE SEÇ ──────────────────────────────────────────────────────────
 function selectCountry(c) {
-  
   currentCountry = c;
 
   // Kıbrıs seçilince cy state'i sıfırla
@@ -123,21 +120,12 @@ function selectCountry(c) {
     cyFileNames    = [];
     window._cyHedefBrutList = null;
   }
+
   document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
-  // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
-  const isUsd = ['iq','ly','lr','lb'].includes(c);
-  const eurRow = document.getElementById('eurRateInput')?.parentElement;
-  const usdRow = document.getElementById('usdRateRow');
-  const eurLabel = document.getElementById('eurLabel');
-  const usdLabel = document.getElementById('usdLabel');
-  if (usdRow) usdRow.style.display = isUsd ? 'flex' : 'none';
-  if (usdLabel) usdLabel.style.display = isUsd ? 'block' : 'none';
-  if (eurRow) eurRow.style.display = isUsd ? 'none' : 'flex';
-  if (eurLabel) eurLabel.style.display = isUsd ? 'none' : 'block';
   // Freight/Insurance inputları: kaldırıldı — tüm ülkeler PDF'ten okur
   document.getElementById('koFreightSection').style.display = 'none';
   // KZ gruplandırma modu: kaldırıldı — her zaman gruplandırılır
@@ -209,7 +197,6 @@ function buildCyWeightInputs() {
     container.appendChild(div);
   }
 
-  // Uygula butonu
   const btn = document.createElement('button');
   btn.className = 'btn-secondary';
   btn.style.cssText = 'width:100%;margin-top:8px;';
@@ -308,8 +295,7 @@ function toggleExSku() {
 // ── KİLO UYGULA ───────────────────────────────────────────────────────────────
 function applyGroupWeights() {
   if (!masterRows) return;
-  if (currentCountry === 'cy') { buildCyWeightInputs(); return; }  // ← ekle
-
+  if (currentCountry === 'cy') { buildCyWeightInputs(); return; }
 
   const groups = [...new Set(masterRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
@@ -342,18 +328,16 @@ function applyGroupWeights() {
   document.getElementById('calcTotal').textContent = round2(totalBrut);
   document.getElementById('adjustSection').style.display = 'block';
 
-  // PDF'ten kilo geldiyse otomatik doldur ve uygula
   if (window._pdfBrutKg && window._pdfBrutKg > 0) {
     const brutEl = document.getElementById('targetWeight');
-    if (brutEl) brutEl.value = window._pdfBrutKg; // sayı direkt, parseNum okur
+    if (brutEl) brutEl.value = window._pdfBrutKg;
 
-    applyWeightAdjust(); // BRÜT dağıtımını uygula
+    applyWeightAdjust();
 
-    // Antrepo modunda PDF'ten NET de geldiyse otomatik uygula
     if (selectedDepo === 'antrepo' && window._pdfNetKg && window._pdfNetKg > 0) {
       const netEl = document.getElementById('targetNet');
       if (netEl) netEl.value = window._pdfNetKg;
-      applyNetAdjust(); // NET dağıtımını da uygula
+      applyNetAdjust();
     }
   } else {
     showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
@@ -393,7 +377,6 @@ function applyWeightAdjust() {
 
   const res = document.getElementById('adjustResult');
   res.className = 'adjust-result visible';
-  // Antrepo modunda NET henüz kesin değil — sadece BRÜT göster
   if (selectedDepo === 'antrepo') {
     res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: Hedef NET girin`;
     document.getElementById('antrepoSection').style.display = 'block';
@@ -433,7 +416,6 @@ function applyNetAdjust() {
   const finalNet = workingRows.reduce((s, r) => s + parseNum(r['NET']), 0);
   const res = document.getElementById('netResult');
   res.className = 'adjust-result visible';
-  // BRÜT + NET birlikte göster
   const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   res.innerHTML = `✓ BRÜT: ${round2(finalBrutDisplay)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
 
@@ -472,7 +454,6 @@ function showMenseAyrim() {
 function buildAndDownloadReady() {
   if (!workingRows) return;
 
-  // Şablonlu backend ülkeleri
   if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
@@ -504,7 +485,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb','cy'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
@@ -512,43 +493,17 @@ async function downloadResult() {
 }
 
 async function downloadRS() {
-  if (!workingRows || !lastFileData) {
+  const isCy = currentCountry === 'cy';
+
+  if (!isCy && (!workingRows || !lastFileData)) {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
   }
+  if (isCy && cyFileDataList.length === 0) {
+    showStatus('error', '⚠ En az 1 Excel yükleyin.');
+    return;
+  }
 
-  const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
-
-    // Kıbrıs — özel liste gönder
-    const isCy = currentCountry === 'cy';
-    const excelB64List = isCy
-      ? await Promise.all(cyFileDataList.map(d => Promise.resolve(arrayBufferToBase64(d))))
-      : null;
-
-    const resp = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        excel:              excelB64,
-        logo:               logoB64,
-        pdf:                pdfB64,
-        ulkeKodu:           currentCountry,
-        hedefBrut:          hedefBrut,
-        hedefNet:           workingRows.reduce((s,r) => s+(r['NET']||0), 0),
-        depoTipi:           selectedDepo,
-        grupKilolari:       groupWeights,
-        exceptionSkus:      exceptionSkus,
-        eurKuru:            getEurRate() || 1.0,
-        koFreight:          parseNum(document.getElementById('koFreightInput')?.value || '0'),
-        koInsurance:        parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
-        // Kıbrıs özel
-        ...(isCy && {
-          excelList:        excelB64List,
-          hedefBrutList:    window._cyHedefBrutList || [hedefBrut],
-          grupKilolariList: cyFileDataList.map(() => groupWeights),
-        }),
-      })
-    });
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor... (0s)';
   btn.disabled = true;
@@ -559,7 +514,7 @@ async function downloadRS() {
   }, 1000);
 
   try {
-    const excelB64 = arrayBufferToBase64(lastFileData);
+    const excelB64 = lastFileData ? arrayBufferToBase64(lastFileData) : '';
 
     let logoB64 = '';
     try {
@@ -570,26 +525,39 @@ async function downloadRS() {
     let pdfB64 = '';
     if (lastPdfData) pdfB64 = arrayBufferToBase64(lastPdfData);
 
-    const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
+    const hedefBrut = workingRows ? workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0) : 0;
+
+    // Kıbrıs özel liste
+    const excelB64List = isCy
+      ? cyFileDataList.map(d => arrayBufferToBase64(d))
+      : null;
+
+    const body = {
+      excel:         excelB64,
+      logo:          logoB64,
+      pdf:           pdfB64,
+      ulkeKodu:      currentCountry,
+      hedefBrut:     hedefBrut,
+      hedefNet:      workingRows ? workingRows.reduce((s,r) => s+(r['NET']||0), 0) : 0,
+      depoTipi:      selectedDepo,
+      grupKilolari:  groupWeights,
+      exceptionSkus: exceptionSkus,
+      eurKuru:       getEurRate() || 1.0,
+      koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
+      koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
+    };
+
+    // Kıbrıs özel alanlar
+    if (isCy) {
+      body.excelList        = excelB64List;
+      body.hedefBrutList    = window._cyHedefBrutList || [hedefBrut];
+      body.grupKilolariList = cyFileDataList.map(() => groupWeights);
+    }
 
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        excel:         excelB64,
-        logo:          logoB64,
-        pdf:           pdfB64,
-        ulkeKodu:      currentCountry,
-        hedefBrut:     hedefBrut,
-        hedefNet:      workingRows.reduce((s,r) => s+(r['NET']||0), 0),
-        depoTipi:      selectedDepo,
-        grupKilolari:  groupWeights,
-        exceptionSkus: exceptionSkus,
-        eurKuru:       getEurRate() || 1.0,
-
-        koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
-        koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
-      })
+      body: JSON.stringify(body)
     });
 
     const data = await resp.json();
@@ -603,7 +571,7 @@ async function downloadRS() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const depoSuffix = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
-    a.href = url; a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
+    a.href = url; a.download = isCy ? `PL- ${data.faturaNo}.xlsx` : `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
     URL.revokeObjectURL(url);
 
     // Master Excel indir
@@ -616,7 +584,7 @@ async function downloadRS() {
       const mA    = document.createElement('a');
       mA.href = mUrl; mA.download = `${data.faturaNo}.xlsx`; mA.click();
       URL.revokeObjectURL(mUrl);
-    } 
+    }
 
     if (data.pdfFields) {
       const pf = data.pdfFields;
