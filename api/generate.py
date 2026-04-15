@@ -25,6 +25,10 @@ LIGHT_BLUE = 'D6E4F0'
 GOLD       = 'C9A84C'
 LIGHT_GRAY = 'F2F2F2'
 TL_FMT     = '₺#,##0.00'
+_FONT_CACHE = {}
+_FILL_CACHE = {}
+_BORDER_CACHE = {}
+_ALIGN_CACHE = {}
 
 EXCEPTION_SKUS = {
     '1SPOCA0029197.': 0.01,
@@ -259,10 +263,19 @@ def hdr(ws, r, col, val, bg=DARK_BLUE, fg='FFFFFF', bold=True, align='center', s
 
 def dat(ws, r, col, val, bg='FFFFFF', bold=False, align='left', fmt=None):
     c = ws.cell(row=r, column=col, value=val)
-    c.font = Font(name='Arial', bold=bold, color='000000', size=9)
-    c.fill = PatternFill('solid', fgColor=bg)
-    c.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
-    c.border = brd()
+    fkey = (bold,)
+    if fkey not in _FONT_CACHE:
+        _FONT_CACHE[fkey] = Font(name='Arial', bold=bold, color='000000', size=9)
+    c.font = _FONT_CACHE[fkey]
+    if bg not in _FILL_CACHE:
+        _FILL_CACHE[bg] = PatternFill('solid', fgColor=bg)
+    c.fill = _FILL_CACHE[bg]
+    if align not in _ALIGN_CACHE:
+        _ALIGN_CACHE[align] = Alignment(horizontal=align, vertical='center', wrap_text=True)
+    c.alignment = _ALIGN_CACHE[align]
+    if 'default' not in _BORDER_CACHE:
+        _BORDER_CACHE['default'] = brd()
+    c.border = _BORDER_CACHE['default']
     if fmt: c.number_format = fmt
     return c
 
