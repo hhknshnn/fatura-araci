@@ -385,11 +385,8 @@ def _sku_grupla(df):
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
 def generate_master_excel(df_original, brut_list, net_list):
-    """
-    Orijinal master Excel'e BRÜT ve NET sütunları ekler.
-    brut_list/net_list orijinal df ile aynı uzunlukta olmalı.
-    BRÜT / Miktar → Ürün Ağırlığı (KG) sütununa yazılır.
-    """
+    import time
+    t0 = time.time()
     df = df_original.copy()
     df['BRÜT'] = brut_list
     df['NET']  = net_list
@@ -402,6 +399,8 @@ def generate_master_excel(df_original, brut_list, net_list):
         return 0.0
 
     df['Ürün Ağırlığı (KG)'] = df.apply(calc_ag, axis=1)
+    print(f'  master calc_ag: {time.time()-t0:.2f}s', flush=True)
+    t1 = time.time()
 
     cols = list(df.columns)
     ag_idx = cols.index('Ürün Ağırlığı (KG)')
@@ -415,6 +414,7 @@ def generate_master_excel(df_original, brut_list, net_list):
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
     buf.seek(0)
+    print(f'  master to_excel: {time.time()-t1:.2f}s', flush=True)
     return buf.getvalue()
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None, destination='SERBIA', incoterm='CIP', info_start_col=None):
