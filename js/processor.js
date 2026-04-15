@@ -89,10 +89,8 @@ function handlePdf(file) {
 }
 
 function loadFile(data) {
-  // Her yeni yüklemede state sıfırla
   processedWB = null; workingRows = null; masterRows = null;
 
-  // step4Next'i gizle — başarılı yüklemede açılacak
   const nextBtn = document.getElementById('step4Next');
   if (nextBtn) nextBtn.style.display = 'none';
 
@@ -110,14 +108,18 @@ function loadFile(data) {
 
     masterRows = rows;
 
-    // Başarılı yükleme — Devam butonunu göster
+    // Devam butonunu göster
     if (nextBtn) nextBtn.style.display = 'block';
 
-    showStatus('success',
-      `<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div>`
-    );
+    // fileName badge güncelle
+    const badge = document.getElementById('fileName');
+    if (badge) badge.textContent = '✓ ' + rows.length.toLocaleString('tr') + ' satır yüklendi';
+
   } catch(err) {
-    showStatus('error', '⚠ ' + err.message);
+    // Hata durumunda badge'e yaz — statusBox adım 5'te olduğu için güvenli değil
+    const badge = document.getElementById('fileName');
+    if (badge) { badge.textContent = '⚠ ' + err.message; badge.style.color = 'var(--error)'; }
+    console.error('loadFile hatası:', err.message);
   }
 }
 
