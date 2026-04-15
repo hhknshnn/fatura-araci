@@ -118,7 +118,7 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
-  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(c));
+  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
   // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
   const isUsd = ['iq','ly','lr','lb'].includes(c);
   const eurRow = document.getElementById('eurRateInput')?.parentElement;
@@ -474,7 +474,6 @@ async function downloadRS() {
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
         eurKuru:       getEurRate() || 1.0,
-        usdKuru:       getUsdRate() || 1.0,
 
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),

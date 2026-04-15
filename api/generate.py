@@ -1668,12 +1668,10 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
         for c_idx, (out_col, src_col) in enumerate(GENEL_INV_COLS):
             cn = c_idx + 1
             if src_col == '__USD__':
-                birim_usd = parse_num(row.get('Fiyat', 0)) / usd_kuru
-                dat(ws_inv, er, cn, birim_usd, bg=bg, align='right', fmt=USD_FMT)
+                dat(ws_inv, er, cn, parse_num(row.get('Fiyat', 0)), bg=bg, align='right', fmt=USD_FMT)
             elif src_col == '__USD_CALC__':
-                miktar    = parse_num(row.get('Miktar', 0))
-                birim_usd = parse_num(row.get('Fiyat', 0)) / usd_kuru
-                dat(ws_inv, er, cn, miktar * birim_usd, bg=bg, align='right', fmt=USD_FMT)
+                miktar = parse_num(row.get('Miktar', 0))
+                dat(ws_inv, er, cn, round(miktar * parse_num(row.get('Fiyat', 0)), 2), bg=bg, align='right', fmt=USD_FMT)
             elif out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
             elif out_col in ('MASTER ITEM CODE', 'HS CODE'):
