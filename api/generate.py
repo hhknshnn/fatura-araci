@@ -1647,17 +1647,17 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     INV_TOTAL_COL = 9   # I — TOTAL AMOUNT USD
     PL_GROSS_COL  = 8   # H
     PL_NET_COL    = 9   # I
-
+    t0 = time.time()
     wb = openpyxl.load_workbook(find_template_fn())
     ws_inv = wb['INV']
     ws_pl  = wb['PL']
     DS = 9  # kolon başlığı satırı — satır 8, veri DS+1'den başlar
-
+    t1 = time.time()
     if ws_inv.max_row > DS:
         ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
     if ws_pl.max_row > DS:
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
-
+    t2 = time.time()
     packages_str = str((pdf_fields or {}).get('kap', '') or '')
     apply_genel_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_genel_template_header(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
