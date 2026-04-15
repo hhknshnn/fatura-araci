@@ -124,6 +124,8 @@ function loadFile(data) {
     showStatus('success',
       `<div class="stat">✓ Dosya yüklendi: <span>${rows.length.toLocaleString('tr')} satır</span></div>`
     );
+    const nextBtn = document.getElementById('step4Next');
+    if (nextBtn) nextBtn.style.display = 'block';
   } catch(err) {
     showStatus('error', '⚠ ' + err.message);
   }

@@ -148,11 +148,21 @@ function onEurRateChanged() {
 }
 
 // ── ADIM 4: DOSYA YÜKLE ───────────────────────────────────────────────────────
+// YENİ
 function initStep4() {
   document.getElementById('step4Title').textContent = 'Dosya Yükle';
   document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
   document.getElementById('step4Back').onclick = () => goStep(3);
 
+  const nextBtn = document.getElementById('step4Next');
+  if (nextBtn) {
+    nextBtn.style.display = 'block'; // butonu göster
+    nextBtn.onclick = () => {
+      if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
+      goStep(5);
+      initStep5();
+    };
+  }
 }
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────

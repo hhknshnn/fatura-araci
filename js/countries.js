@@ -5,10 +5,8 @@
 const COUNTRIES = {
   kz: { label: 'Kazakistan', suffix: '_kazakistan' },
   rs: { label: 'Sırbistan',  suffix: '_sirbistan'  },
-  iq: { label: 'Irak',       suffix: '_irak'        },
   ge: { label: 'Gürcistan',  suffix: '_gurcistan'   },
   cy: { label: 'KKTC',       suffix: '_kktc'        },
-  ru: { label: 'Rusya',      suffix: '_rusya'        },
   ba: { label: 'Bosna',      suffix: '_bosna'        },
   be: { label: 'Belçika',    suffix: '_belcika'      },
   de: { label: 'Almanya',  suffix: '_almanya'  },
