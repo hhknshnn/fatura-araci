@@ -1609,6 +1609,7 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                          pdf_fields, hedef_net, depo_tipi, usd_kuru,
                          find_template_fn, df_original=None):
     """USD bazlı genel INV+PL üretim motoru — Irak, Libya, Liberya, Lübnan."""
+    import time
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
@@ -1644,30 +1645,33 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
             net_list = net_list_new
 
     USD_FMT       = '#,##0.00 "USD"'
-    INV_TOTAL_COL = 9   # I — TOTAL AMOUNT USD
-    PL_GROSS_COL  = 8   # H
-    PL_NET_COL    = 9   # I
+    INV_TOTAL_COL = 9
+    PL_GROSS_COL  = 8
+    PL_NET_COL    = 9
+
     t0 = time.time()
     wb = openpyxl.load_workbook(find_template_fn())
     ws_inv = wb['INV']
     ws_pl  = wb['PL']
-    DS = 9  # kolon başlığı satırı — satır 8, veri DS+1'den başlar
+    print(f'  USD load_workbook: {time.time()-t0:.2f}s', flush=True)
+
+    DS = 9
     t1 = time.time()
     if ws_inv.max_row > DS:
         ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
     if ws_pl.max_row > DS:
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
-    t2 = time.time()
+    print(f'  USD delete_rows: {time.time()-t1:.2f}s', flush=True)
+
     packages_str = str((pdf_fields or {}).get('kap', '') or '')
     apply_genel_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
     apply_genel_template_header(ws_pl,  'PACKING LIST',       fatura_no, fatura_date, packages_str)
 
-    # INV kolon başlıkları
     ws_inv.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(GENEL_INV_COLS):
         hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # INV veri satırları
+    t2 = time.time()
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_inv.row_dimensions[er].height = 23
@@ -1685,8 +1689,8 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
+    print(f'  USD INV loop: {time.time()-t2:.2f}s', flush=True)
 
-    # INV footer — GRAND TOTAL USD (freight/insurance yok)
     last_inv = DS + len(df)
     tr, gr = last_inv + 1, last_inv + 2
     ws_inv.row_dimensions[tr].height = 22
@@ -1721,12 +1725,11 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
 
     set_print(ws_inv, f'A1:L{gr}')
 
-    # PL kolon başlıkları
     ws_pl.row_dimensions[DS].height = 35
     for i, (hd, _) in enumerate(GENEL_PL_COLS):
         hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    # PL veri satırları
+    t3 = time.time()
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_pl.row_dimensions[er].height = 23
@@ -1743,8 +1746,8 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                 dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 dat(ws_pl, er, cn, row.get(src_col, ''), bg=bg, align='left')
+    print(f'  USD PL loop: {time.time()-t3:.2f}s', flush=True)
 
-    # PL footer — TOTAL KG
     last_pl = DS + len(df)
     pl_gr = last_pl + 1
     ws_pl.row_dimensions[pl_gr].height = 28
@@ -1780,9 +1783,12 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     ws_inv.sheet_view.topLeftCell = 'A1'
     ws_pl.sheet_view.topLeftCell  = 'A1'
 
+    t4 = time.time()
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    print(f'  USD wb.save: {time.time()-t4:.2f}s', flush=True)
+
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
