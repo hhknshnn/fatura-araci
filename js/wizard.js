@@ -622,11 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
   dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files); });
 
-  document.getElementById('step4Next').onclick = () => {
-    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
-    goStep(5);
-    initStep5();
-  };
+
 });
 
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────
