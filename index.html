@@ -14,7 +14,7 @@
 
   <!-- HEADER -->
   <header class="app-header">
-    <a href="/" onclick="location.reload();return false;" 
+    <a href="/" onclick="location.reload();return false;"
        style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;cursor:pointer;">
       <div class="app-logo">📋</div>
       <div class="app-title">Fatura <span>Aracı</span></div>
@@ -24,25 +24,15 @@
 
   <!-- WIZARD STEPS -->
   <div class="wizard-steps" id="wizardSteps">
-    <div class="step-item">
-      <div class="step-dot active" id="dot1">1</div>
-    </div>
+    <div class="step-item"><div class="step-dot active" id="dot1">1</div></div>
     <div class="step-line" id="line1"></div>
-    <div class="step-item">
-      <div class="step-dot" id="dot2">2</div>
-    </div>
+    <div class="step-item"><div class="step-dot" id="dot2">2</div></div>
     <div class="step-line" id="line2"></div>
-    <div class="step-item">
-      <div class="step-dot" id="dot3">3</div>
-    </div>
+    <div class="step-item"><div class="step-dot" id="dot3">3</div></div>
     <div class="step-line" id="line3"></div>
-    <div class="step-item">
-      <div class="step-dot" id="dot4">4</div>
-    </div>
+    <div class="step-item"><div class="step-dot" id="dot4">4</div></div>
     <div class="step-line" id="line4"></div>
-    <div class="step-item">
-      <div class="step-dot" id="dot5">5</div>
-    </div>
+    <div class="step-item"><div class="step-dot" id="dot5">5</div></div>
   </div>
 
   <!-- ── ADIM 1: MOD SEÇ ─────────────────────────────────────────────────── -->
@@ -78,32 +68,22 @@
     <div class="panel-label">Taslak Doldur</div>
     <div class="panel-title">Fatura Taslağı</div>
     <div class="panel-desc">Ülkeyi ve depo tipini seçin, formu doldurun.</div>
-
     <div class="status-box" id="taslakStatus"></div>
-
     <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Ülke</div>
     <div class="country-grid" id="taslakUlkeGrid" style="margin-bottom:20px;"></div>
-
     <div id="taslakDepoSection" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Depo Tipi</div>
       <div class="mode-options" style="margin-bottom:20px;">
         <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
           <div class="mode-icon">🏭</div>
-          <div>
-            <div class="mode-title">Serbest Depo</div>
-            <div class="mode-desc">NET = BRÜT × 0.9</div>
-          </div>
+          <div><div class="mode-title">Serbest Depo</div><div class="mode-desc">NET = BRÜT × 0.9</div></div>
         </div>
         <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
           <div class="mode-icon">🏗️</div>
-          <div>
-            <div class="mode-title">Antrepo</div>
-            <div class="mode-desc">NET elle girilir</div>
-          </div>
+          <div><div class="mode-title">Antrepo</div><div class="mode-desc">NET elle girilir</div></div>
         </div>
       </div>
     </div>
-
     <div id="taslakFormSection" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">Bilgileri Girin</div>
       <div id="taslakFormAlanlari"></div>
@@ -112,7 +92,6 @@
         ⬇ Taslak İndir
       </button>
     </div>
-
     <div class="nav-row" style="margin-top:20px;">
       <button class="btn-ghost" onclick="
         document.getElementById('stepTaslak').style.display='none';
@@ -130,17 +109,11 @@
     <div class="mode-options" id="step2Options">
       <div class="mode-btn" id="mode-serbest" onclick="selectDepo('serbest')">
         <div class="mode-icon">🏭</div>
-        <div>
-          <div class="mode-title">Serbest Depo</div>
-          <div class="mode-desc">NET = BRÜT × 0.9</div>
-        </div>
+        <div><div class="mode-title">Serbest Depo</div><div class="mode-desc">NET = BRÜT × 0.9</div></div>
       </div>
       <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
         <div class="mode-icon">🏗️</div>
-        <div>
-          <div class="mode-title">Antrepo</div>
-          <div class="mode-desc">Hedef NET ayrıca girilir</div>
-        </div>
+        <div><div class="mode-title">Antrepo</div><div class="mode-desc">Hedef NET ayrıca girilir</div></div>
       </div>
     </div>
     <div class="nav-row">
@@ -169,11 +142,6 @@
         <div class="country-flag"><img src="https://flagcdn.com/40x30/ge.png"></div>
         <div class="country-name">Gürcistan</div>
         <div class="country-sub">12 sütun</div>
-      </div>
-      <div class="country-btn" id="country-cy" onclick="selectCountry('cy')">
-        <div class="country-flag"><img src="https://flagcdn.com/40x30/cy.png"></div>
-        <div class="country-name">KKTC</div>
-        <div class="country-sub">8 sütun</div>
       </div>
       <div class="country-btn" id="country-ru" onclick="selectCountry('ru')">
         <div class="country-flag"><img src="https://flagcdn.com/40x30/ru.png"></div>
@@ -210,11 +178,6 @@
         <div class="country-name">Hollanda</div>
         <div class="country-sub">INV + PL</div>
       </div>
-      <div class="country-btn" id="country-ru" onclick="selectCountry('ru')">
-        <div class="country-flag"><img src="https://flagcdn.com/40x30/ru.png"></div>
-        <div class="country-name">Rusya</div>
-        <div class="country-sub">INV + PL</div>
-      </div>
       <div class="country-btn" id="country-uz" onclick="selectCountry('uz')">
         <div class="country-flag"><img src="https://flagcdn.com/40x30/uz.png"></div>
         <div class="country-name">Özbekistan</div>
@@ -242,8 +205,8 @@
       </div>
     </div>
 
-    <!-- EUR kur + Freight/Insurance (Belçika, Kosova, Makedonya) -->
-<div class="eur-section" id="eurSection">
+    <!-- EUR/USD kur girişi -->
+    <div class="eur-section" id="eurSection">
       <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
         <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
@@ -256,28 +219,34 @@
           placeholder="örn: 34,00" style="flex:1;">
         <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
       </div>
+      <!-- Freight/Insurance — gizli, PDF'ten otomatik okunur -->
       <div id="koFreightSection" style="display:none;">
-        ...mevcut içerik...
+        <div class="eur-label">Freight (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+          <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+            placeholder="örn: 1200,00" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
+        <div class="eur-label">Insurance (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+          <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+            placeholder="örn: 300,00" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
       </div>
     </div>
 
-    <!-- KZ gruplandırma modu -->
-    <div class="eur-section" id="kzModeSection">
+    <!-- KZ gruplandırma modu — gizli -->
+    <div class="eur-section" id="kzModeSection" style="display:none;">
       <div class="eur-label">Çıktı Türü</div>
       <div class="mode-options">
         <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
           <div class="mode-icon">🗜️</div>
-          <div>
-            <div class="mode-title">Gruplandır</div>
-            <div class="mode-desc">SKU bazında birleştir</div>
-          </div>
+          <div><div class="mode-title">Gruplandır</div><div class="mode-desc">SKU bazında birleştir</div></div>
         </div>
         <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
           <div class="mode-icon">📋</div>
-          <div>
-            <div class="mode-title">Gruplandırma</div>
-            <div class="mode-desc">Tüm satırlar</div>
-          </div>
+          <div><div class="mode-title">Gruplandırma</div><div class="mode-desc">Tüm satırlar</div></div>
         </div>
       </div>
     </div>
@@ -326,7 +295,8 @@
 
     <div class="nav-row" style="margin-top:16px;">
       <button class="btn-ghost" id="step4Back" onclick="goStep(3)">← Geri</button>
-      <button class="btn-secondary" id="step4Next" onclick="goStep(5)" style="display:none;">Devam →</button>
+      <!-- onclick YOK — initStep4() tarafından set edilir -->
+      <button class="btn-secondary" id="step4Next" style="display:none;">Devam →</button>
     </div>
   </div>
 

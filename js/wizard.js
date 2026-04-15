@@ -33,6 +33,7 @@ async function loadSharedConfig() {
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
 function goStep(n) {
+  // Fatura öncesi modunda adım 2 atlanır, direkt adım 4'e gidilir
   if (selectedMod === 'oncesi' && n === 2) {
     setupStepFaturaOncesi();
     showOnlyStep(4);
@@ -43,6 +44,8 @@ function goStep(n) {
   showOnlyStep(n);
   updateDots(n);
   currentStep = n;
+  if (n === 4) initStep4(); // adım 4 gösterilince başlat
+  if (n === 5) initStep5(); // adım 5 gösterilince başlat
 }
 
 function showOnlyStep(n) {
@@ -74,15 +77,15 @@ function updateDots(active) {
 }
 
 function setupStepFaturaOncesi() {
+  // Fatura öncesi modunda adım 4 başlıklarını ayarla
   document.getElementById('step4Title').textContent = 'Master Excel Yükle';
   document.getElementById('step4Desc').textContent  = 'Menşe ayrımı için master dosyayı yükleyin.';
   document.getElementById('pdfDropZone').style.display = 'none';
   document.getElementById('step4Back').onclick = () => goStep(1);
-  document.getElementById('step4Next').onclick = () => {
-    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
-    goStep(5);
-    initStep5();
-  };
+  // step4Next onclick burada set edilir — fatura öncesi moduna özel
+  const nextBtn = document.getElementById('step4Next');
+  nextBtn.style.display = masterRows ? 'block' : 'none';
+  nextBtn.onclick = () => { goStep(5); };
 }
 
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
@@ -119,23 +122,25 @@ function selectCountry(c) {
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
+
   // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
   const isUsd = ['iq','ly','lr','lb'].includes(c);
-  const eurRow = document.getElementById('eurRateInput')?.parentElement;
-  const usdRow = document.getElementById('usdRateRow');
-  const eurLabel = document.getElementById('eurLabel');
-  const usdLabel = document.getElementById('usdLabel');
-  if (usdRow) usdRow.style.display = isUsd ? 'flex' : 'none';
-  if (usdLabel) usdLabel.style.display = isUsd ? 'block' : 'none';
-  if (eurRow) eurRow.style.display = isUsd ? 'none' : 'flex';
-  if (eurLabel) eurLabel.style.display = isUsd ? 'none' : 'block';
-  // Freight/Insurance inputları: kaldırıldı — tüm ülkeler PDF'ten okur
-  document.getElementById('koFreightSection').style.display = 'none';
-  // KZ gruplandırma modu: kaldırıldı — her zaman gruplandırılır
-  document.getElementById('kzModeSection').style.display = 'none';
+  const eurInputRow = document.getElementById('eurRateInput')?.parentElement;
+  const usdRateRow  = document.getElementById('usdRateRow');
+  const eurLabel    = document.getElementById('eurLabel');
+  const usdLabel    = document.getElementById('usdLabel');
+  if (usdRateRow)  usdRateRow.style.display  = isUsd ? 'flex'  : 'none';
+  if (usdLabel)    usdLabel.style.display     = isUsd ? 'block' : 'none';
+  if (eurInputRow) eurInputRow.style.display  = isUsd ? 'none'  : 'flex';
+  if (eurLabel)    eurLabel.style.display     = isUsd ? 'none'  : 'block';
 
-  // PDF drop zone: şablonlu backend ülkeleri
-  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(c) ? 'block' : 'none';
+  // Freight/Insurance ve KZ modu gizli — PDF'ten otomatik okunur
+  document.getElementById('koFreightSection').style.display = 'none';
+  document.getElementById('kzModeSection').style.display    = 'none';
+
+  // PDF drop zone: backend şablonu olan ülkeler
+  const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
+  document.getElementById('pdfDropZone').style.display = backendUlkeler.includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -152,20 +157,21 @@ function onEurRateChanged() {
 
 // ── ADIM 4: DOSYA YÜKLE ───────────────────────────────────────────────────────
 function initStep4() {
+  // Fatura sonrası modu için başlıkları sıfırla
   document.getElementById('step4Title').textContent = 'Dosya Yükle';
   document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
   document.getElementById('step4Back').onclick = () => goStep(3);
-  document.getElementById('step4Next').onclick = () => {
-    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
-    goStep(5);
-    initStep5();
-  };
+
+  // Buton: Excel yüklüyse göster, değilse gizli — loadFile() açacak
+  const nextBtn = document.getElementById('step4Next');
+  nextBtn.style.display = masterRows ? 'block' : 'none';
+  nextBtn.onclick = () => { goStep(5); };
 }
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
 function initStep5() {
   buildKgTable(masterRows);
-  document.getElementById('kgPanel').style.display = 'block';
+  document.getElementById('kgPanel').style.display      = 'block';
   document.getElementById('antrepoSection').style.display = 'none';
   document.getElementById('menseBox').classList.remove('visible');
   document.getElementById('downloadBtn').classList.remove('visible');
@@ -232,6 +238,7 @@ function toggleExSku() {
 function applyGroupWeights() {
   if (!masterRows) return;
 
+  // Tablodaki grup kilolarını oku ve kaydet
   const groups = [...new Set(masterRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
     const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
@@ -240,8 +247,9 @@ function applyGroupWeights() {
   });
   try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch(e) {}
 
+  // Her satır için BRÜT/NET hesapla
   workingRows = masterRows.map(row => {
-    const r = { ...row };
+    const r      = { ...row };
     const sku    = String(r['SKU']).trim();
     const grup   = String(r['ÜRÜN ARA GRUBU']).trim();
     const ag     = parseNum(r['Ürün Ağırlığı (KG)']);
@@ -266,15 +274,12 @@ function applyGroupWeights() {
   // PDF'ten kilo geldiyse otomatik doldur ve uygula
   if (window._pdfBrutKg && window._pdfBrutKg > 0) {
     const brutEl = document.getElementById('targetWeight');
-    if (brutEl) brutEl.value = window._pdfBrutKg; // sayı direkt, parseNum okur
-
-    applyWeightAdjust(); // BRÜT dağıtımını uygula
-
-    // Antrepo modunda PDF'ten NET de geldiyse otomatik uygula
+    if (brutEl) brutEl.value = window._pdfBrutKg;
+    applyWeightAdjust();
     if (selectedDepo === 'antrepo' && window._pdfNetKg && window._pdfNetKg > 0) {
       const netEl = document.getElementById('targetNet');
       if (netEl) netEl.value = window._pdfNetKg;
-      applyNetAdjust(); // NET dağıtımını da uygula
+      applyNetAdjust();
     }
   } else {
     showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
@@ -314,7 +319,6 @@ function applyWeightAdjust() {
 
   const res = document.getElementById('adjustResult');
   res.className = 'adjust-result visible';
-  // Antrepo modunda NET henüz kesin değil — sadece BRÜT göster
   if (selectedDepo === 'antrepo') {
     res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: Hedef NET girin`;
     document.getElementById('antrepoSection').style.display = 'block';
@@ -351,11 +355,10 @@ function applyNetAdjust() {
     return r;
   });
 
-  const finalNet = workingRows.reduce((s, r) => s + parseNum(r['NET']), 0);
+  const finalNet         = workingRows.reduce((s, r) => s + parseNum(r['NET']),  0);
+  const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   const res = document.getElementById('netResult');
   res.className = 'adjust-result visible';
-  // BRÜT + NET birlikte göster
-  const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   res.innerHTML = `✓ BRÜT: ${round2(finalBrutDisplay)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
 
   buildAndDownloadReady();
@@ -393,8 +396,9 @@ function showMenseAyrim() {
 function buildAndDownloadReady() {
   if (!workingRows) return;
 
-  // Şablonlu backend ülkeleri
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) {
+  // Şablonlu backend ülkeleri — Python tarafı üretir
+  const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
+  if (backendUlkeler.includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -425,10 +429,11 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) { await downloadRS(); return; }
+  const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
+  if (backendUlkeler.includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
-  let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
+  const suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
   XLSX.writeFile(processedWB, originalFileName + suffix + '.xlsx');
 }
 
@@ -437,6 +442,7 @@ async function downloadRS() {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
   }
+
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor... (0s)';
   btn.disabled = true;
@@ -469,13 +475,13 @@ async function downloadRS() {
         pdf:           pdfB64,
         ulkeKodu:      currentCountry,
         hedefBrut:     hedefBrut,
-        hedefNet:      workingRows.reduce((s,r) => s+(r['NET']||0), 0),
+        hedefNet:      workingRows.reduce((s, r) => s + (r['NET'] || 0), 0),
         depoTipi:      selectedDepo,
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
         eurKuru:       getEurRate() || 1.0,
-
-        koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
+        usdKuru:       getUsdRate() || 1.0,
+        koFreight:     parseNum(document.getElementById('koFreightInput')?.value  || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
       })
     });
@@ -491,7 +497,9 @@ async function downloadRS() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const depoSuffix = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
-    a.href = url; a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
+    a.href = url;
+    a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`;
+    a.click();
     URL.revokeObjectURL(url);
 
     // Master Excel indir
@@ -502,12 +510,14 @@ async function downloadRS() {
       const mBlob = new Blob([mBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const mUrl  = URL.createObjectURL(mBlob);
       const mA    = document.createElement('a');
-      mA.href = mUrl; mA.download = `${data.faturaNo}.xlsx`; mA.click();
+      mA.href = mUrl;
+      mA.download = `${data.faturaNo}.xlsx`;
+      mA.click();
       URL.revokeObjectURL(mUrl);
-    } 
+    }
 
     if (data.pdfFields) {
-      const pf = data.pdfFields;
+      const pf  = data.pdfFields;
       const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
       document.getElementById('pdfKap').textContent     = pf.kap || '—';
       document.getElementById('pdfNavlun').textContent  = fmt(pf.navlun);
@@ -536,21 +546,24 @@ function arrayBufferToBase64(buf) {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSharedConfig();
-  try { const s = localStorage.getItem('exSkus'); if(s) { const l=JSON.parse(s); exceptionSkus={...exceptionSkus,...l}; } } catch(e) {}
-  try { const s = localStorage.getItem('gwData');  if(s) { const l=JSON.parse(s); groupWeights={...groupWeights,...l};   } } catch(e) {}
+
+  // LocalStorage'dan kayıtlı verileri yükle
+  try { const s = localStorage.getItem('exSkus'); if(s) { const l = JSON.parse(s); exceptionSkus = { ...exceptionSkus, ...l }; } } catch(e) {}
+  try { const s = localStorage.getItem('gwData');  if(s) { const l = JSON.parse(s); groupWeights  = { ...groupWeights,  ...l }; } } catch(e) {}
 
   renderExSkuList();
 
+  // Drag & drop desteği
   const dropZone = document.getElementById('dropZone');
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
   dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files); });
-
-  document.getElementById('step4Next').onclick = () => {
-    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
-    goStep(5);
-    initStep5();
-  };
+  dropZone.addEventListener('drop',      e  => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files);
+  });
+  // NOT: step4Next onclick burada SET EDİLMİYOR
+  // initStep4() goStep(4) çağrısıyla otomatik set eder
 });
 
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────
@@ -560,10 +573,10 @@ function triggerMenseTaslak() {
   const trRows    = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
   const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
 
-  const trKg      = round2(trRows.reduce((s,r)    => s + parseNum(r['BRÜT']), 0));
-  const yabanciKg = round2(otherRows.reduce((s,r) => s + parseNum(r['BRÜT']), 0));
-  const brutKg    = round2(workingRows.reduce((s,r) => s + parseNum(r['BRÜT']), 0));
-  const netKg     = round2(workingRows.reduce((s,r) => s + parseNum(r['NET']),  0));
+  const trKg      = round2(trRows.reduce((s, r)    => s + parseNum(r['BRÜT']), 0));
+  const yabanciKg = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
+  const brutKg    = round2(workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
+  const netKg     = round2(workingRows.reduce((s, r) => s + parseNum(r['NET']),  0));
 
   indirMenseTaslak(trKg, yabanciKg, brutKg, netKg);
 }
