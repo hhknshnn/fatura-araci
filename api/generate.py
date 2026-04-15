@@ -6,8 +6,6 @@ import os
 import re
 import traceback
 import pdfplumber
-import time
-t0 = time.time()
 
 import pandas as pd
 import openpyxl
@@ -407,13 +405,10 @@ def _sku_grupla(df):
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
 def generate_master_excel(df_original, brut_list, net_list):
-    import time
-    t0 = time.time()
     df = df_original.copy()
     df['BRÜT'] = brut_list
     df['NET']  = net_list
 
-    # calc_ag vektörize — apply yerine numpy ile
     miktar_arr = df['Miktar'].apply(parse_num)
     brut_arr   = df['BRÜT'].apply(parse_num)
     df['Ürün Ağırlığı (KG)'] = (brut_arr / miktar_arr.replace(0, float('nan'))).round(6).fillna(0)
@@ -425,10 +420,7 @@ def generate_master_excel(df_original, brut_list, net_list):
     cols.insert(ag_idx + 1, 'BRÜT')
     cols.insert(ag_idx + 2, 'NET')
     df = df[cols]
-    print(f'  master calc_ag: {time.time()-t0:.2f}s', flush=True)
 
-    t1 = time.time()
-    # openpyxl doğrudan — pd.ExcelWriter overhead'i yok
     wb = Workbook(write_only=True)
     ws = wb.create_sheet()
     rows = [list(df.columns)] + df.values.tolist()
@@ -437,7 +429,6 @@ def generate_master_excel(df_original, brut_list, net_list):
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    print(f'  master to_excel: {time.time()-t1:.2f}s', flush=True)
     return buf.getvalue()
 
 def build_header(ws, sheet_title, fatura_no, fatura_date, musteri, musteri_adres, col_count, logo_bytes=None, pdf_fields=None, destination='SERBIA', incoterm='CIP', info_start_col=None):
@@ -1632,7 +1623,6 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                          pdf_fields, hedef_net, depo_tipi, usd_kuru,
                          find_template_fn, df_original=None):
     """USD bazlı genel INV+PL üretim motoru — Irak, Libya, Liberya, Lübnan."""
-    import time
     df['GTİP'] = df['GTİP'].apply(
         lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
     df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
@@ -1672,19 +1662,15 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     PL_GROSS_COL  = 8
     PL_NET_COL    = 9
 
-    t0 = time.time()
     wb = openpyxl.load_workbook(find_template_fn())
     ws_inv = wb['INV']
     ws_pl  = wb['PL']
-    print(f'  USD load_workbook: {time.time()-t0:.2f}s', flush=True)
-
     DS = 9
-    t1 = time.time()
+
     if ws_inv.max_row > DS:
         ws_inv.delete_rows(DS + 1, ws_inv.max_row - DS)
     if ws_pl.max_row > DS:
         ws_pl.delete_rows(DS + 1, ws_pl.max_row - DS)
-    print(f'  USD delete_rows: {time.time()-t1:.2f}s', flush=True)
 
     packages_str = str((pdf_fields or {}).get('kap', '') or '')
     apply_genel_template_header(ws_inv, 'COMMERCIAL INVOICE', fatura_no, fatura_date, packages_str)
@@ -1694,7 +1680,6 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     for i, (hd, _) in enumerate(GENEL_INV_COLS):
         hdr(ws_inv, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    t2 = time.time()
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_inv.row_dimensions[er].height = 23
@@ -1712,7 +1697,6 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                 dat(ws_inv, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
-    print(f'  USD INV loop: {time.time()-t2:.2f}s', flush=True)
 
     last_inv = DS + len(df)
     tr, gr = last_inv + 1, last_inv + 2
@@ -1752,7 +1736,6 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     for i, (hd, _) in enumerate(GENEL_PL_COLS):
         hdr(ws_pl, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
 
-    t3 = time.time()
     for r_idx, (_, row) in enumerate(df.iterrows()):
         er = DS + 1 + r_idx
         ws_pl.row_dimensions[er].height = 23
@@ -1769,7 +1752,6 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
                 dat(ws_pl, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
             else:
                 dat(ws_pl, er, cn, row.get(src_col, ''), bg=bg, align='left')
-    print(f'  USD PL loop: {time.time()-t3:.2f}s', flush=True)
 
     last_pl = DS + len(df)
     pl_gr = last_pl + 1
@@ -1806,12 +1788,9 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     ws_inv.sheet_view.topLeftCell = 'A1'
     ws_pl.sheet_view.topLeftCell  = 'A1'
 
-    t4 = time.time()
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    print(f'  USD wb.save: {time.time()-t4:.2f}s', flush=True)
-
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
@@ -2398,12 +2377,9 @@ class handler(BaseHTTPRequestHandler):
                 pdf_fields = parse_pdf(pdf_bytes_data)
 
             ulke_kodu   = body.get('ulkeKodu', 'rs')
-            t0 = time.time()
 
             df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')           
             df_original = df.copy()
-            t1 = time.time()
-            print(f'TIMING generate: {t1-t0:.2f}s', flush=True)
             if ulke_kodu == 'ba':
                 excel_out, fatura_no, master_out = generate_excel_ba(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
@@ -2482,8 +2458,7 @@ class handler(BaseHTTPRequestHandler):
                 excel_out, fatura_no, master_out = generate_excel(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
-            t2 = time.time()
-            print(f'TIMING json/base64: {t2-t1:.2f}s', flush=True)
+            
             result = json.dumps({
                 'success':   True,
                 'excel':     base64.b64encode(excel_out).decode('utf-8'),
