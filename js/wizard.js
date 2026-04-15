@@ -261,7 +261,23 @@ function applyGroupWeights() {
   const totalBrut = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   document.getElementById('calcTotal').textContent = round2(totalBrut);
   document.getElementById('adjustSection').style.display = 'block';
-  showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
+
+  // PDF'ten kilo geldiyse otomatik doldur ve uygula
+  if (window._pdfBrutKg && window._pdfBrutKg > 0) {
+    const brutEl = document.getElementById('targetWeight');
+    if (brutEl) {
+      brutEl.value = window._pdfBrutKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+    }
+    // NET de varsa antrepo alanına yaz (applyWeightAdjust sonra tetikler)
+    if (window._pdfNetKg && window._pdfNetKg > 0) {
+      const netEl = document.getElementById('targetNet');
+      if (netEl) netEl.value = window._pdfNetKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+    }
+    // Otomatik uygula
+    applyWeightAdjust();
+  } else {
+    showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
+  }
 }
 
 // ── HEDEF BRÜT UYGULA ─────────────────────────────────────────────────────────
