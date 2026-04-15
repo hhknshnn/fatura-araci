@@ -495,7 +495,7 @@ async function downloadRS() {
     URL.revokeObjectURL(url);
 
     // Master Excel indir
-    /* if (data.master) {
+    if (data.master) {
       const mBin   = atob(data.master);
       const mBytes = new Uint8Array(mBin.length);
       for (let i = 0; i < mBin.length; i++) mBytes[i] = mBin.charCodeAt(i);
@@ -504,7 +504,7 @@ async function downloadRS() {
       const mA    = document.createElement('a');
       mA.href = mUrl; mA.download = `${data.faturaNo}.xlsx`; mA.click();
       URL.revokeObjectURL(mUrl);
-    } */
+    } 
 
     if (data.pdfFields) {
       const pf = data.pdfFields;
