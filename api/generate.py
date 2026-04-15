@@ -433,7 +433,7 @@ def generate_master_excel(df_original, brut_list, net_list):
     df = df[cols]
 
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
     buf.seek(0)
     print(f'  master to_excel: {time.time()-t1:.2f}s', flush=True)
