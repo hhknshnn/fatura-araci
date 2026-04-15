@@ -32,7 +32,6 @@ async function loadSharedConfig() {
 }
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
-// YENİ:
 function goStep(n) {
   if (selectedMod === 'oncesi' && n === 2) {
     setupStepFaturaOncesi();
@@ -44,7 +43,6 @@ function goStep(n) {
   showOnlyStep(n);
   updateDots(n);
   currentStep = n;
-  if (n === 4) initStep4(); // ← bu satırı ekle
 }
 
 function showOnlyStep(n) {
@@ -116,18 +114,21 @@ function selectDepo(depo) {
 function selectCountry(c) {
   currentCountry = c;
 
-  // Kıbrıs seçilince cy state'i sıfırla
-  if (c === 'cy') {
-    cyFileDataList = [];
-    cyFileNames    = [];
-    window._cyHedefBrutList = null;
-  }
-
   document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
   document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
+  // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
+  const isUsd = ['iq','ly','lr','lb'].includes(c);
+  const eurRow = document.getElementById('eurRateInput')?.parentElement;
+  const usdRow = document.getElementById('usdRateRow');
+  const eurLabel = document.getElementById('eurLabel');
+  const usdLabel = document.getElementById('usdLabel');
+  if (usdRow) usdRow.style.display = isUsd ? 'flex' : 'none';
+  if (usdLabel) usdLabel.style.display = isUsd ? 'block' : 'none';
+  if (eurRow) eurRow.style.display = isUsd ? 'none' : 'flex';
+  if (eurLabel) eurLabel.style.display = isUsd ? 'none' : 'block';
   // Freight/Insurance inputları: kaldırıldı — tüm ülkeler PDF'ten okur
   document.getElementById('koFreightSection').style.display = 'none';
   // KZ gruplandırma modu: kaldırıldı — her zaman gruplandırılır
@@ -150,21 +151,15 @@ function onEurRateChanged() {
 }
 
 // ── ADIM 4: DOSYA YÜKLE ───────────────────────────────────────────────────────
-// YENİ:
 function initStep4() {
   document.getElementById('step4Title').textContent = 'Dosya Yükle';
   document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
   document.getElementById('step4Back').onclick = () => goStep(3);
-
-  const nextBtn = document.getElementById('step4Next');
-  if (nextBtn) {
-    // masterRows zaten doluysa (geri gelindi) butonu göster, değilse gizle
-    nextBtn.style.display = 'none'; // her zaman gizle, loadFile açar
-    nextBtn.onclick = () => {
-      goStep(5);
-      initStep5();
-    };
-  }
+  document.getElementById('step4Next').onclick = () => {
+    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
+    goStep(5);
+    initStep5();
+  };
 }
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
@@ -177,73 +172,6 @@ function initStep5() {
   if (selectedMod === 'sonrasi') {
     document.getElementById('downloadBtn').style.display = 'none';
   }
-  // Kıbrıs — her Excel için ayrı hedef BRÜT alanı
-  if (currentCountry === 'cy') {
-    document.getElementById('adjustSection').style.display = 'block';
-    buildCyWeightInputs();
-  }
-}
-
-function buildCyWeightInputs() {
-  const count = cyFileDataList.length || 1;
-  const container = document.getElementById('adjustSection');
-  container.innerHTML = '';
-
-  for (let i = 0; i < count; i++) {
-    const div = document.createElement('div');
-    div.style.cssText = 'margin-bottom:14px;';
-    div.innerHTML = `
-      <div style="font-size:13px;font-weight:500;margin-bottom:6px;">
-        ${count > 1 ? `Fatura ${i+1} — ` : ''}Hedef BRÜT (kg)
-        ${cyFileNames[i] ? `<span style="font-size:11px;color:var(--text3);">(${cyFileNames[i]})</span>` : ''}
-      </div>
-      <div class="target-row">
-        <input class="target-input" id="cyBrut_${i}" type="text" inputmode="decimal"
-               placeholder="örn: 3500,00"
-               value="${window._pdfBrutKg && count === 1 ? window._pdfBrutKg : ''}">
-      </div>`;
-    container.appendChild(div);
-  }
-
-  const btn = document.createElement('button');
-  btn.className = 'btn-secondary';
-  btn.style.cssText = 'width:100%;margin-top:8px;';
-  btn.textContent = '✓ Kiloları Uygula ve Hesapla';
-  btn.onclick = applyCyWeights;
-  container.appendChild(btn);
-
-  const resultDiv = document.createElement('div');
-  resultDiv.id = 'cyAdjustResult';
-  resultDiv.className = 'adjust-result';
-  container.appendChild(resultDiv);
-}
-
-function applyCyWeights() {
-  const count = cyFileDataList.length || 1;
-  const brutList = [];
-
-  for (let i = 0; i < count; i++) {
-    const val = parseNum(document.getElementById(`cyBrut_${i}`)?.value || '0');
-    if (!val || val <= 0) {
-      alert(`Fatura ${i+1} için geçerli bir hedef BRÜT kilo girin.`);
-      return;
-    }
-    brutList.push(val);
-  }
-
-  window._cyHedefBrutList = brutList;
-
-  const res = document.getElementById('cyAdjustResult');
-  if (res) {
-    res.className = 'adjust-result visible';
-    res.innerHTML = brutList.map((b, i) =>
-      `✓ Fatura ${i+1}: <strong>${round2(b)} kg</strong>`
-    ).join(' &nbsp;|&nbsp; ');
-  }
-
-  document.getElementById('downloadBtn').style.display = 'block';
-  document.getElementById('downloadBtn').classList.add('visible');
-  showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
@@ -303,7 +231,6 @@ function toggleExSku() {
 // ── KİLO UYGULA ───────────────────────────────────────────────────────────────
 function applyGroupWeights() {
   if (!masterRows) return;
-  if (currentCountry === 'cy') { buildCyWeightInputs(); return; }
 
   const groups = [...new Set(masterRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
@@ -336,16 +263,18 @@ function applyGroupWeights() {
   document.getElementById('calcTotal').textContent = round2(totalBrut);
   document.getElementById('adjustSection').style.display = 'block';
 
+  // PDF'ten kilo geldiyse otomatik doldur ve uygula
   if (window._pdfBrutKg && window._pdfBrutKg > 0) {
     const brutEl = document.getElementById('targetWeight');
-    if (brutEl) brutEl.value = window._pdfBrutKg;
+    if (brutEl) brutEl.value = window._pdfBrutKg; // sayı direkt, parseNum okur
 
-    applyWeightAdjust();
+    applyWeightAdjust(); // BRÜT dağıtımını uygula
 
+    // Antrepo modunda PDF'ten NET de geldiyse otomatik uygula
     if (selectedDepo === 'antrepo' && window._pdfNetKg && window._pdfNetKg > 0) {
       const netEl = document.getElementById('targetNet');
       if (netEl) netEl.value = window._pdfNetKg;
-      applyNetAdjust();
+      applyNetAdjust(); // NET dağıtımını da uygula
     }
   } else {
     showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
@@ -385,6 +314,7 @@ function applyWeightAdjust() {
 
   const res = document.getElementById('adjustResult');
   res.className = 'adjust-result visible';
+  // Antrepo modunda NET henüz kesin değil — sadece BRÜT göster
   if (selectedDepo === 'antrepo') {
     res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: Hedef NET girin`;
     document.getElementById('antrepoSection').style.display = 'block';
@@ -424,6 +354,7 @@ function applyNetAdjust() {
   const finalNet = workingRows.reduce((s, r) => s + parseNum(r['NET']), 0);
   const res = document.getElementById('netResult');
   res.className = 'adjust-result visible';
+  // BRÜT + NET birlikte göster
   const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   res.innerHTML = `✓ BRÜT: ${round2(finalBrutDisplay)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
 
@@ -462,6 +393,7 @@ function showMenseAyrim() {
 function buildAndDownloadReady() {
   if (!workingRows) return;
 
+  // Şablonlu backend ülkeleri
   if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
@@ -493,7 +425,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb','cy'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
@@ -501,17 +433,10 @@ async function downloadResult() {
 }
 
 async function downloadRS() {
-  const isCy = currentCountry === 'cy';
-
-  if (!isCy && (!workingRows || !lastFileData)) {
+  if (!workingRows || !lastFileData) {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
   }
-  if (isCy && cyFileDataList.length === 0) {
-    showStatus('error', '⚠ En az 1 Excel yükleyin.');
-    return;
-  }
-
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor... (0s)';
   btn.disabled = true;
@@ -522,7 +447,7 @@ async function downloadRS() {
   }, 1000);
 
   try {
-    const excelB64 = lastFileData ? arrayBufferToBase64(lastFileData) : '';
+    const excelB64 = arrayBufferToBase64(lastFileData);
 
     let logoB64 = '';
     try {
@@ -533,39 +458,26 @@ async function downloadRS() {
     let pdfB64 = '';
     if (lastPdfData) pdfB64 = arrayBufferToBase64(lastPdfData);
 
-    const hedefBrut = workingRows ? workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0) : 0;
-
-    // Kıbrıs özel liste
-    const excelB64List = isCy
-      ? cyFileDataList.map(d => arrayBufferToBase64(d))
-      : null;
-
-    const body = {
-      excel:         excelB64,
-      logo:          logoB64,
-      pdf:           pdfB64,
-      ulkeKodu:      currentCountry,
-      hedefBrut:     hedefBrut,
-      hedefNet:      workingRows ? workingRows.reduce((s,r) => s+(r['NET']||0), 0) : 0,
-      depoTipi:      selectedDepo,
-      grupKilolari:  groupWeights,
-      exceptionSkus: exceptionSkus,
-      eurKuru:       getEurRate() || 1.0,
-      koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
-      koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
-    };
-
-    // Kıbrıs özel alanlar
-    if (isCy) {
-      body.excelList        = excelB64List;
-      body.hedefBrutList    = window._cyHedefBrutList || [hedefBrut];
-      body.grupKilolariList = cyFileDataList.map(() => groupWeights);
-    }
+    const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
 
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        excel:         excelB64,
+        logo:          logoB64,
+        pdf:           pdfB64,
+        ulkeKodu:      currentCountry,
+        hedefBrut:     hedefBrut,
+        hedefNet:      workingRows.reduce((s,r) => s+(r['NET']||0), 0),
+        depoTipi:      selectedDepo,
+        grupKilolari:  groupWeights,
+        exceptionSkus: exceptionSkus,
+        eurKuru:       getEurRate() || 1.0,
+
+        koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
+        koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
+      })
     });
 
     const data = await resp.json();
@@ -579,7 +491,7 @@ async function downloadRS() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const depoSuffix = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
-    a.href = url; a.download = isCy ? `PL- ${data.faturaNo}.xlsx` : `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
+    a.href = url; a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`; a.click();
     URL.revokeObjectURL(url);
 
     // Master Excel indir
@@ -592,7 +504,7 @@ async function downloadRS() {
       const mA    = document.createElement('a');
       mA.href = mUrl; mA.download = `${data.faturaNo}.xlsx`; mA.click();
       URL.revokeObjectURL(mUrl);
-    }
+    } 
 
     if (data.pdfFields) {
       const pf = data.pdfFields;
@@ -634,7 +546,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
   dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files); });
 
-
+  document.getElementById('step4Next').onclick = () => {
+    if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
+    goStep(5);
+    initStep5();
+  };
 });
 
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────

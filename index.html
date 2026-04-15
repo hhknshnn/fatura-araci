@@ -257,16 +257,7 @@
         <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
       </div>
       <div id="koFreightSection" style="display:none;">
-        <div class="eur-label">Freight (EUR)</div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-          <input class="target-input" id="koFreightInput" type="text" inputmode="decimal" placeholder="örn: 1200,00" style="flex:1;">
-          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-        </div>
-        <div class="eur-label">Insurance (EUR)</div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-          <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal" placeholder="örn: 300,00" style="flex:1;">
-          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-        </div>
+        ...mevcut içerik...
       </div>
     </div>
 
@@ -335,7 +326,7 @@
 
     <div class="nav-row" style="margin-top:16px;">
       <button class="btn-ghost" id="step4Back" onclick="goStep(3)">← Geri</button>
-      <button class="btn-secondary" id="step4Next" style="display:none;">Devam →</button>
+      <button class="btn-secondary" id="step4Next" onclick="goStep(5)" style="display:none;">Devam →</button>
     </div>
   </div>
 
@@ -381,7 +372,7 @@
       </div>
     </div>
 
-    <button class="btn-secondary" onclick="currentCountry === 'cy' ? applyCyWeights() : applyGroupWeights()" style="width:100%;margin-bottom:12px;">
+    <button class="btn-secondary" onclick="applyGroupWeights()" style="width:100%;margin-bottom:12px;">
       ✓ Kiloları Uygula ve Hesapla
     </button>
 
