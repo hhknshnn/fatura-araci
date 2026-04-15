@@ -32,6 +32,7 @@ async function loadSharedConfig() {
 }
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
+// YENİ:
 function goStep(n) {
   if (selectedMod === 'oncesi' && n === 2) {
     setupStepFaturaOncesi();
@@ -43,6 +44,7 @@ function goStep(n) {
   showOnlyStep(n);
   updateDots(n);
   currentStep = n;
+  if (n === 4) initStep4(); // ← bu satırı ekle
 }
 
 function showOnlyStep(n) {
