@@ -103,7 +103,7 @@ function handlePdf(file) {
 
   // Step 4 next butonunu parse tamamlanana kadar disable et
   const nextBtn = document.getElementById('step4Next');
-  if (nextBtn) nextBtn.disabled = true;
+  
 
   // Sayaç başlat
   let elapsed = 0;
