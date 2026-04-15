@@ -1902,8 +1902,9 @@ def generate_excel_cy(df_list, grup_kilolari_list, hedef_brut_list, exception_sk
 
     wb = openpyxl.load_workbook(find_cy_template_path())
     ws = wb['PL']
-    DS = 8  # kolon başlığı satır 8, veri 9'dan başlar
+    DS = 9  # kolon başlığı satır 9, veri 10'dan başlar (satır 8, A7:F8 birleşik)  
 
+    # Şablondaki örnek satırları tek tek sil (birleşik hücre bozulmasın)
     if ws.max_row > DS:
         ws.delete_rows(DS + 1, ws.max_row - DS)
 
