@@ -4,9 +4,78 @@ import base64
 import io
 import os
 import traceback
-
+import re
+import pdfplumber
 import openpyxl
 
+def _normalize_pdf_text(text):
+    return re.sub(r'\s+', ' ', (text or '').replace('\u00a0', ' ')).strip()
+
+def _extract_pdf_amount(text, patterns):
+    def _parse_pdf_amount(value):
+        s = str(value).strip().replace(' ', '').replace('\u00a0', '')
+        if '.' in s and ',' in s:
+            if s.rfind(',') > s.rfind('.'):
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                s = s.replace(',', '')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        try:
+            return float(s)
+        except Exception:
+            return 0.0
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return _parse_pdf_amount(m.group(1))
+    return 0.0
+
+def parse_pdf_fields(pdf_bytes):
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0}
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages]
+            text = ' '.join(part for part in page_texts if part).strip()
+            if not text:
+                return result
+            result['navlun'] = _extract_pdf_amount(text, [
+                r'\bNAVLUN\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+                r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+            ])
+            result['sigorta'] = _extract_pdf_amount(text, [
+                r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+                r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+            ])
+            # Kap sayısı
+            kap_patterns = [
+                r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+                r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+                r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+                r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+            ]
+            for p in kap_patterns:
+                m = re.search(p, text, re.IGNORECASE)
+                if m:
+                    result['kap'] = m.group(1).strip()
+                    break
+            # BRÜT kilo
+            result['brutKg'] = _extract_pdf_amount(text, [
+                r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
+                r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
+                r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+                r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
+            ])
+            # NET kilo
+            result['netKg'] = _extract_pdf_amount(text, [
+                r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
+                r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
+                r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+                r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
+            ])
+    except Exception:
+        pass
+    return result
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_config(ulke_kodu):
     """Ülkeye göre taslak config dosyasını yükle."""
@@ -156,12 +225,11 @@ class handler(BaseHTTPRequestHandler):
             action = body.get('action', 'fill')
 
             if action == 'parsePdf':
-                from generate import parse_pdf
                 pdf_b64 = body.get('pdf', '')
                 if not pdf_b64:
                     raise ValueError('PDF verisi boş')
                 pdf_bytes_data = base64.b64decode(pdf_b64)
-                pdf_fields = parse_pdf(pdf_bytes_data)
+                pdf_fields = parse_pdf_fields(pdf_bytes_data)
                 result = json.dumps({'success': True, 'pdfFields': pdf_fields})
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
