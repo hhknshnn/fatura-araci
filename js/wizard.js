@@ -304,10 +304,12 @@ function applyWeightAdjust() {
 
   const res = document.getElementById('adjustResult');
   res.className = 'adjust-result visible';
-  res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
-
+  // Antrepo modunda NET henüz kesin değil — sadece BRÜT göster
   if (selectedDepo === 'antrepo') {
+    res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: Hedef NET girin`;
     document.getElementById('antrepoSection').style.display = 'block';
+  } else {
+    res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
   }
 
   if (selectedMod === 'oncesi') {
@@ -342,7 +344,9 @@ function applyNetAdjust() {
   const finalNet = workingRows.reduce((s, r) => s + parseNum(r['NET']), 0);
   const res = document.getElementById('netResult');
   res.className = 'adjust-result visible';
-  res.innerHTML = `✓ NET: ${round2(finalNet)} kg`;
+  // BRÜT + NET birlikte göster
+  const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
+  res.innerHTML = `✓ BRÜT: ${round2(finalBrutDisplay)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
 
   buildAndDownloadReady();
 }
