@@ -62,12 +62,19 @@ function handleFile(file) {
 function handlePdf(file) {
   if (!file) return;
   const badge = document.getElementById('pdfFileName');
-  badge.textContent = '⏳ PDF okunuyor...';  // yükleniyor göster
+  badge.textContent = '⏳ PDF okunuyor... (0s)';
   badge.style.display = 'inline-flex';
 
-  // Step 4 next butonunu da disable et
+  // Step 4 next butonunu parse tamamlanana kadar disable et
   const nextBtn = document.getElementById('step4Next');
   if (nextBtn) nextBtn.disabled = true;
+
+  // Sayaç başlat
+  let elapsed = 0;
+  const timer = setInterval(() => {
+    elapsed++;
+    badge.textContent = `⏳ PDF okunuyor... (${elapsed}s)`;
+  }, 1000);
 
   const r = new FileReader();
   r.onload = async e => {
@@ -84,21 +91,19 @@ function handlePdf(file) {
         body: JSON.stringify({ action: 'parsePdf', pdf: pdfB64 })
       });
       const data = await resp.json();
+
       if (data.success && data.pdfFields) {
         const pf = data.pdfFields;
-        const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
-        document.getElementById('pdfKap').textContent     = pf.kap     || '—';
-        document.getElementById('pdfNavlun').textContent  = fmt(pf.navlun);
-        document.getElementById('pdfSigorta').textContent = fmt(pf.sigorta);
-        document.getElementById('pdfInfo').classList.add('visible');
+        // Kilo state'e kaydet — step 5'te otomatik kullanılır
         if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
         if (pf.netKg  && pf.netKg  > 0) window._pdfNetKg  = pf.netKg;
       }
     } catch(e) {
       console.warn('PDF parse hatası:', e);
     } finally {
-      // Parse bitti — badge güncelle, next butonu aç
-      badge.textContent = '✓ ' + file.name;
+      clearInterval(timer);
+      // Parse bitti
+      badge.textContent = `✓ PDF okundu (${elapsed}s)`;
       if (nextBtn) nextBtn.disabled = false;
     }
   };
