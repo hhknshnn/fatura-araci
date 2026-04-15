@@ -118,14 +118,24 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
-  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
+  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(c));
+  // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
+  const isUsd = ['iq','ly','lr','lb'].includes(c);
+  const eurRow = document.getElementById('eurRateInput')?.parentElement;
+  const usdRow = document.getElementById('usdRateRow');
+  const eurLabel = document.getElementById('eurLabel');
+  const usdLabel = document.getElementById('usdLabel');
+  if (usdRow) usdRow.style.display = isUsd ? 'flex' : 'none';
+  if (usdLabel) usdLabel.style.display = isUsd ? 'block' : 'none';
+  if (eurRow) eurRow.style.display = isUsd ? 'none' : 'flex';
+  if (eurLabel) eurLabel.style.display = isUsd ? 'none' : 'block';
   // Freight/Insurance inputları: kaldırıldı — tüm ülkeler PDF'ten okur
   document.getElementById('koFreightSection').style.display = 'none';
   // KZ gruplandırma modu: kaldırıldı — her zaman gruplandırılır
   document.getElementById('kzModeSection').style.display = 'none';
 
   // PDF drop zone: şablonlu backend ülkeleri
-  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(c) ? 'block' : 'none';
+  document.getElementById('pdfDropZone').style.display = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
 }
@@ -384,7 +394,7 @@ function buildAndDownloadReady() {
   if (!workingRows) return;
 
   // Şablonlu backend ülkeleri
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(currentCountry)) {
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
@@ -400,6 +410,12 @@ function getEurRate() {
   return (v && v > 0) ? v : null;
 }
 
+function getUsdRate() {
+  const el = document.getElementById('usdRateInput');
+  const v  = el ? parseNum(el.value) : 0;
+  return (v && v > 0) ? v : null;
+}
+
 // ── STATUS ────────────────────────────────────────────────────────────────────
 function showStatus(type, html) {
   const sb = document.getElementById('statusBox');
@@ -409,7 +425,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz'].includes(currentCountry)) { await downloadRS(); return; }
+  if (['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'].includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
   let suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
@@ -458,6 +474,8 @@ async function downloadRS() {
         grupKilolari:  groupWeights,
         exceptionSkus: exceptionSkus,
         eurKuru:       getEurRate() || 1.0,
+        usdKuru:       getUsdRate() || 1.0,
+
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance:   parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
       })

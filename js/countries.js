@@ -17,6 +17,10 @@ const COUNTRIES = {
   mk: { label: 'Makedonya',  suffix: '_makedonya'    },
   ru: { label: 'Rusya',      suffix: '_rusya'      },
   uz: { label: 'Özbekistan', suffix: '_ozbekistan' },
+  iq: { label: 'Irak',     suffix: '_irak'    },
+  ly: { label: 'Libya',    suffix: '_libya'   },
+  lr: { label: 'Liberya',  suffix: '_liberya' },
+  lb: { label: 'Lübnan',   suffix: '_lubnan'  },
 };
 
 const KZ_COLS = [
