@@ -35,7 +35,8 @@ def parse_pdf_fields(pdf_bytes):
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages]
+            # Bilgiler son sayfalarda — sadece son 2 sayfayı oku
+            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages[-2:]]
             text = ' '.join(part for part in page_texts if part).strip()
             if not text:
                 return result
