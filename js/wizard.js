@@ -159,9 +159,8 @@ function initStep4() {
   const nextBtn = document.getElementById('step4Next');
   if (nextBtn) {
     // masterRows zaten doluysa (geri gelindi) butonu göster, değilse gizle
-    nextBtn.style.display = masterRows ? 'block' : 'none';
+    nextBtn.style.display = 'none'; // her zaman gizle, loadFile açar
     nextBtn.onclick = () => {
-      if (!masterRows) { alert('Önce Excel dosyası yükleyin.'); return; }
       goStep(5);
       initStep5();
     };
