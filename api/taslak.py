@@ -144,12 +144,31 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({'status': 'ok', 'service': 'taslak'}).encode())
 
+
+
     def do_POST(self):
         try:
             length = int(self.headers.get('Content-Length', 0))
             body   = json.loads(self.rfile.read(length))
 
             # Parametreler
+            # do_POST başında, ulke_kodu'ndan önce:
+            action = body.get('action', 'fill')
+
+            if action == 'parsePdf':
+                from generate import parse_pdf
+                pdf_b64 = body.get('pdf', '')
+                if not pdf_b64:
+                    raise ValueError('PDF verisi boş')
+                pdf_bytes_data = base64.b64decode(pdf_b64)
+                pdf_fields = parse_pdf(pdf_bytes_data)
+                result = json.dumps({'success': True, 'pdfFields': pdf_fields})
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(result.encode('utf-8'))
+                return
             ulke_kodu  = body.get('ulkeKodu', 'rs')
             taslak_b64 = body.get('taslak', '')
             form_data  = body.get('formData', {})

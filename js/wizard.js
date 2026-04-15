@@ -162,6 +162,15 @@ function initStep5() {
   if (selectedMod === 'sonrasi') {
     document.getElementById('downloadBtn').style.display = 'none';
   }
+  // PDF'ten kilo geldiyse otomatik doldur
+  if (window._pdfBrutKg && window._pdfBrutKg > 0) {
+    const brutEl = document.getElementById('targetWeight');
+    if (brutEl) brutEl.value = window._pdfBrutKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+  }
+  if (window._pdfNetKg && window._pdfNetKg > 0) {
+    const netEl = document.getElementById('targetNet');
+    if (netEl) netEl.value = window._pdfNetKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+  }
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────

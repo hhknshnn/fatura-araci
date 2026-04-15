@@ -66,7 +66,40 @@ function handlePdf(file) {
   badge.style.display = 'inline-flex';
 
   const r = new FileReader();
-  r.onload = e => { lastPdfData = e.target.result; };
+  r.onload = async e => {
+    lastPdfData = e.target.result;   // binary sakla (generate için)
+
+    // PDF'i parse et → kilo alanlarını otomatik doldur
+    try {
+      const b = new Uint8Array(lastPdfData);
+      let s = '';
+      for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+      const pdfB64 = btoa(s);
+
+      const resp = await fetch('/api/taslak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'parsePdf', pdf: pdfB64 })
+      });
+      const data = await resp.json();
+      if (data.success && data.pdfFields) {
+        const pf = data.pdfFields;
+
+        // PDF info kutusunu güncelle
+        const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
+        document.getElementById('pdfKap').textContent     = pf.kap     || '—';
+        document.getElementById('pdfNavlun').textContent  = fmt(pf.navlun);
+        document.getElementById('pdfSigorta').textContent = fmt(pf.sigorta);
+        document.getElementById('pdfInfo').classList.add('visible');
+
+        // Kilo alanlarını state'e kaydet — step 5 açılınca kullanılacak
+        if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
+        if (pf.netKg  && pf.netKg  > 0) window._pdfNetKg  = pf.netKg;
+      }
+    } catch(e) {
+      console.warn('PDF parse hatası:', e);
+    }
+  };
   r.readAsArrayBuffer(file);
 }
 
