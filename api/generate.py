@@ -759,6 +759,11 @@ def apply_uz_template_header(ws, sheet_title, fatura_no, fatura_date, packages='
     ws['L4'] = fatura_no
     ws['L5'] = packages
 
+def apply_genel_template_header(ws, sheet_title, fatura_no, fatura_date, packages=''):
+    ws['A1'] = sheet_title  # COMMERCIAL INVOICE veya PACKING LIST
+    ws['I3'] = str(fatura_date)
+    ws['I4'] = fatura_no
+    ws['I5'] = packages
 # ── EUR tabanlı INV+PL ortak üretim motoru ────────────────────────────────────
 def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
                         pdf_fields, hedef_net, depo_tipi, eur_kuru,
