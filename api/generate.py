@@ -255,10 +255,19 @@ def brd(c='BFBFBF'):
 
 def hdr(ws, r, col, val, bg=DARK_BLUE, fg='FFFFFF', bold=True, align='center', size=9):
     c = ws.cell(row=r, column=col, value=val)
-    c.font = Font(name='Arial', bold=bold, color=fg, size=size)
-    c.fill = PatternFill('solid', fgColor=bg)
-    c.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
-    c.border = brd()
+    hkey = (bold, fg, size)
+    if hkey not in _FONT_CACHE:
+        _FONT_CACHE[hkey] = Font(name='Arial', bold=bold, color=fg, size=size)
+    c.font = _FONT_CACHE[hkey]
+    if bg not in _FILL_CACHE:
+        _FILL_CACHE[bg] = PatternFill('solid', fgColor=bg)
+    c.fill = _FILL_CACHE[bg]
+    if align not in _ALIGN_CACHE:
+        _ALIGN_CACHE[align] = Alignment(horizontal=align, vertical='center', wrap_text=True)
+    c.alignment = _ALIGN_CACHE[align]
+    if 'default' not in _BORDER_CACHE:
+        _BORDER_CACHE['default'] = brd()
+    c.border = _BORDER_CACHE['default']
     return c
 
 def dat(ws, r, col, val, bg='FFFFFF', bold=False, align='left', fmt=None):
@@ -424,7 +433,7 @@ def generate_master_excel(df_original, brut_list, net_list):
     df = df[cols]
 
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False)
     buf.seek(0)
     print(f'  master to_excel: {time.time()-t1:.2f}s', flush=True)
