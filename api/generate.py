@@ -2369,7 +2369,9 @@ class handler(BaseHTTPRequestHandler):
                 pdf_fields = parse_pdf(pdf_bytes_data)
 
             ulke_kodu   = body.get('ulkeKodu', 'rs')
-            df          = pd.read_excel(io.BytesIO(excel_bytes))
+            t0 = time.time()
+
+            df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')           
             df_original = df.copy()
             t1 = time.time()
             print(f'TIMING generate: {t1-t0:.2f}s', flush=True)
