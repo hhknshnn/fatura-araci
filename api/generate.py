@@ -413,16 +413,10 @@ def generate_master_excel(df_original, brut_list, net_list):
     df['BRÜT'] = brut_list
     df['NET']  = net_list
 
-    def calc_ag(row):
-        miktar = parse_num(row.get('Miktar', 0))
-        brut   = parse_num(row.get('BRÜT', 0))
-        if miktar > 0:
-            return round(brut / miktar, 6)
-        return 0.0
-
-    df['Ürün Ağırlığı (KG)'] = df.apply(calc_ag, axis=1)
-    print(f'  master calc_ag: {time.time()-t0:.2f}s', flush=True)
-    t1 = time.time()
+    # calc_ag vektörize — apply yerine numpy ile
+    miktar_arr = df['Miktar'].apply(parse_num)
+    brut_arr   = df['BRÜT'].apply(parse_num)
+    df['Ürün Ağırlığı (KG)'] = (brut_arr / miktar_arr.replace(0, float('nan'))).round(6).fillna(0)
 
     cols = list(df.columns)
     ag_idx = cols.index('Ürün Ağırlığı (KG)')
@@ -431,10 +425,17 @@ def generate_master_excel(df_original, brut_list, net_list):
     cols.insert(ag_idx + 1, 'BRÜT')
     cols.insert(ag_idx + 2, 'NET')
     df = df[cols]
+    print(f'  master calc_ag: {time.time()-t0:.2f}s', flush=True)
 
+    t1 = time.time()
+    # openpyxl doğrudan — pd.ExcelWriter overhead'i yok
+    wb = Workbook(write_only=True)  # write_only mod — çok daha hızlı
+    ws = wb.create_sheet()
+    ws.append(list(df.columns))  # header
+    for row in df.itertuples(index=False):
+        ws.append(list(row))
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
+    wb.save(buf)
     buf.seek(0)
     print(f'  master to_excel: {time.time()-t1:.2f}s', flush=True)
     return buf.getvalue()
