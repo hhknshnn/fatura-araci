@@ -36,9 +36,13 @@ function handleMultiFile(files) {
   for (const file of files) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext === 'pdf') {
-      handlePdf(file);           // PDF → navlun/sigorta/kap
+      handlePdf(file);
     } else if (ext === 'xlsx' || ext === 'xls') {
-      handleFile(file);          // Excel → master rows
+      if (currentCountry === 'cy') {
+        handleFileCy(file);  // Kıbrıs — çoklu Excel
+      } else {
+        handleFile(file);
+      }
     }
   }
 }
@@ -55,6 +59,38 @@ function handleFile(file) {
   r.onload = e => {
     lastFileData = e.target.result;
     loadFile(lastFileData);
+  };
+  r.readAsArrayBuffer(file);
+}
+
+// Kıbrıs için çoklu Excel yükleme — max 3
+let cyFileDataList = [];  // her Excel'in ArrayBuffer'ı
+let cyFileNames    = [];  // badge için dosya adları
+
+function handleFileCy(file) {
+  if (cyFileDataList.length >= 3) {
+    showStatus('error', '⚠ En fazla 3 Excel yüklenebilir.');
+    return;
+  }
+
+  const r = new FileReader();
+  r.onload = e => {
+    cyFileDataList.push(e.target.result);
+    cyFileNames.push(file.name);
+
+    // Badge güncelle
+    const badge = document.getElementById('fileName');
+    badge.textContent = `✓ ${cyFileDataList.length} Excel yüklendi: ${cyFileNames.join(', ')}`;
+    badge.style.display = 'inline-flex';
+
+    // masterRows ilk Excel'den al (KG tablosu için)
+    if (cyFileDataList.length === 1) {
+      lastFileData = e.target.result;
+      loadFile(e.target.result);
+    }
+
+    // Step 4 next butonunu aktif et
+    document.getElementById('step4Next').style.display = 'block';
   };
   r.readAsArrayBuffer(file);
 }

@@ -17,6 +17,8 @@ let processedWB      = null;
 
 let groupWeights  = {};
 let exceptionSkus = {};
+let cyFileDataList = [];
+let cyFileNames    = [];
 
 // ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 async function loadSharedConfig() {
@@ -112,8 +114,15 @@ function selectDepo(depo) {
 
 // ── ADIM 3: ÜLKE SEÇ ──────────────────────────────────────────────────────────
 function selectCountry(c) {
+  
   currentCountry = c;
 
+  // Kıbrıs seçilince cy state'i sıfırla
+  if (c === 'cy') {
+    cyFileDataList = [];
+    cyFileNames    = [];
+    window._cyHedefBrutList = null;
+  }
   document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('country-' + c).classList.add('active');
 
@@ -172,6 +181,74 @@ function initStep5() {
   if (selectedMod === 'sonrasi') {
     document.getElementById('downloadBtn').style.display = 'none';
   }
+  // Kıbrıs — her Excel için ayrı hedef BRÜT alanı
+  if (currentCountry === 'cy') {
+    document.getElementById('adjustSection').style.display = 'block';
+    buildCyWeightInputs();
+  }
+}
+
+function buildCyWeightInputs() {
+  const count = cyFileDataList.length || 1;
+  const container = document.getElementById('adjustSection');
+  container.innerHTML = '';
+
+  for (let i = 0; i < count; i++) {
+    const div = document.createElement('div');
+    div.style.cssText = 'margin-bottom:14px;';
+    div.innerHTML = `
+      <div style="font-size:13px;font-weight:500;margin-bottom:6px;">
+        ${count > 1 ? `Fatura ${i+1} — ` : ''}Hedef BRÜT (kg)
+        ${cyFileNames[i] ? `<span style="font-size:11px;color:var(--text3);">(${cyFileNames[i]})</span>` : ''}
+      </div>
+      <div class="target-row">
+        <input class="target-input" id="cyBrut_${i}" type="text" inputmode="decimal"
+               placeholder="örn: 3500,00"
+               value="${window._pdfBrutKg && count === 1 ? window._pdfBrutKg : ''}">
+      </div>`;
+    container.appendChild(div);
+  }
+
+  // Uygula butonu
+  const btn = document.createElement('button');
+  btn.className = 'btn-secondary';
+  btn.style.cssText = 'width:100%;margin-top:8px;';
+  btn.textContent = '✓ Kiloları Uygula ve Hesapla';
+  btn.onclick = applyCyWeights;
+  container.appendChild(btn);
+
+  const resultDiv = document.createElement('div');
+  resultDiv.id = 'cyAdjustResult';
+  resultDiv.className = 'adjust-result';
+  container.appendChild(resultDiv);
+}
+
+function applyCyWeights() {
+  const count = cyFileDataList.length || 1;
+  const brutList = [];
+
+  for (let i = 0; i < count; i++) {
+    const val = parseNum(document.getElementById(`cyBrut_${i}`)?.value || '0');
+    if (!val || val <= 0) {
+      alert(`Fatura ${i+1} için geçerli bir hedef BRÜT kilo girin.`);
+      return;
+    }
+    brutList.push(val);
+  }
+
+  window._cyHedefBrutList = brutList;
+
+  const res = document.getElementById('cyAdjustResult');
+  if (res) {
+    res.className = 'adjust-result visible';
+    res.innerHTML = brutList.map((b, i) =>
+      `✓ Fatura ${i+1}: <strong>${round2(b)} kg</strong>`
+    ).join(' &nbsp;|&nbsp; ');
+  }
+
+  document.getElementById('downloadBtn').style.display = 'block';
+  document.getElementById('downloadBtn').classList.add('visible');
+  showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
@@ -231,6 +308,8 @@ function toggleExSku() {
 // ── KİLO UYGULA ───────────────────────────────────────────────────────────────
 function applyGroupWeights() {
   if (!masterRows) return;
+  if (currentCountry === 'cy') { buildCyWeightInputs(); return; }  // ← ekle
+
 
   const groups = [...new Set(masterRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
@@ -437,6 +516,39 @@ async function downloadRS() {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
   }
+
+  const hedefBrut = workingRows.reduce((s, r) => s + (r['BRÜT'] || 0), 0);
+
+    // Kıbrıs — özel liste gönder
+    const isCy = currentCountry === 'cy';
+    const excelB64List = isCy
+      ? await Promise.all(cyFileDataList.map(d => Promise.resolve(arrayBufferToBase64(d))))
+      : null;
+
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        excel:              excelB64,
+        logo:               logoB64,
+        pdf:                pdfB64,
+        ulkeKodu:           currentCountry,
+        hedefBrut:          hedefBrut,
+        hedefNet:           workingRows.reduce((s,r) => s+(r['NET']||0), 0),
+        depoTipi:           selectedDepo,
+        grupKilolari:       groupWeights,
+        exceptionSkus:      exceptionSkus,
+        eurKuru:            getEurRate() || 1.0,
+        koFreight:          parseNum(document.getElementById('koFreightInput')?.value || '0'),
+        koInsurance:        parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
+        // Kıbrıs özel
+        ...(isCy && {
+          excelList:        excelB64List,
+          hedefBrutList:    window._cyHedefBrutList || [hedefBrut],
+          grupKilolariList: cyFileDataList.map(() => groupWeights),
+        }),
+      })
+    });
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor... (0s)';
   btn.disabled = true;

@@ -208,6 +208,18 @@ KZ_PL_COLS = [
     ('NET WEIGHT',           '__NET__'),
 ]
 
+CY_PL_COLS = [
+    ('MENŞEİ',                  'MENŞEİ Açıklama'),
+    ('Asorti Barkodu',          'Asorti Barkodu'),
+    ('ÜRÜN KODU',               'SKU'),
+    ('ÜRÜN TANIMI ( ALT GRUP)', 'ALT GRUBU Açıklama'),
+    ('ÜRÜN ADI',                'Madde Açıklaması'),
+    ('TOPLAM ÜRÜN ADEDİ',       'Miktar'),
+    ('TOPLAM BRÜT AĞIRLIK',     '__BRUT__'),
+    ('TOPLAM NET AĞIRLIK',      '__NET__'),
+    ('ANAGRUP',                 'ÜRÜN ANA GRUBU'),
+    ('E-FAT SERİ NO',           'E-Fatura Seri Numarası'),
+]
 DE_INV_COLS = BE_INV_COLS
 DE_PL_COLS  = BE_PL_COLS
 NL_INV_COLS = BE_INV_COLS
@@ -722,7 +734,15 @@ def find_uz_template_path():
     for path in candidates:
         if os.path.exists(path): return path
     raise FileNotFoundError(f'ref_uz.xlsx not found. Checked: {candidates}')
-
+def find_cy_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'ref_cy.xlsx'),
+        os.path.join(current_dir, 'templates', 'ref_cy.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError('ref_cy.xlsx not found.')
 def find_iq_template_path():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -780,6 +800,11 @@ def apply_genel_template_header(ws, sheet_title, fatura_no, fatura_date, package
     ws['I3'] = str(fatura_date)
     ws['I4'] = fatura_no
     ws['I5'] = packages
+
+def apply_cy_template_header(ws, fatura_no_str, fatura_date, packages=''):
+    ws['H3'] = str(fatura_date)   # ilk faturanın tarihi
+    ws['H4'] = fatura_no_str      # tüm fatura numaraları virgülle
+    ws['H5'] = packages    
 # ── EUR tabanlı INV+PL ortak üretim motoru ────────────────────────────────────
 def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
                         pdf_fields, hedef_net, depo_tipi, eur_kuru,
@@ -1819,6 +1844,124 @@ def generate_excel_lb(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                                 pdf_fields, hedef_net, depo_tipi, usd_kuru,
                                 find_lb_template_path, df_original=df_original)
 
+def generate_excel_cy(df_list, grup_kilolari_list, hedef_brut_list, exception_skus,
+                      pdf_fields=None, df_original_list=None):
+    """Kıbrıs — sadece PL üretimi. 1-3 Excel birleştirilir."""
+
+    all_rows   = []   # (df_grouped, brut_list, net_list) listesi
+    fatura_nos = []
+    first_date = None
+    master_dfs   = []
+    master_bruts = []
+    master_nets  = []
+
+    for i, df in enumerate(df_list):
+        df = df.copy()
+        df['Asorti Barkodu'] = df['Asorti Barkodu'].apply(
+            lambda x: str(int(x)) if pd.notna(x) and str(x).strip() not in ['', 'nan'] else '')
+
+        df_for_master = df_original_list[i] if df_original_list else df
+        hedef_brut    = hedef_brut_list[i]
+        grup_kilolari = grup_kilolari_list[i]
+
+        # Master için ağırlık hesapla (gruplandırma öncesi)
+        brut_orig, net_orig = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
+        master_dfs.append(df_for_master)
+        master_bruts.append(brut_orig)
+        master_nets.append(net_orig)
+
+        # SKU bazında gruplandır
+        df_grouped  = _sku_grupla(df)
+        fatura_no   = str(df_grouped['E-Fatura Seri Numarası'].iloc[0]).strip()
+        fatura_date = df_grouped['Fatura Tarihi'].iloc[0]
+        if hasattr(fatura_date, 'date'):
+            fatura_date = fatura_date.date()
+
+        fatura_nos.append(fatura_no)
+        if first_date is None:
+            first_date = fatura_date
+
+        brut_list, net_list = calculate_weights(df_grouped, grup_kilolari, hedef_brut, exception_skus)
+        all_rows.append((df_grouped, brut_list, net_list))
+
+    fatura_no_str = ', '.join(fatura_nos)
+    packages_str  = str((pdf_fields or {}).get('kap', '') or '')
+
+    wb = openpyxl.load_workbook(find_cy_template_path())
+    ws = wb['PL']
+    DS = 8  # kolon başlığı satır 8, veri 9'dan başlar
+
+    if ws.max_row > DS:
+        ws.delete_rows(DS + 1, ws.max_row - DS)
+
+    apply_cy_template_header(ws, fatura_no_str, first_date, packages_str)
+
+    ws.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(CY_PL_COLS):
+        hdr(ws, DS, i + 1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    r_global = 0
+    for df_grouped, brut_list, net_list in all_rows:
+        for local_idx, (_, row) in enumerate(df_grouped.iterrows()):
+            er = DS + 1 + r_global
+            ws.row_dimensions[er].height = 23
+            bg = 'FFFFFF' if r_global % 2 == 0 else 'EBF3FB'
+            for c_idx, (out_col, src_col) in enumerate(CY_PL_COLS):
+                cn = c_idx + 1
+                if src_col == '__BRUT__':
+                    dat(ws, er, cn, round(brut_list[local_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+                elif src_col == '__NET__':
+                    dat(ws, er, cn, round(net_list[local_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+                elif out_col == 'TOPLAM ÜRÜN ADEDİ':
+                    dat(ws, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+                elif out_col in ('Asorti Barkodu', 'E-FAT SERİ NO'):
+                    dat(ws, er, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+                else:
+                    dat(ws, er, cn, row.get(src_col, ''), bg=bg, align='left')
+            r_global += 1
+
+    last_pl = DS + r_global
+    pl_gr   = last_pl + 1
+    ws.row_dimensions[pl_gr].height = 28
+
+    for col_idx in range(1, 6):
+        ws.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+
+    c = ws.cell(row=pl_gr, column=6, value='TOTAL KG:')
+    c.font      = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill      = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.border    = brd()
+
+    c = ws.cell(row=pl_gr, column=7, value=f'=SUM(G{DS+1}:G{last_pl})')
+    c.font         = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill         = PatternFill('solid', fgColor=GOLD)
+    c.alignment    = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border       = brd()
+
+    c = ws.cell(row=pl_gr, column=8, value=f'=SUM(H{DS+1}:H{last_pl})')
+    c.font         = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill         = PatternFill('solid', fgColor=GOLD)
+    c.alignment    = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border       = brd()
+
+    set_print(ws, f'A1:J{pl_gr}')
+    ws.sheet_view.topLeftCell = 'A1'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    # Master Excel — tüm df'leri birleştir
+    master_combined = pd.concat(master_dfs, ignore_index=True)
+    brut_combined   = [b for bl in master_bruts for b in bl]
+    net_combined    = [n for nl in master_nets  for n in nl]
+    master_out = generate_master_excel(master_combined, brut_combined, net_combined)
+
+    return buf.getvalue(), fatura_no_str, master_out
+
 def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
     """Bosna INV + PL üretimi."""
@@ -2454,6 +2597,22 @@ class handler(BaseHTTPRequestHandler):
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, usd_kuru=usd_kuru,
                     df_original=df_original)
+            elif ulke_kodu == 'cy':
+                excel_list_b64  = body.get('excelList', [body.get('excel', '')])
+                hedef_brut_list = body.get('hedefBrutList', [hedef_brut])
+                grup_list       = body.get('grupKilolariList', [grup_kilolari])
+
+                df_list          = []
+                df_original_list = []
+                for eb64 in excel_list_b64:
+                    if not eb64: continue
+                    d = pd.read_excel(io.BytesIO(base64.b64decode(eb64)), engine='openpyxl')
+                    df_list.append(d.copy())
+                    df_original_list.append(d.copy())
+
+                excel_out, fatura_no, master_out = generate_excel_cy(
+                    df_list, grup_list, hedef_brut_list, exception_skus,
+                    pdf_fields=pdf_fields, df_original_list=df_original_list)
             else:
                 excel_out, fatura_no, master_out = generate_excel(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
