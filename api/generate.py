@@ -802,9 +802,22 @@ def apply_genel_template_header(ws, sheet_title, fatura_no, fatura_date, package
     ws['I5'] = packages
 
 def apply_cy_template_header(ws, fatura_no_str, fatura_date, packages=''):
-    ws['H3'] = str(fatura_date)   # ilk faturanın tarihi
-    ws['H4'] = fatura_no_str      # tüm fatura numaraları virgülle
-    ws['H5'] = packages    
+    # Birleştirilmiş hücrelerde sadece sol-üst hücreye yaz
+    def set_cell(ws, coord, value):
+        from openpyxl.utils import coordinate_to_tuple
+        row, col = coordinate_to_tuple(coord)
+        # Birleştirilmiş aralıkları kontrol et
+        for merged in ws.merged_cells.ranges:
+            if (merged.min_row <= row <= merged.max_row and
+                merged.min_col <= col <= merged.max_col):
+                # Sol-üst köşeye yaz
+                ws.cell(row=merged.min_row, column=merged.min_col, value=value)
+                return
+        ws[coord] = value  # Birleştirilmiş değilse direkt yaz
+
+    set_cell(ws, 'H3', str(fatura_date))
+    set_cell(ws, 'H4', fatura_no_str)
+    set_cell(ws, 'H5', packages) 
 # ── EUR tabanlı INV+PL ortak üretim motoru ────────────────────────────────────
 def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
                         pdf_fields, hedef_net, depo_tipi, eur_kuru,
