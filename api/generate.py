@@ -2547,39 +2547,25 @@ class handler(BaseHTTPRequestHandler):
 
             ulke_kodu   = body.get('ulkeKodu', 'rs')
 
+            if ulke_kodu == 'cy':
+                faturalar = body.get('faturalar', [])
+                excel_out = generate_excel_cy(faturalar, grup_kilolari, exception_skus)
+                fatura_no = '_'.join(f.get('faturaNo','') for f in faturalar)
+                result = json.dumps({'success': True, 'excel': base64.b64encode(excel_out).decode('utf-8'), 'master': '', 'faturaNo': fatura_no, 'pdfFields': {}})
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(result.encode('utf-8'))
+                return
+
             df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')           
             df_original = df.copy()
             if ulke_kodu == 'ba':
                 excel_out, fatura_no, master_out = generate_excel_ba(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
-            elif ulke_kodu == 'cy':
-                try:
-                    faturalar = body.get('faturalar', [])
-                    excel_out = generate_excel_cy(
-                        faturalar, grup_kilolari, exception_skus)
-                    fatura_no = '_'.join(f.get('faturaNo','') for f in faturalar)
-                    result = json.dumps({
-                        'success': True,
-                        'excel':   base64.b64encode(excel_out).decode('utf-8'),
-                        'master':  '',
-                        'faturaNo': fatura_no,
-                        'pdfFields': {},
-                    })
-                    self.send_response(200)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(result.encode('utf-8'))
-                    return
-                except Exception as e:
-                    err = json.dumps({'success': False, 'error': f'Kıbrıs hatası: {str(e)}', 'trace': traceback.format_exc()})
-                    self.send_response(500)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(err.encode('utf-8'))
-                    return
+            
             elif ulke_kodu == 'ge':
                 excel_out, fatura_no, master_out = generate_excel_ge(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
