@@ -23,6 +23,26 @@ function round2(n) {
 
 // ── DOSYA YÜKLEME ─────────────────────────────────────────────────────────────
 function handleMultiFile(files) {
+
+  // Kıbrıs'a özel — dosyaları ayrı dizilere topla
+  if (currentCountry === 'cy') {
+    cyExcelFiles = [];
+    cyPdfFiles   = [];
+    for (const file of files) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'pdf') cyPdfFiles.push(file);
+      else if (ext === 'xlsx' || ext === 'xls') cyExcelFiles.push(file);
+    }
+    // Badge güncelle
+    const badge = document.getElementById('fileName');
+    badge.textContent = `✓ ${cyExcelFiles.length} Excel, ${cyPdfFiles.length} PDF seçildi`;
+    badge.style.display = 'inline-flex';
+    // Devam butonunu göster
+    const nextBtn = document.getElementById('step4Next');
+    if (nextBtn && cyExcelFiles.length > 0) nextBtn.style.display = 'block';
+    return;
+  }
+  // Diğer ülkeler — mevcut kod aynen
   for (const file of files) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext === 'pdf') {

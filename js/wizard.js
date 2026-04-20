@@ -14,6 +14,8 @@ let originalFileName = '';
 let masterRows       = null;
 let workingRows      = null;
 let processedWB      = null;
+let cyExcelFiles     = [];   // Kıbrıs: birden fazla Excel
+let cyPdfFiles       = [];   // Kıbrıs: birden fazla PDF
 
 let groupWeights  = {};
 let exceptionSkus = {};
