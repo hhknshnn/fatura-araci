@@ -319,6 +319,14 @@ function applyGroupWeights() {
       applyNetAdjust();
     }
   } else {
+    // Kıbrıs'ta hedef BRÜT girişini gizle, PDF'lerden otomatik okunacak
+    if (currentCountry === 'cy') {
+      document.getElementById('adjustSection').style.display = 'none';
+      document.getElementById('downloadBtn').style.display   = 'block';
+      document.getElementById('downloadBtn').classList.add('visible');
+      showStatus('success', '<div class="stat">✓ Kilolar hesaplandı — İndir butonuna basın</div><div class="stat">BRÜT/NET her PDF\'den otomatik okunacak</div>');
+      return;
+    }
     showStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(totalBrut)} kg</span> — Hedef kilo girin</div>`);
   }
 }
