@@ -16,6 +16,8 @@ let workingRows      = null;
 let processedWB      = null;
 let cyExcelFiles     = [];   // Kıbrıs: birden fazla Excel
 let cyPdfFiles       = [];   // Kıbrıs: birden fazla PDF
+let cyMasterRows  = []; 
+
 
 let groupWeights  = {};
 let exceptionSkus = {};
@@ -172,6 +174,11 @@ function initStep4() {
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
 function initStep5() {
+  // Kıbrıs'a özel — tüm Excel'leri birleştirip KG tablosu göster
+  if (currentCountry === 'cy') {
+    initStep5CY();
+    return;
+  }
   buildKgTable(masterRows);
   document.getElementById('kgPanel').style.display      = 'block';
   document.getElementById('antrepoSection').style.display = 'none';
@@ -180,6 +187,34 @@ function initStep5() {
   if (selectedMod === 'sonrasi') {
     document.getElementById('downloadBtn').style.display = 'none';
   }
+}
+
+async function initStep5CY() {
+  if (cyExcelFiles.length === 0) {
+    showStatus('error', '⚠ Önce Excel dosyası seçin.');
+    return;
+  }
+
+  // Tüm Excel'leri oku ve satırları birleştir
+  cyMasterRows = [];
+  for (const file of cyExcelFiles) {
+    const buf  = await fileToArrayBuffer(file);
+    const wb   = XLSX.read(buf, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+    cyMasterRows = cyMasterRows.concat(rows);
+  }
+
+  // Mevcut KG tablosunu birleşik satırlarla göster
+  buildKgTable(cyMasterRows);
+  document.getElementById('kgPanel').style.display       = 'block';
+  document.getElementById('skuPanel').style.display      = 'block';
+  document.getElementById('antrepoSection').style.display = 'none';
+  document.getElementById('menseBox').classList.remove('visible');
+  document.getElementById('menseTaslakSection').style.display = 'none';
+  document.getElementById('downloadBtn').style.display   = 'none';
+  document.getElementById('downloadBtn').classList.remove('visible');
+
+  showStatus('info', `<div class="stat">⏳ ${cyExcelFiles.length} Excel yüklendi — grup kilolarını girin</div>`);
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
@@ -238,10 +273,10 @@ function toggleExSku() {
 
 // ── KİLO UYGULA ───────────────────────────────────────────────────────────────
 function applyGroupWeights() {
-  if (!masterRows) return;
-
+  const rows = currentCountry === 'cy' ? cyMasterRows : masterRows;
+  if (!rows) return;
   // Tablodaki grup kilolarını oku ve kaydet
-  const groups = [...new Set(masterRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
+  const groups = [...new Set(rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
     const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
     const el = document.getElementById(id);
@@ -250,7 +285,7 @@ function applyGroupWeights() {
   try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch(e) {}
 
   // Her satır için BRÜT/NET hesapla
-  workingRows = masterRows.map(row => {
+  workingRows = rows.map(row => {
     const r      = { ...row };
     const sku    = String(r['SKU']).trim();
     const grup   = String(r['ÜRÜN ARA GRUBU']).trim();
@@ -550,8 +585,79 @@ async function downloadCY() {
     showStatus('error', '⚠ En az 1 Excel dosyası seçin.');
     return;
   }
-  showStatus('info', `<div class="stat">⏳ ${cyExcelFiles.length} fatura işleniyor...</div>`);
-  // Sonraki adımda burası doldurulacak
+
+  const btn = document.getElementById('downloadBtn');
+  btn.textContent = '⏳ Hazırlanıyor...';
+  btn.disabled = true;
+
+  try {
+    // Her Excel'i oku ve fatura no ile PDF eşleştir
+    const faturalar = [];
+
+    for (const excelFile of cyExcelFiles) {
+      // Excel'i base64'e çevir
+      const excelBuf = await fileToArrayBuffer(excelFile);
+      const excelB64 = arrayBufferToBase64(excelBuf);
+
+      // Excel'den fatura no oku (XLSX.js ile)
+      const wb = XLSX.read(excelBuf, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      const faturaNo = String(rows[0]?.['E-Fatura Seri Numarası'] || '').trim();
+
+      // Aynı fatura no'lu PDF'i bul
+      let pdfB64 = '';
+      for (const pdfFile of cyPdfFiles) {
+        const pdfBuf = await fileToArrayBuffer(pdfFile);
+        const pdfText = pdfFile.name;
+        // PDF adında fatura no geçiyor mu?
+        if (pdfText.includes(faturaNo.replace('ANT', 'ANT'))) {
+          pdfB64 = arrayBufferToBase64(pdfBuf);
+          break;
+        }
+      }
+
+      faturalar.push({ excel: excelB64, pdf: pdfB64, faturaNo });
+    }
+
+    // Fatura no'ya göre sırala
+    faturalar.sort((a, b) => a.faturaNo.localeCompare(b.faturaNo));
+
+    showStatus('info', `<div class="stat">⏳ ${faturalar.length} fatura backend'e gönderiliyor...</div>`);
+
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ulkeKodu:      'cy',
+        faturalar:     faturalar,
+        grupKilolari:  groupWeights,
+        exceptionSkus: exceptionSkus,
+      })
+    });
+
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+
+    // PL indir
+    const bin   = atob(data.excel);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `PL_Kibris_${faturalar.map(f => f.faturaNo).join('_')}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showStatus('success', `<div class="stat">✓ İndirildi: ${faturalar.length} fatura</div>`);
+
+  } catch(err) {
+    showStatus('error', '⚠ ' + err.message);
+  } finally {
+    btn.textContent = '⬇ PL İndir';
+    btn.disabled = false;
+  }
 }
 
 function arrayBufferToBase64(buf) {
@@ -597,4 +703,14 @@ function triggerMenseTaslak() {
   const netKg     = round2(workingRows.reduce((s, r) => s + parseNum(r['NET']),  0));
 
   indirMenseTaslak(trKg, yabanciKg, brutKg, netKg);
+}
+
+// Yardımcı — File → ArrayBuffer
+function fileToArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error('Dosya okunamadı'));
+    r.readAsArrayBuffer(file);
+  });
 }
