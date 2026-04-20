@@ -1831,7 +1831,12 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     brut_original, net_original = calculate_weights(df_for_master, grup_kilolari, hedef_brut, exception_skus)
 
     # SKU bazında gruplandırma — INV+PL için
-    df = _sku_grupla(df)
+    # SKU bazında gruplandırma — INV+PL için
+    # Net Tutar (D) sum ile toplanır (Fiyat(D) x Miktar yuvarlama farkından kaçınmak için)
+    agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
+    agg_dict['Miktar'] = 'sum'
+    agg_dict['Net Tutar (D)'] = 'sum'
+    df = df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
     # Gruplandırma sonrası Net Tutar (D) yeniden hesapla
     # (aynı SKU birden fazla satırda olabilir, _sku_grupla sadece Miktar'ı toplar)
     df['Net Tutar (D)'] = df.apply(
