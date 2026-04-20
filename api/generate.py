@@ -1964,6 +1964,7 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         ws_pl.cell(row=pl_gr, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
 
     c = ws_pl.cell(row=pl_gr, column=6, value='TOTAL KG:')
+    ws_pl.column_dimensions['F'].width = 12  # TOTAL KG: için yeterli genişlik
     c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     c.fill = PatternFill('solid', fgColor=GOLD)
     c.alignment = Alignment(horizontal='right', vertical='center')
@@ -1988,6 +1989,9 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     c.border = brd()
 
     set_print(ws_pl, f'A1:H{pl_gr}')
+
+    ws_inv.sheet_view.topLeftCell = 'A1'
+    ws_pl.sheet_view.topLeftCell  = 'A1'
 
     buf = io.BytesIO()
     wb.save(buf)
