@@ -2202,6 +2202,164 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
     return buf.getvalue(), fatura_no, master_out
 
+def generate_excel_cy(faturalar, grup_kilolari, exception_skus):
+    """Kıbrıs PL üretimi — 1-3 fatura, tek PL çıktısı."""
+    import pandas as pd
+
+    # Her fatura için df ve pdf_fields hazırla
+    fatura_list = []
+    for f in faturalar:
+        excel_bytes = base64.b64decode(f['excel'])
+        df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
+        
+        # PDF'ten BRÜT/NET oku
+        pdf_fields = {'brutKg': 0.0, 'netKg': 0.0, 'kap': ''}
+        if f.get('pdf'):
+            pdf_bytes = base64.b64decode(f['pdf'])
+            pdf_fields = parse_pdf(pdf_bytes)
+            # parse_pdf brutKg/netKg dönmüyor, taslak parse'ını kullanalım
+            parsed = parse_pdf_fields(pdf_bytes)
+            pdf_fields['brutKg'] = parsed.get('brutKg', 0.0)
+            pdf_fields['netKg']  = parsed.get('netKg',  0.0)
+            pdf_fields['kap']    = parsed.get('kap', '')
+
+        hedef_brut = float(pdf_fields.get('brutKg', 0) or 0)
+        hedef_net  = float(pdf_fields.get('netKg',  0) or 0)
+        fatura_no  = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+        fatura_date = df['Fatura Tarihi'].iloc[0]
+        if hasattr(fatura_date, 'date'):
+            fatura_date = fatura_date.date()
+
+        # SKU gruplandırma
+        df = _sku_grupla(df)
+
+        # Ağırlık hesapla
+        brut_list, net_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
+
+        # Antrepo: net'i PDF'ten oku
+        if hedef_net > 0:
+            toplam_brut = sum(brut_list)
+            if toplam_brut > 0:
+                net_list_new = []
+                toplam_net = 0.0
+                for i, b in enumerate(brut_list):
+                    if i < len(brut_list) - 1:
+                        val = round((b / toplam_brut) * hedef_net, 2)
+                        net_list_new.append(val)
+                        toplam_net += val
+                    else:
+                        net_list_new.append(round(hedef_net - toplam_net, 2))
+                net_list = net_list_new
+
+        fatura_list.append({
+            'df': df,
+            'brut_list': brut_list,
+            'net_list': net_list,
+            'fatura_no': fatura_no,
+            'fatura_date': fatura_date,
+            'kap': pdf_fields.get('kap', ''),
+        })
+
+    # Fatura no'ya göre sırala
+    fatura_list.sort(key=lambda x: x['fatura_no'])
+
+    # Şablonu yükle
+    cy_template = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates', 'ref_cy.xlsx')
+    wb = openpyxl.load_workbook(cy_template)
+    ws = wb['PL']
+    DS = 9  # kolon başlığı satırı
+
+    # Eski veri satırlarını temizle
+    if ws.max_row > DS:
+        ws.delete_rows(DS + 1, ws.max_row - DS)
+
+    # Header bilgilerini doldur
+    fatura_nos  = ' / '.join(f['fatura_no'] for f in fatura_list)
+    toplam_kap  = ' / '.join(str(f['kap']) for f in fatura_list if f['kap'])
+    ws['H3'] = str(fatura_list[0]['fatura_date'])
+    ws['H4'] = fatura_nos
+    ws['H5'] = toplam_kap
+
+    # CY_PL_COLS
+    CY_PL_COLS = [
+        ('MENŞEİ',                  'MENŞEİ Açıklama'),
+        ('Asorti Barkodu',          'Asorti Barkodu'),
+        ('ÜRÜN KODU',               'SKU'),
+        ('ÜRÜN TANIMI ( ALT GRUP)', 'ALT GRUBU Açıklama'),
+        ('ÜRÜN ADI',                'Madde Açıklaması'),
+        ('TOPLAM ÜRÜN ADEDİ',       'Miktar'),
+        ('TOPLAM BRÜT AĞIRLIK',     '__BRUT__'),
+        ('TOPLAM NET AĞIRLIK',      '__NET__'),
+        ('ANAGRUP',                 'ÜRÜN ANA GRUBU'),
+        ('E-FAT SERİ NO',           'E-Fatura Seri Numarası'),
+    ]
+
+    # Kolon başlıklarını yaz
+    ws.row_dimensions[DS].height = 35
+    for i, (hd, _) in enumerate(CY_PL_COLS):
+        hdr(ws, DS, i+1, hd, bg=DARK_BLUE, size=9, align='center')
+
+    # Her faturanın satırlarını alt alta yaz
+    current_row = DS + 1
+    for f in fatura_list:
+        df = f['df']
+        brut_list = f['brut_list']
+        net_list  = f['net_list']
+
+        for r_idx, (_, row) in enumerate(df.iterrows()):
+            ws.row_dimensions[current_row].height = 23
+            bg = 'FFFFFF' if r_idx % 2 == 0 else 'EBF3FB'
+            for c_idx, (out_col, src_col) in enumerate(CY_PL_COLS):
+                cn = c_idx + 1
+                if src_col == '__BRUT__':
+                    dat(ws, current_row, cn, round(brut_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+                elif src_col == '__NET__':
+                    dat(ws, current_row, cn, round(net_list[r_idx], 2), bg=bg, align='right', fmt='#,##0.00')
+                elif out_col == 'TOPLAM ÜRÜN ADEDİ':
+                    dat(ws, current_row, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
+                elif out_col == 'Asorti Barkodu':
+                    dat(ws, current_row, cn, str(row.get(src_col, '') or ''), bg=bg, align='left')
+                else:
+                    dat(ws, current_row, cn, row.get(src_col, ''), bg=bg, align='left')
+            current_row += 1
+
+    # TOTAL satırı
+    last_row = current_row - 1
+    total_row = current_row
+    ws.row_dimensions[total_row].height = 28
+
+    for col_idx in range(1, 6):
+        ws.cell(row=total_row, column=col_idx).fill = PatternFill('solid', fgColor='FFFFFF')
+
+    c = ws.cell(row=total_row, column=6, value='TOTAL KG:')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.border = brd()
+
+    c = ws.cell(row=total_row, column=7,
+                value=f'=SUM(G{DS+1}:G{last_row})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    c = ws.cell(row=total_row, column=8,
+                value=f'=SUM(H{DS+1}:H{last_row})')
+    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    c.fill = PatternFill('solid', fgColor=GOLD)
+    c.alignment = Alignment(horizontal='right', vertical='center')
+    c.number_format = '#,##0.00'
+    c.border = brd()
+
+    ws.sheet_view.topLeftCell = 'A1'
+    set_print(ws, f'A1:J{total_row}')
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                    pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
@@ -2395,6 +2553,33 @@ class handler(BaseHTTPRequestHandler):
                 excel_out, fatura_no, master_out = generate_excel_ba(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
+            elif ulke_kodu == 'cy':
+                try:
+                    faturalar = body.get('faturalar', [])
+                    excel_out = generate_excel_cy(
+                        faturalar, grup_kilolari, exception_skus)
+                    fatura_no = '_'.join(f.get('faturaNo','') for f in faturalar)
+                    result = json.dumps({
+                        'success': True,
+                        'excel':   base64.b64encode(excel_out).decode('utf-8'),
+                        'master':  '',
+                        'faturaNo': fatura_no,
+                        'pdfFields': {},
+                    })
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(result.encode('utf-8'))
+                    return
+                except Exception as e:
+                    err = json.dumps({'success': False, 'error': f'Kıbrıs hatası: {str(e)}', 'trace': traceback.format_exc()})
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(err.encode('utf-8'))
+                    return
             elif ulke_kodu == 'ge':
                 excel_out, fatura_no, master_out = generate_excel_ge(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
