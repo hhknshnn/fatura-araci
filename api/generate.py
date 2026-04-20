@@ -1832,7 +1832,12 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     # SKU bazında gruplandırma — INV+PL için
     df = _sku_grupla(df)
-
+    # Gruplandırma sonrası Net Tutar (D) yeniden hesapla
+    # (aynı SKU birden fazla satırda olabilir, _sku_grupla sadece Miktar'ı toplar)
+    df['Net Tutar (D)'] = df.apply(
+        lambda r: round(parse_num(r.get('Fiyat (D)', 0)) * parse_num(r.get('Miktar', 0)), 2),
+        axis=1
+    )
     fatura_no    = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
     fatura_date  = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'): fatura_date = fatura_date.date()
