@@ -440,6 +440,13 @@ async function downloadResult() {
 }
 
 async function downloadRS() {
+  // Kıbrıs'a özel — ayrı fonksiyona yönlendir
+  if (currentCountry === 'cy') {
+    await downloadCY();
+    return;
+  }
+  
+  // Diğer ülkeler — mevcut kod aynen devam eder
   if (!workingRows || !lastFileData) {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
@@ -536,6 +543,15 @@ async function downloadRS() {
     btn.textContent = `⬇ INV + PL İndir (${elapsed}s)`;
     btn.disabled = false;
   }
+}
+
+async function downloadCY() {
+  if (cyExcelFiles.length === 0) {
+    showStatus('error', '⚠ En az 1 Excel dosyası seçin.');
+    return;
+  }
+  showStatus('info', `<div class="stat">⏳ ${cyExcelFiles.length} fatura işleniyor...</div>`);
+  // Sonraki adımda burası doldurulacak
 }
 
 function arrayBufferToBase64(buf) {
