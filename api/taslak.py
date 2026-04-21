@@ -32,7 +32,7 @@ def _extract_pdf_amount(text, patterns):
     return 0.0
 
 def parse_pdf_fields(pdf_bytes):
-    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0}
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0, 'kur': 0.0}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             # Bilgiler son sayfalarda — sadece son 2 sayfayı oku
@@ -60,6 +60,10 @@ def parse_pdf_fields(pdf_bytes):
                 if m:
                     result['kap'] = m.group(1).strip()
                     break
+            # Kur bilgisi
+            result['kur'] = _extract_pdf_amount(text, [
+                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*([\d.,]+)',
+            ])    
             # BRÜT kilo
             result['brutKg'] = _extract_pdf_amount(text, [
                 r'\bB\.KG\s*[:.]?\s*([\d.,]+)',

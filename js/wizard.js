@@ -125,7 +125,21 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
-  document.getElementById('eurSection').classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
+  const kurUlkesi = ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(c);
+  const eurSection = document.getElementById('eurSection');
+  // PDF'ten kur zaten geldiyse gizli kalsın
+  if (kurUlkesi && window._pdfKur && window._pdfKur > 0) {
+    eurSection.classList.remove('visible');
+    eurSection.style.display = 'none';
+    // Input'a değeri yaz (backend'e gitmesi için)
+    const targetInput = ['iq','ly','lr','lb'].includes(c)
+      ? document.getElementById('usdRateInput')
+      : document.getElementById('eurRateInput');
+    if (targetInput) targetInput.value = String(window._pdfKur).replace('.', ',');
+  } else {
+    eurSection.classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
+    eurSection.style.display = '';
+  }
 
   // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
   const isUsd = ['iq','ly','lr','lb'].includes(c);
@@ -493,6 +507,23 @@ async function downloadRS() {
   if (!workingRows || !lastFileData) {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
+  }
+
+  // Kur kontrolü — EUR/USD ülkeleri için kur zorunlu
+  const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
+  const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
+  if (isEurUlke || isUsdUlke) {
+    const kur = isEurUlke ? getEurRate() : getUsdRate();
+    if (!kur || kur <= 0) {
+      // Kur ekranını tekrar göster
+      const eurSection = document.getElementById('eurSection');
+      if (eurSection) {
+        eurSection.classList.add('visible');
+        eurSection.style.display = '';
+      }
+      showStatus('error', '⚠ Kur bilgisi giriniz!');
+      return;
+    }
   }
 
   const btn = document.getElementById('downloadBtn');

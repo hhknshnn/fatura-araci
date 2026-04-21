@@ -97,6 +97,25 @@ function handlePdf(file) {
         const pf = data.pdfFields;
         if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
         if (pf.netKg  && pf.netKg  > 0) window._pdfNetKg  = pf.netKg;
+        if (pf.kur    && pf.kur    > 0) {
+          window._pdfKur = pf.kur;
+          // Aktif kur input'una yaz ve ekranı gizle
+          const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
+          const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
+          if (isUsdUlke) {
+            const el = document.getElementById('usdRateInput');
+            if (el) el.value = String(pf.kur).replace('.', ',');
+          } else if (isEurUlke) {
+            const el = document.getElementById('eurRateInput');
+            if (el) el.value = String(pf.kur).replace('.', ',');
+          }
+          // Kur bölümünü gizle (PDF'ten geldi, kullanıcı görmesin)
+          const eurSection = document.getElementById('eurSection');
+          if (eurSection) {
+            eurSection.classList.remove('visible');
+            eurSection.style.display = 'none';
+          }
+        }
       }
     } catch(e) {
       console.warn('PDF parse hatası:', e);

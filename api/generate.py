@@ -337,7 +337,7 @@ def _extract_pdf_packages(text):
     return ''
 
 def parse_pdf(pdf_bytes):
-    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'kur': 0.0}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages[-2:]]
@@ -351,6 +351,9 @@ def parse_pdf(pdf_bytes):
             result['sigorta'] = _extract_pdf_amount(text, [
                 r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
                 r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
+            ])
+            result['kur'] = _extract_pdf_amount(text, [
+                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*([\d.,]+)',
             ])
             result['kap'] = _extract_pdf_packages(text)
     except Exception:
