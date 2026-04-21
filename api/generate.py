@@ -2217,11 +2217,22 @@ def generate_excel_cy(faturalar, grup_kilolari, exception_skus):
         if f.get('pdf'):
             pdf_bytes = base64.b64decode(f['pdf'])
             pdf_fields = parse_pdf(pdf_bytes)
-            # parse_pdf brutKg/netKg dönmüyor, taslak parse'ını kullanalım
-            parsed = parse_pdf_fields(pdf_bytes)
-            pdf_fields['brutKg'] = parsed.get('brutKg', 0.0)
-            pdf_fields['netKg']  = parsed.get('netKg',  0.0)
-            pdf_fields['kap']    = parsed.get('kap', '')
+            import re as _re
+            text = ''
+            try:
+                with pdfplumber.open(io.BytesIO(pdf_bytes)) as _pdf:
+                    text = ' '.join(p.extract_text() or '' for p in _pdf.pages[-2:])
+            except: pass
+            def _ext(t, pats):
+                for p in pats:
+                    m = _re.search(p, t, _re.IGNORECASE)
+                    if m:
+                        try: return float(m.group(1).replace(',','.'))
+                        except: pass
+                return 0.0
+            pdf_fields['brutKg'] = _ext(text, [r'\bB\.KG\s*[:.]?\s*([\d.,]+)'])
+            pdf_fields['netKg']  = _ext(text, [r'\bN\.KG\s*[:.]?\s*([\d.,]+)'])
+            pdf_fields['kap']    = pdf_fields.get('kap', '')
 
         hedef_brut = float(pdf_fields.get('brutKg', 0) or 0)
         hedef_net  = float(pdf_fields.get('netKg',  0) or 0)
