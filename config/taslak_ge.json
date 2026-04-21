@@ -11,12 +11,12 @@
     "navlun": {
       "hucre": "C3",
       "tip": "sayi",
-      "label": "Navlun (EUR)"
+      "label": "Navlun (USD)"
     },
     "sigorta": {
       "hucre": "C4",
       "tip": "sayi",
-      "label": "Sigorta (EUR)"
+      "label": "Sigorta (USD)"
     },
     "kap": {
       "hucre": "C5",
