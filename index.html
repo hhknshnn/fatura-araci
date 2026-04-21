@@ -210,36 +210,7 @@
       </div>
     </div>
 
-    <!-- EUR/USD kur girişi -->
-    <div class="eur-section" id="eurSection">
-      <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
-        <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
-          placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
-        <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
-      </div>
-      <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
-      <div id="usdRateRow" style="display:none;gap:10px;align-items:center;margin-bottom:12px;">
-        <input class="target-input" id="usdRateInput" type="text" inputmode="decimal"
-          placeholder="örn: 34,00" style="flex:1;">
-        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
-      </div>
-      <!-- Freight/Insurance — gizli, PDF'ten otomatik okunur -->
-      <div id="koFreightSection" style="display:none;">
-        <div class="eur-label">Freight (EUR)</div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-          <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
-            placeholder="örn: 1200,00" style="flex:1;">
-          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-        </div>
-        <div class="eur-label">Insurance (EUR)</div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-          <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
-            placeholder="örn: 300,00" style="flex:1;">
-          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-        </div>
-      </div>
-    </div>
+    
 
     <!-- KZ gruplandırma modu — gizli -->
     <div class="eur-section" id="kzModeSection" style="display:none;">
@@ -295,6 +266,37 @@
       <div class="pdf-row">
         <span class="pdf-key">🛡 INSURANCE</span>
         <span class="pdf-val" id="pdfSigorta">—</span>
+      </div>
+    </div>
+
+    <!-- EUR/USD kur girişi — PDF'te kur yoksa burada gösterilir -->
+    <div class="eur-section" id="eurSection">
+      <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+        <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
+          placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
+        <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
+      </div>
+      <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
+      <div id="usdRateRow" style="display:none;gap:10px;align-items:center;margin-bottom:12px;">
+        <input class="target-input" id="usdRateInput" type="text" inputmode="decimal"
+          placeholder="örn: 34,00" style="flex:1;">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
+      </div>
+      <!-- Freight/Insurance — gizli, PDF'ten otomatik okunur -->
+      <div id="koFreightSection" style="display:none;">
+        <div class="eur-label">Freight (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+          <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+            placeholder="örn: 1200,00" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
+        <div class="eur-label">Insurance (EUR)</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+          <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+            placeholder="örn: 300,00" style="flex:1;">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+        </div>
       </div>
     </div>
 

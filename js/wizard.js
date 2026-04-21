@@ -124,24 +124,8 @@ function selectCountry(c) {
   document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('country-' + c).classList.add('active');
 
-  // EUR section: Belçika, Almanya, Hollanda, Kosova, Makedonya
-  const kurUlkesi = ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(c);
-  const eurSection = document.getElementById('eurSection');
-  // PDF'ten kur zaten geldiyse gizli kalsın
-  if (kurUlkesi && window._pdfKur && window._pdfKur > 0) {
-    eurSection.classList.remove('visible');
-    eurSection.style.display = 'none';
-    // Input'a değeri yaz (backend'e gitmesi için)
-    const targetInput = ['iq','ly','lr','lb'].includes(c)
-      ? document.getElementById('usdRateInput')
-      : document.getElementById('eurRateInput');
-    if (targetInput) targetInput.value = String(window._pdfKur).replace('.', ',');
-  } else {
-    eurSection.classList.toggle('visible', ['be','de','nl','xk','mk'].includes(c));
-    eurSection.style.display = '';
-  }
-
-  // USD ülkeleri için USD kur inputunu göster, EUR'u gizle
+  // Kur ekranı artık adım 4'te — adım 3'te sadece ülke seçimi
+  // USD/EUR input görünürlüğünü hazırla (adım 4'te lazım olacak)
   const isUsd = ['iq','ly','lr','lb'].includes(c);
   const eurInputRow = document.getElementById('eurRateInput')?.parentElement;
   const usdRateRow  = document.getElementById('usdRateRow');
@@ -151,6 +135,13 @@ function selectCountry(c) {
   if (usdLabel)    usdLabel.style.display     = isUsd ? 'block' : 'none';
   if (eurInputRow) eurInputRow.style.display  = isUsd ? 'none'  : 'flex';
   if (eurLabel)    eurLabel.style.display     = isUsd ? 'none'  : 'block';
+
+  // Kur ekranını varsayılan olarak gizle — adım 4'te gerekirse açılacak
+  const eurSection = document.getElementById('eurSection');
+  if (eurSection) {
+    eurSection.classList.remove('visible');
+    eurSection.style.display = 'none';
+  }
 
   // Freight/Insurance ve KZ modu gizli — PDF'ten otomatik okunur
   document.getElementById('koFreightSection').style.display = 'none';
@@ -183,7 +174,54 @@ function initStep4() {
   // Buton: Excel yüklüyse göster, değilse gizli — loadFile() açacak
   const nextBtn = document.getElementById('step4Next');
   nextBtn.style.display = masterRows ? 'block' : 'none';
-  nextBtn.onclick = () => { goStep(5); };
+  nextBtn.onclick = () => { goStep4Next(); };
+
+  // Kur ekranı görünürlüğünü güncelle
+  updateEurSectionStep4();
+}
+
+// Adım 4'te kur ekranını göster/gizle
+function updateEurSectionStep4() {
+  const kurUlkesi = ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(currentCountry);
+  const eurSection = document.getElementById('eurSection');
+  if (!eurSection) return;
+
+  if (!kurUlkesi) {
+    // Kur gerekmiyor — tamamen gizle
+    eurSection.classList.remove('visible');
+    eurSection.style.display = 'none';
+    return;
+  }
+
+  // Kur ülkesi — PDF'ten kur geldiyse gizle, gelmediyse göster
+  if (window._pdfKur && window._pdfKur > 0) {
+    eurSection.classList.remove('visible');
+    eurSection.style.display = 'none';
+  } else {
+    eurSection.classList.add('visible');
+    eurSection.style.display = '';
+  }
+}
+
+// Adım 4 → Adım 5 geçişi — kur kontrolü yap
+function goStep4Next() {
+  const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
+  const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
+
+  if (isEurUlke || isUsdUlke) {
+    const kur = isEurUlke ? getEurRate() : getUsdRate();
+    if (!kur || kur <= 0) {
+      // Kur ekranını göster ve uyar
+      const eurSection = document.getElementById('eurSection');
+      if (eurSection) {
+        eurSection.classList.add('visible');
+        eurSection.style.display = '';
+      }
+      alert('⚠ Kur bilgisi giriniz!');
+      return;
+    }
+  }
+  goStep(5);
 }
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
@@ -507,23 +545,6 @@ async function downloadRS() {
   if (!workingRows || !lastFileData) {
     showStatus('error', '⚠ Önce kiloları uygulayın.');
     return;
-  }
-
-  // Kur kontrolü — EUR/USD ülkeleri için kur zorunlu
-  const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
-  const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
-  if (isEurUlke || isUsdUlke) {
-    const kur = isEurUlke ? getEurRate() : getUsdRate();
-    if (!kur || kur <= 0) {
-      // Kur ekranını tekrar göster
-      const eurSection = document.getElementById('eurSection');
-      if (eurSection) {
-        eurSection.classList.add('visible');
-        eurSection.style.display = '';
-      }
-      showStatus('error', '⚠ Kur bilgisi giriniz!');
-      return;
-    }
   }
 
   const btn = document.getElementById('downloadBtn');

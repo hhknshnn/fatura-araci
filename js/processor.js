@@ -99,7 +99,7 @@ function handlePdf(file) {
         if (pf.netKg  && pf.netKg  > 0) window._pdfNetKg  = pf.netKg;
         if (pf.kur    && pf.kur    > 0) {
           window._pdfKur = pf.kur;
-          // Aktif kur input'una yaz ve ekranı gizle
+          // Aktif kur input'una yaz
           const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
           const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
           if (isUsdUlke) {
@@ -109,12 +109,10 @@ function handlePdf(file) {
             const el = document.getElementById('eurRateInput');
             if (el) el.value = String(pf.kur).replace('.', ',');
           }
-          // Kur bölümünü gizle (PDF'ten geldi, kullanıcı görmesin)
-          const eurSection = document.getElementById('eurSection');
-          if (eurSection) {
-            eurSection.classList.remove('visible');
-            eurSection.style.display = 'none';
-          }
+        }
+        // Adım 4'teki kur ekranı görünürlüğünü güncelle
+        if (typeof updateEurSectionStep4 === 'function') {
+          updateEurSectionStep4();
         }
       }
     } catch(e) {
