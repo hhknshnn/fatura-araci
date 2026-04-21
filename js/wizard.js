@@ -186,14 +186,14 @@ function updateEurSectionStep4() {
   const eurSection = document.getElementById('eurSection');
   if (!eurSection) return;
 
-  if (!kurUlkesi) {
-    // Kur gerekmiyor — tamamen gizle
+  // Kur gerekmiyorsa veya PDF henüz yüklenmediyse gizli tut
+  if (!kurUlkesi || !lastPdfData) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
     return;
   }
 
-  // Kur ülkesi — PDF'ten kur geldiyse gizle, gelmediyse göster
+  // PDF yüklendi — kur geldiyse gizle, gelmediyse göster
   if (window._pdfKur && window._pdfKur > 0) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
@@ -209,6 +209,11 @@ function goStep4Next() {
   const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
 
   if (isEurUlke || isUsdUlke) {
+    // PDF yüklenmediyse uyar
+    if (!lastPdfData) {
+      alert('⚠ Fatura PDF yükleyin.');
+      return;
+    }
     const kur = isEurUlke ? getEurRate() : getUsdRate();
     if (!kur || kur <= 0) {
       // Kur ekranını göster ve uyar
