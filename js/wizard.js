@@ -474,7 +474,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
+  const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb','cy'];
   if (backendUlkeler.includes(currentCountry)) { await downloadRS(); return; }
 
   if (!processedWB) return;
