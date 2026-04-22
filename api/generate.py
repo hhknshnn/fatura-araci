@@ -415,6 +415,7 @@ def _sku_grupla(df):
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
 def generate_master_excel(df_original, brut_list, net_list):
+    """Stilize master Excel — header mavi+beyaz, auto width, zebra, freeze, filter."""
     df = df_original.copy()
     df['BRÜT'] = brut_list
     df['NET']  = net_list
@@ -431,11 +432,70 @@ def generate_master_excel(df_original, brut_list, net_list):
     cols.insert(ag_idx + 2, 'NET')
     df = df[cols]
 
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet()
-    rows = [list(df.columns)] + df.values.tolist()
-    for row in rows:
-        ws.append(row)
+    headers    = list(df.columns)
+    data_rows  = df.values.tolist()
+    n_cols     = len(headers)
+    ZEBRA_CLR  = 'F7FAFD'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Master'
+
+    # Kolon genişlikleri — ilk 200 satıra bakarak auto
+    sample = min(200, len(data_rows))
+    for c_idx in range(n_cols):
+        max_len = len(str(headers[c_idx] or ''))
+        for r in data_rows[:sample]:
+            v = r[c_idx]
+            if v is None: continue
+            s = str(v)
+            if len(s) > max_len: max_len = len(s)
+        w = max(10, min(40, max_len + 2))
+        ws.column_dimensions[get_column_letter(c_idx + 1)].width = w
+
+    # Header satırı
+    thin        = Side(style='thin', color='BFBFBF')
+    border_all  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hdr_font    = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    hdr_fill    = PatternFill('solid', fgColor=DARK_BLUE)
+    hdr_align   = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    for c_idx, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=c_idx, value=h)
+        cell.font      = hdr_font
+        cell.fill      = hdr_fill
+        cell.alignment = hdr_align
+        cell.border    = border_all
+    ws.row_dimensions[1].height = 30
+
+    # Sayısal kolon tespiti (ilk data row'a göre — sağa hizala)
+    right_cols = set()
+    if data_rows:
+        for c_idx, v in enumerate(data_rows[0]):
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                right_cols.add(c_idx)
+
+    # Data satırları
+    data_font   = Font(name='Arial', size=9)
+    align_left  = Alignment(horizontal='left',  vertical='center')
+    align_right = Alignment(horizontal='right', vertical='center')
+    fill_white  = PatternFill('solid', fgColor='FFFFFF')
+    fill_zebra  = PatternFill('solid', fgColor=ZEBRA_CLR)
+
+    for r_idx, row in enumerate(data_rows):
+        excel_row = r_idx + 2
+        bg = fill_white if r_idx % 2 == 0 else fill_zebra
+        for c_idx, val in enumerate(row, start=1):
+            cell = ws.cell(row=excel_row, column=c_idx, value=val)
+            cell.font      = data_font
+            cell.fill      = bg
+            cell.alignment = align_right if (c_idx - 1) in right_cols else align_left
+            cell.border    = border_all
+
+    # Freeze + auto filter
+    ws.freeze_panes  = 'A2'
+    ws.auto_filter.ref = f'A1:{get_column_letter(n_cols)}{len(data_rows) + 1}'
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
