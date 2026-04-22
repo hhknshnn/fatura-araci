@@ -56,6 +56,11 @@
         <div class="choice-name">GTİP Kontrol</div>
         <div class="choice-desc">Faturadaki GTİP'leri referans listeye göre doğrula</div>
       </div>
+            <div class="choice-card" id="card-evrak" onclick="selectMod('evrak')">
+        <span class="choice-icon">📄</span>
+        <div class="choice-name">Ek Evrak Üret</div>
+        <div class="choice-desc">Ülkeye özel ek evrakları PDF olarak üret</div>
+      </div>
       <div class="choice-card" id="card-sonrasi" onclick="selectMod('sonrasi')">
         <span class="choice-icon">📤</span>
         <div class="choice-name">Fatura Sonrası</div>
@@ -131,6 +136,36 @@
 
     <div class="nav-row" style="margin-top:20px;">
       <button class="btn-ghost" onclick="exitGtipPanel()">← Geri</button>
+    </div>
+  </div>
+
+    <!-- ── EK EVRAK PANELİ (bağımsız) ───────────────────────────────────────── -->
+  <div class="panel" id="stepEvrak" style="display:none;">
+    <div class="panel-label">Ek Evrak</div>
+    <div class="panel-title">Ek Evrak Üret</div>
+    <div class="panel-desc">Ülke ve evrak tipini seçin, bilgileri girin, PDF olarak indirin.</div>
+
+    <div class="status-box" id="evrakStatus"></div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;margin-top:16px;text-transform:uppercase;letter-spacing:1px;">Ülke</div>
+    <div class="country-grid" id="evrakUlkeGrid" style="margin-bottom:20px;"></div>
+
+    <div id="evrakTipSection" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Evrak Türü</div>
+      <div id="evrakTipGrid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px;"></div>
+    </div>
+
+    <div id="evrakFormSection" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">Bilgileri Girin</div>
+      <div id="evrakFormAlanlari"></div>
+    </div>
+
+    <button class="btn-primary visible" id="evrakIndir" onclick="indirEvrak()" style="display:none;margin-top:16px;">
+      ⬇ PDF İndir
+    </button>
+
+    <div class="nav-row" style="margin-top:20px;">
+      <button class="btn-ghost" onclick="exitEvrakPanel()">← Geri</button>
     </div>
   </div>
 
@@ -469,6 +504,7 @@
 <script src="js/wizard.js"></script>
 <script src="js/taslak.js"></script>
 <script src="js/gtip.js"></script>
+<script src="js/evrak.js"></script>
 
 </body>
 </html>

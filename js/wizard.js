@@ -98,7 +98,8 @@ function selectMod(mod) {
   document.getElementById('card-taslak').classList.toggle('active', mod === 'taslak');
   document.getElementById('card-oncesi').classList.toggle('active', mod === 'oncesi');
   document.getElementById('card-sonrasi').classList.toggle('active', mod === 'sonrasi');
-  document.getElementById('card-gtip') && document.getElementById('card-gtip').classList.toggle('active', mod === 'gtip');
+  document.getElementById('card-gtip')  && document.getElementById('card-gtip').classList.toggle('active', mod === 'gtip');
+  document.getElementById('card-evrak') && document.getElementById('card-evrak').classList.toggle('active', mod === 'evrak');
 
   if (mod === 'taslak') {
     showOnlyStep(0);
@@ -110,6 +111,12 @@ function selectMod(mod) {
   if (mod === 'gtip') {
     showOnlyStep(0);
     if (typeof initGtipPanel === 'function') initGtipPanel();
+    updateDots(1);
+    return;
+  }
+  if (mod === 'evrak') {
+    showOnlyStep(0);
+    if (typeof initEvrakPanel === 'function') initEvrakPanel();
     updateDots(1);
     return;
   }

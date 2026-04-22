@@ -1,0 +1,28 @@
+{
+  "ulke": "Belçika",
+  "evraklar": {
+    "mill_test": {
+      "label": "MILL TEST",
+      "aciklama": "Rus menşeli ürün/hammadde kullanılmadığına dair beyan",
+      "template": "mill_test.pdf",
+      "dosyaAdi": "MILL TEST - {faturaNo}.pdf",
+      "alanlar": [
+        {
+          "id": "faturaNo",
+          "label": "Fatura No",
+          "tip": "text",
+          "placeholder": "örn: DEH2026000000123"
+        },
+        {
+          "id": "faturaTarihi",
+          "label": "Fatura Tarihi",
+          "tip": "date"
+        }
+      ],
+      "overlay": [
+        { "field": "faturaTarihi", "x": 143, "y": 269.5, "format": "tr_date", "size": 12 },
+        { "field": "faturaNo",     "x": 161, "y": 283.3, "size": 12 }
+      ]
+    }
+  }
+}
