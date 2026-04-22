@@ -658,3 +658,88 @@ body::before{
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+.gtip-group {
+  background: var(--surface2, #151a24);
+  border: 1px solid var(--border, #1f1f1f);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.gtip-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.gtip-group-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gtip-group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.gtip-group-code {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-weight: 600;
+  color: var(--error, #EF4444);
+  font-size: 13px;
+}
+
+.gtip-group-count {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  color: var(--text3, #6b7280);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.gtip-group-arrow {
+  color: var(--accent2, #60A5FA);
+  font-size: 11px;
+}
+
+.gtip-group-body {
+  border-top: 1px solid var(--border, #1f1f1f);
+  padding: 6px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.gtip-item {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.gtip-item:last-child {
+  border-bottom: none;
+}
+
+.gtip-item-sku {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  color: var(--accent2, #60A5FA);
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+
+.gtip-item-urun {
+  color: var(--text, #e5e7eb);
+  margin-bottom: 2px;
+}
+
+.gtip-item-mat {
+  color: var(--text3, #6b7280);
+  font-size: 11px;
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+}

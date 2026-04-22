@@ -51,6 +51,11 @@
         <div class="choice-name">Fatura Öncesi — Menşe Hesapla</div>
         <div class="choice-desc">KG hesapla ve menşe ayrımı yap</div>
       </div>
+            <div class="choice-card" id="card-gtip" onclick="selectMod('gtip')">
+        <span class="choice-icon">🔎</span>
+        <div class="choice-name">GTİP Kontrol</div>
+        <div class="choice-desc">Faturadaki GTİP'leri referans listeye göre doğrula</div>
+      </div>
       <div class="choice-card" id="card-sonrasi" onclick="selectMod('sonrasi')">
         <span class="choice-icon">📤</span>
         <div class="choice-name">Fatura Sonrası</div>
@@ -98,6 +103,34 @@
         document.getElementById('step1').style.display='block';
         updateDots(1);
       ">← Geri</button>
+    </div>
+  </div>
+
+    <!-- ── GTİP KONTROL PANELİ (bağımsız) ──────────────────────────────────── -->
+  <div class="panel" id="stepGtip" style="display:none;">
+    <div class="panel-label">GTİP Kontrol</div>
+    <div class="panel-title">GTİP Doğrulama</div>
+    <div class="panel-desc">Master Excel yükleyin. GTİP'ler referans listeye göre otomatik kontrol edilir.</div>
+
+    <div class="status-box" id="gtipResultBox"></div>
+
+    <div class="drop-zone" id="gtipDropZone" style="margin-top:14px;">
+      <input type="file" accept=".xlsx,.xls" onchange="handleGtipFile(this.files[0])">
+      <div class="drop-icon">🔎</div>
+      <h3>Master Excel Yükle</h3>
+      <p>xlsx/xls dosyasını sürükleyin veya seçin</p>
+      <div class="file-badge" id="gtipFileName" style="display:none;"></div>
+    </div>
+
+    <div id="gtipErrorPanel" style="display:none;margin-top:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">
+        Sorunlu GTİP'ler
+      </div>
+      <div id="gtipErrorList"></div>
+    </div>
+
+    <div class="nav-row" style="margin-top:20px;">
+      <button class="btn-ghost" onclick="exitGtipPanel()">← Geri</button>
     </div>
   </div>
 
@@ -435,6 +468,7 @@
 <script src="js/sku.js"></script>
 <script src="js/wizard.js"></script>
 <script src="js/taslak.js"></script>
+<script src="js/gtip.js"></script>
 
 </body>
 </html>

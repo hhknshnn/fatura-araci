@@ -98,12 +98,19 @@ function selectMod(mod) {
   document.getElementById('card-taslak').classList.toggle('active', mod === 'taslak');
   document.getElementById('card-oncesi').classList.toggle('active', mod === 'oncesi');
   document.getElementById('card-sonrasi').classList.toggle('active', mod === 'sonrasi');
+  document.getElementById('card-gtip') && document.getElementById('card-gtip').classList.toggle('active', mod === 'gtip');
 
   if (mod === 'taslak') {
     showOnlyStep(0);
     document.getElementById('stepTaslak').style.display = 'block';
     updateDots(1);
     initTaslakPanel();
+    return;
+  }
+  if (mod === 'gtip') {
+    showOnlyStep(0);
+    if (typeof initGtipPanel === 'function') initGtipPanel();
+    updateDots(1);
     return;
   }
   document.getElementById('step1Next').style.display = 'block';
