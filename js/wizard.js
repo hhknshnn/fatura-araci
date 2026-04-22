@@ -125,16 +125,18 @@ function selectCountry(c) {
   document.getElementById('country-' + c).classList.add('active');
 
   // Kur ekranı artık adım 4'te — adım 3'te sadece ülke seçimi
-  // USD/EUR input görünürlüğünü hazırla (adım 4'te lazım olacak)
-  const isUsd = ['iq','ly','lr','lb'].includes(c);
+  // USD ülkeleri kur kullanmıyor (fatura zaten USD kesiliyor)
+  // USD input satırlarını tamamen gizle
+  const usdRateRow = document.getElementById('usdRateRow');
+  const usdLabel   = document.getElementById('usdLabel');
+  if (usdRateRow) usdRateRow.style.display = 'none';
+  if (usdLabel)   usdLabel.style.display   = 'none';
+
+  // EUR input her zaman görünür (kur ülkesiyse eurSection açıldığında)
   const eurInputRow = document.getElementById('eurRateInput')?.parentElement;
-  const usdRateRow  = document.getElementById('usdRateRow');
   const eurLabel    = document.getElementById('eurLabel');
-  const usdLabel    = document.getElementById('usdLabel');
-  if (usdRateRow)  usdRateRow.style.display  = isUsd ? 'flex'  : 'none';
-  if (usdLabel)    usdLabel.style.display     = isUsd ? 'block' : 'none';
-  if (eurInputRow) eurInputRow.style.display  = isUsd ? 'none'  : 'flex';
-  if (eurLabel)    eurLabel.style.display     = isUsd ? 'none'  : 'block';
+  if (eurInputRow) eurInputRow.style.display = 'flex';
+  if (eurLabel)    eurLabel.style.display    = 'block';
 
   // Kur ekranını varsayılan olarak gizle — adım 4'te gerekirse açılacak
   const eurSection = document.getElementById('eurSection');
@@ -180,9 +182,9 @@ function initStep4() {
   updateEurSectionStep4();
 }
 
-// Adım 4'te kur ekranını göster/gizle
+// Adım 4'te kur ekranını göster/gizle — sadece EUR ülkeleri
 function updateEurSectionStep4() {
-  const kurUlkesi = ['be','de','nl','xk','mk','iq','ly','lr','lb'].includes(currentCountry);
+  const kurUlkesi = ['be','de','nl','xk','mk'].includes(currentCountry);
   const eurSection = document.getElementById('eurSection');
   if (!eurSection) return;
 
@@ -203,18 +205,17 @@ function updateEurSectionStep4() {
   }
 }
 
-// Adım 4 → Adım 5 geçişi — kur kontrolü yap
+// Adım 4 → Adım 5 geçişi — sadece EUR ülkeleri için kur kontrolü
 function goStep4Next() {
   const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
-  const isUsdUlke = ['iq','ly','lr','lb'].includes(currentCountry);
 
-  if (isEurUlke || isUsdUlke) {
+  if (isEurUlke) {
     // PDF yüklenmediyse uyar
     if (!lastPdfData) {
       alert('⚠ Fatura PDF yükleyin.');
       return;
     }
-    const kur = isEurUlke ? getEurRate() : getUsdRate();
+    const kur = getEurRate();
     if (!kur || kur <= 0) {
       // Kur ekranını göster ve uyar
       const eurSection = document.getElementById('eurSection');
