@@ -1,5 +1,11 @@
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+try:
+    from price_list_pdf import generate_price_list_pdf_kz
+except ImportError as _e:
+    print(f'price_list_pdf import hatası: {_e}')
+    generate_price_list_pdf_kz = None
 from http.server import BaseHTTPRequestHandler
-from price_list_pdf import generate_price_list_pdf_kz
 import json
 import base64
 import io
