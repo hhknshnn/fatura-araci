@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler
+from price_list_pdf import generate_price_list_pdf_kz
 import json
 import base64
 import io
@@ -1064,72 +1065,6 @@ def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
-# ── Kazakistan PRICE LIST üreticisi ───────────────────────────────────────────
-def generate_price_list_kz(df_grouped):
-    """Kazakistan Price List — INV ile aynı veriden üretilir, SKU bazında gruplandırılmış."""
-    from copy import copy as _copy
-
-    wb = openpyxl.load_workbook(find_price_list_kz_template_path())
-    ws = wb['Price List']
-    DS = 10  # header satırı
-    TEMPLATE_ROW = 11  # stil referansı — template'te bu satır format örneği olarak duruyor
-
-    # Template stillerini cache'le (Row 11'den)
-    template_styles = {}
-    for col in range(1, 7):
-        c = ws.cell(row=TEMPLATE_ROW, column=col)
-        template_styles[col] = {
-            'font':          _copy(c.font),
-            'border':        _copy(c.border),
-            'alignment':     _copy(c.alignment),
-            'fill':          _copy(c.fill),
-            'number_format': c.number_format,
-        }
-
-    # Template'teki örnek data satırlarını (11, 12) temizle — formatları cache'ledik zaten
-    if ws.max_row > DS:
-        ws.delete_rows(DS + 1, ws.max_row - DS)
-
-    fatura_no = str(df_grouped['E-Fatura Seri Numarası'].iloc[0]).strip()
-
-    # Satırları yaz
-    for r_idx, (_, row) in enumerate(df_grouped.iterrows()):
-        er = DS + 1 + r_idx
-
-        name_ru = row.get('Ürün Açıklaması RU', '')
-        if not name_ru or str(name_ru).strip() == '':
-            name_ru = row.get('ALT GRUBU -RU', '')
-
-        values = [
-            r_idx + 1,                                       # A: FT NO (sıra)
-            fatura_no,                                       # B: Invoice No
-            str(row.get('SKU', '') or ''),                   # C: ITEM CODE
-            row.get('Ürün Açıklaması EN', ''),               # D: ITEM NAME - EN
-            name_ru,                                         # E: Наименование
-            parse_num(row.get('Fiyat', 0)),                  # F: UNIT PRICE (TRY)
-        ]
-
-        for col_idx, val in enumerate(values, start=1):
-            cell = ws.cell(row=er, column=col_idx, value=val)
-            st = template_styles[col_idx]
-            cell.font          = _copy(st['font'])
-            cell.border        = _copy(st['border'])
-            cell.alignment     = _copy(st['alignment'])
-            cell.fill          = _copy(st['fill'])
-            if col_idx == 6:
-                cell.number_format = '#,##0.00 "TRY"'
-            else:
-                cell.number_format = st['number_format']
-
-    # Print area güncelle — veri ne kadar uzadıysa
-    last_row = DS + len(df_grouped)
-    ws.print_area = f'B1:F{last_row}'
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return buf.getvalue()
-
 def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
     """Kazakistan INV + PL üretimi."""
@@ -1337,12 +1272,23 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf.seek(0)
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
 
-    # Price List — INV ile aynı SKU-gruplandırılmış df'ten üretilir
+    # Price List PDF — INV ile aynı SKU-gruplandırılmış df'ten üretilir
     try:
-        price_list_out = generate_price_list_kz(df)
+        pdf_rows = []
+        for _, row in df.iterrows():
+            name_ru = row.get('Ürün Açıklaması RU', '')
+            if not name_ru or str(name_ru).strip() == '':
+                name_ru = row.get('ALT GRUBU -RU', '')
+            pdf_rows.append({
+                'sku':     str(row.get('SKU', '') or ''),
+                'name_en': row.get('Ürün Açıklaması EN', ''),
+                'name_ru': name_ru,
+                'price':   parse_num(row.get('Fiyat', 0)),
+            })
+        price_list_out = generate_price_list_pdf_kz(pdf_rows, fatura_no)
     except Exception as _pl_err:
         price_list_out = None
-        print(f'Price List üretim hatası: {_pl_err}')
+        print(f'Price List PDF üretim hatası: {_pl_err}')
 
     return buf.getvalue(), fatura_no, master_out, price_list_out
 
@@ -2748,7 +2694,7 @@ class handler(BaseHTTPRequestHandler):
             if ulke_kodu == 'kz' and locals().get('price_list_out'):
                 response_data['priceList'] = base64.b64encode(price_list_out).decode('utf-8')
             result = json.dumps(response_data)
-            
+
             self.send_response(200)
             self.send_header('Content-Type','application/json')
             self.send_header('Access-Control-Allow-Origin','*')

@@ -645,11 +645,11 @@ async function downloadRS() {
       const plBin   = atob(data.priceList);
       const plBytes = new Uint8Array(plBin.length);
       for (let i = 0; i < plBin.length; i++) plBytes[i] = plBin.charCodeAt(i);
-      const plBlob = new Blob([plBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const plBlob = new Blob([plBytes], { type: 'application/pdf' });
       const plUrl  = URL.createObjectURL(plBlob);
       const plA    = document.createElement('a');
       plA.href = plUrl;
-      plA.download = `Price List - ${data.faturaNo}.xlsx`;
+      plA.download = `Price List - ${data.faturaNo}.pdf`;
       plA.click();
       URL.revokeObjectURL(plUrl);
     }
