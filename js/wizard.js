@@ -640,6 +640,20 @@ async function downloadRS() {
       URL.revokeObjectURL(mUrl);
     }
 
+        // Kazakistan — ek Price List dosyası
+    if (data.priceList) {
+      const plBin   = atob(data.priceList);
+      const plBytes = new Uint8Array(plBin.length);
+      for (let i = 0; i < plBin.length; i++) plBytes[i] = plBin.charCodeAt(i);
+      const plBlob = new Blob([plBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const plUrl  = URL.createObjectURL(plBlob);
+      const plA    = document.createElement('a');
+      plA.href = plUrl;
+      plA.download = `Price List - ${data.faturaNo}.xlsx`;
+      plA.click();
+      URL.revokeObjectURL(plUrl);
+    }
+
     if (data.pdfFields) {
       const pf  = data.pdfFields;
       const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';

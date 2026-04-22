@@ -702,6 +702,16 @@ def find_kz_template_path():
         if os.path.exists(path): return path
     raise FileNotFoundError(f'ref_kz.xlsx not found. Checked: {candidates}')
 
+def find_price_list_kz_template_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.path.dirname(current_dir), 'templates', 'price_list_kz.xlsx'),
+        os.path.join(current_dir, 'templates', 'price_list_kz.xlsx'),
+    ]
+    for path in candidates:
+        if os.path.exists(path): return path
+    raise FileNotFoundError(f'price_list_kz.xlsx not found.')
+
 def find_ru_template_path():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -1054,6 +1064,71 @@ def generate_excel_nl(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         df_original=df_original
     )
 
+# ── Kazakistan PRICE LIST üreticisi ───────────────────────────────────────────
+def generate_price_list_kz(df_grouped):
+    """Kazakistan Price List — INV ile aynı veriden üretilir, SKU bazında gruplandırılmış."""
+    from copy import copy as _copy
+
+    wb = openpyxl.load_workbook(find_price_list_kz_template_path())
+    ws = wb['Price List']
+    DS = 10  # header satırı
+    TEMPLATE_ROW = 11  # stil referansı — template'te bu satır format örneği olarak duruyor
+
+    # Template stillerini cache'le (Row 11'den)
+    template_styles = {}
+    for col in range(1, 7):
+        c = ws.cell(row=TEMPLATE_ROW, column=col)
+        template_styles[col] = {
+            'font':          _copy(c.font),
+            'border':        _copy(c.border),
+            'alignment':     _copy(c.alignment),
+            'fill':          _copy(c.fill),
+            'number_format': c.number_format,
+        }
+
+    # Template'teki örnek data satırlarını (11, 12) temizle — formatları cache'ledik zaten
+    if ws.max_row > DS:
+        ws.delete_rows(DS + 1, ws.max_row - DS)
+
+    fatura_no = str(df_grouped['E-Fatura Seri Numarası'].iloc[0]).strip()
+
+    # Satırları yaz
+    for r_idx, (_, row) in enumerate(df_grouped.iterrows()):
+        er = DS + 1 + r_idx
+
+        name_ru = row.get('Ürün Açıklaması RU', '')
+        if not name_ru or str(name_ru).strip() == '':
+            name_ru = row.get('ALT GRUBU -RU', '')
+
+        values = [
+            r_idx + 1,                                       # A: FT NO (sıra)
+            fatura_no,                                       # B: Invoice No
+            str(row.get('SKU', '') or ''),                   # C: ITEM CODE
+            row.get('Ürün Açıklaması EN', ''),               # D: ITEM NAME - EN
+            name_ru,                                         # E: Наименование
+            parse_num(row.get('Fiyat', 0)),                  # F: UNIT PRICE (TRY)
+        ]
+
+        for col_idx, val in enumerate(values, start=1):
+            cell = ws.cell(row=er, column=col_idx, value=val)
+            st = template_styles[col_idx]
+            cell.font          = _copy(st['font'])
+            cell.border        = _copy(st['border'])
+            cell.alignment     = _copy(st['alignment'])
+            cell.fill          = _copy(st['fill'])
+            if col_idx == 6:
+                cell.number_format = '#,##0.00 "TRY"'
+            else:
+                cell.number_format = st['number_format']
+
+    # Print area güncelle — veri ne kadar uzadıysa
+    last_row = DS + len(df_grouped)
+    ws.print_area = f'B1:F{last_row}'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
@@ -1261,7 +1336,15 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     wb.save(buf)
     buf.seek(0)
     master_out = generate_master_excel(df_for_master, brut_original, net_original)
-    return buf.getvalue(), fatura_no, master_out
+
+    # Price List — INV ile aynı SKU-gruplandırılmış df'ten üretilir
+    try:
+        price_list_out = generate_price_list_kz(df)
+    except Exception as _pl_err:
+        price_list_out = None
+        print(f'Price List üretim hatası: {_pl_err}')
+
+    return buf.getvalue(), fatura_no, master_out, price_list_out
 
 def generate_excel_ru(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', df_original=None):
@@ -2597,7 +2680,7 @@ class handler(BaseHTTPRequestHandler):
                     hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
                     df_original=df_original)
             elif ulke_kodu == 'kz':
-                excel_out, fatura_no, master_out = generate_excel_kz(
+                excel_out, fatura_no, master_out, price_list_out = generate_excel_kz(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
             elif ulke_kodu == 'ru':
@@ -2654,14 +2737,18 @@ class handler(BaseHTTPRequestHandler):
                 excel_out, fatura_no, master_out = generate_excel(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
-            
-            result = json.dumps({
+                        
+            response_data = {
                 'success':   True,
                 'excel':     base64.b64encode(excel_out).decode('utf-8'),
                 'master':    base64.b64encode(master_out).decode('utf-8'),
                 'faturaNo':  fatura_no,
                 'pdfFields': pdf_fields,
-            })
+            }
+            if ulke_kodu == 'kz' and locals().get('price_list_out'):
+                response_data['priceList'] = base64.b64encode(price_list_out).decode('utf-8')
+            result = json.dumps(response_data)
+            
             self.send_response(200)
             self.send_header('Content-Type','application/json')
             self.send_header('Access-Control-Allow-Origin','*')
