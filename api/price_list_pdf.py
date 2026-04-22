@@ -113,6 +113,8 @@ def _styles():
                                      alignment=1),
         'cell_l':     ParagraphStyle('cell_l',     fontName=F,  fontSize=8,  leading=10,
                                      alignment=0),
+        'th':         ParagraphStyle('th',         fontName=FB, fontSize=8,  leading=10,
+                                     alignment=1, textColor=colors.white),
     }
 
 
@@ -170,22 +172,24 @@ def _build_elements(rows, fatura_no, S):
 
     # Data tablosu
     data = [[
-        Paragraph('<b>Invoice No</b>',                     S['cell']),
-        Paragraph('<b>ITEM CODE<br/>КОД ПОЗИЦИИ</b>',      S['cell']),
-        Paragraph('<b>ITEM NAME - EN</b>',                 S['cell']),
-        Paragraph('<b>Наименование</b>',                   S['cell']),
-        Paragraph('<b>UNIT PRICE<br/>ЦЕНА ЗА ЕДИНИЦУ</b>', S['cell']),
+        Paragraph('Invoice No',                     S['th']),
+        Paragraph('ITEM CODE<br/>КОД ПОЗИЦИИ',      S['th']),
+        Paragraph('ITEM NAME - EN',                 S['th']),
+        Paragraph('Наименование',                   S['th']),
+        Paragraph('UNIT PRICE<br/>ЦЕНА ЗА ЕДИНИЦУ', S['th']),
     ]]
     for r in rows:
+        # SKU'yu düz string olarak veriyoruz — Paragraph kullanmazsak bölünmez
         data.append([
-            Paragraph(str(fatura_no),                       S['cell']),
-            Paragraph(str(r.get('sku', '') or ''),           S['cell']),
-            Paragraph(str(r.get('name_en', '') or ''),       S['cell_l']),
-            Paragraph(str(r.get('name_ru', '') or ''),       S['cell_l']),
+            Paragraph(str(fatura_no),                         S['cell']),
+            str(r.get('sku', '') or ''),
+            Paragraph(str(r.get('name_en', '') or ''),        S['cell_l']),
+            Paragraph(str(r.get('name_ru', '') or ''),        S['cell_l']),
             Paragraph(f"{float(r.get('price', 0) or 0):,.2f} TRY", S['cell']),
         ])
 
-    tbl = Table(data, colWidths=[28 * mm, 26 * mm, 52 * mm, 52 * mm, 22 * mm],
+    # Kolon genişlikleri: Invoice 28 + ITEM CODE 30 + EN 49 + RU 49 + PRICE 24 = 180mm
+    tbl = Table(data, colWidths=[28 * mm, 30 * mm, 49 * mm, 49 * mm, 24 * mm],
                 repeatRows=1)
     tbl.setStyle(TableStyle([
         ('BACKGROUND',      (0, 0), (-1, 0),  DARK_BLUE_PDF),
@@ -195,6 +199,10 @@ def _build_elements(rows, fatura_no, S):
         ('ROWBACKGROUNDS',  (0, 1), (-1, -1), [colors.white, ZEBRA_BLUE]),
         ('TOPPADDING',      (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING',   (0, 0), (-1, -1), 3),
+        # ITEM CODE kolonu (col 1): ortalı hizala, font 8, Calibri-like
+        ('FONTNAME',        (1, 1), (1, -1), 'DejaVu'),
+        ('FONTSIZE',        (1, 1), (1, -1), 8),
+        ('ALIGN',           (1, 1), (1, -1), 'CENTER'),
     ]))
     elems.append(tbl)
     return elems
