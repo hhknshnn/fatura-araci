@@ -573,6 +573,7 @@ function sidebarSelect(mod) {
   } else if (mod === 'oncesi') {
     document.getElementById('wizardSteps').style.display = 'none';
     if (typeof selectMod === 'function') selectMod('oncesi');
+    // selectMod → showOnlyStep(4) → step2'yi açar
   
   } else if (mod === 'taslak') {
     document.getElementById('stepTaslak').style.display = 'flex';
@@ -637,7 +638,7 @@ function showOnlyStep(n) {
   });
   const map = { 1:'step1', 2:'step1', 3:'step2', 4:'step2', 5:'step3' };
   const target = map[n];
-  if (target) document.getElementById(target).style.display = 'flex';
+  if (target) document.getElementById(target).style.display = 'block';
 }
 function updateTopbarBadges() {
   const countryBadge = document.getElementById('topbarCountry');
