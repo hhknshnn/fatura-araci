@@ -128,7 +128,6 @@
             <div class="mode-icon">🏭</div>
             <div>
               <div class="mode-title">Serbest Depo</div>
-              <div class="mode-desc">NET = BRÜT × 0.9</div>
             </div>
           </div>
           <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
@@ -161,6 +160,7 @@
             <input type="text" id="countrySearchInput" class="country-search-input" placeholder="Ülke ara..." oninput="filterCountryList()">
           </div>
 
+          <div class="country-groups-wrapper">
           <div class="country-group" id="cgroup-kurumsal">
             <div class="country-group-header" onclick="toggleCountryGroup('kurumsal')">
               <span class="country-group-label">Kurumsal</span>
@@ -263,6 +263,9 @@
                 <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
             </div>
+          </div>
+
+          </div>
           </div>
 
           <div id="countryNoResults" style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı</div>
