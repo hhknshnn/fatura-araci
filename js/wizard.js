@@ -1,5 +1,4 @@
 // ── WIZARD.JS ─────────────────────────────────────────────────────────────────
-// Wizard akış yönetimi, state ve UI kontrolü
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let currentStep    = 1;
@@ -14,10 +13,9 @@ let originalFileName = '';
 let masterRows       = null;
 let workingRows      = null;
 let processedWB      = null;
-let cyExcelFiles     = [];   // Kıbrıs: birden fazla Excel
-let cyPdfFiles       = [];   // Kıbrıs: birden fazla PDF
-let cyMasterRows  = []; 
-
+let cyExcelFiles     = [];
+let cyPdfFiles       = [];
+let cyMasterRows     = [];
 
 let groupWeights  = {};
 let exceptionSkus = {};
@@ -37,7 +35,6 @@ async function loadSharedConfig() {
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
 function goStep(n) {
-  // Fatura öncesi modunda adım 2 atlanır, direkt adım 4'e gidilir
   if (selectedMod === 'oncesi' && n === 2) {
     setupStepFaturaOncesi();
     showOnlyStep(4);
@@ -48,8 +45,8 @@ function goStep(n) {
   showOnlyStep(n);
   updateDots(n);
   currentStep = n;
-  if (n === 4) initStep4(); // adım 4 gösterilince başlat
-  if (n === 5) initStep5(); // adım 5 gösterilince başlat
+  if (n === 4) initStep4();
+  if (n === 5) initStep5();
 }
 
 function showOnlyStep(n) {
@@ -81,22 +78,16 @@ function updateDots(active) {
 }
 
 function setupStepFaturaOncesi() {
-  // Fatura öncesi modunda adım 4 başlıklarını ayarla
-  document.getElementById('step4Title').textContent = 'Master Excel Yükle';
-  document.getElementById('step4Desc').textContent  = 'Menşe ayrımı için master dosyayı yükleyin.';
-  document.getElementById('pdfDropZone').style.display = 'none';
-  document.getElementById('step4Back').onclick = () => goStep(1);
-  // step4Next onclick burada set edilir — fatura öncesi moduna özel
   const nextBtn = document.getElementById('step4Next');
-  nextBtn.style.display = masterRows ? 'block' : 'none';
-  nextBtn.onclick = () => { goStep(5); };
+  if (nextBtn) {
+    nextBtn.style.display = masterRows ? 'block' : 'none';
+    nextBtn.onclick = () => { goStep(5); };
+  }
 }
 
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
-// YENİ — bununla değiştir:
 function selectMod(mod) {
   selectedMod = mod;
-  // Eski HTML'deki kartlar artık yok — null check ile
   ['card-taslak','card-oncesi','card-sonrasi','card-gtip','card-evrak'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('active', id === 'card-' + mod);
@@ -122,7 +113,6 @@ function selectMod(mod) {
     updateDots(1);
     return;
   }
-  // sonrasi ve oncesi — step1Next artık yok, sidebar hallediyor
   const btn = document.getElementById('step1Next');
   if (btn) btn.style.display = 'block';
 }
@@ -141,41 +131,48 @@ function selectDepo(depo) {
 function selectCountry(c) {
   currentCountry = c;
 
-  document.querySelectorAll('.country-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('country-' + c).classList.add('active');
+  document.querySelectorAll('.country-btn, .country-row').forEach(btn => btn.classList.remove('active'));
+  const el = document.getElementById('country-' + c);
+  if (el) el.classList.add('active');
 
-  // Kur ekranı artık adım 4'te — adım 3'te sadece ülke seçimi
-  // USD ülkeleri kur kullanmıyor (fatura zaten USD kesiliyor)
-  // USD input satırlarını tamamen gizle
+  // USD kur satırlarını gizle
   const usdRateRow = document.getElementById('usdRateRow');
   const usdLabel   = document.getElementById('usdLabel');
   if (usdRateRow) usdRateRow.style.display = 'none';
   if (usdLabel)   usdLabel.style.display   = 'none';
 
-  // EUR input her zaman görünür (kur ülkesiyse eurSection açıldığında)
+  // EUR kur satırlarını varsayılan göster
   const eurInputRow = document.getElementById('eurRateInput')?.parentElement;
   const eurLabel    = document.getElementById('eurLabel');
   if (eurInputRow) eurInputRow.style.display = 'flex';
   if (eurLabel)    eurLabel.style.display    = 'block';
 
-  // Kur ekranını varsayılan olarak gizle — adım 4'te gerekirse açılacak
+  // Kur ekranını gizle — adım 4'te gerekirse açılacak
   const eurSection = document.getElementById('eurSection');
   if (eurSection) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
   }
 
-  // Freight/Insurance ve KZ modu gizli — PDF'ten otomatik okunur
   document.getElementById('koFreightSection').style.display = 'none';
   document.getElementById('kzModeSection').style.display    = 'none';
 
-  // PDF drop zone: backend şablonu olan ülkeler
+  // ── DROPZONE: Ülke seçilince göster ──────────────────────────────────────
   const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
-  const dz = document.getElementById('dropZone');
-  if (dz) dz.style.display = 'block';
-  document.getElementById('pdfDropZone').style.display = backendUlkeler.includes(c) ? 'block' : 'none';
+  const dropZone = document.getElementById('dropZone');
+  if (dropZone) dropZone.style.display = 'block';
 
-  document.getElementById('step3Next').style.display = 'block';
+  // Kıbrıs özel: çoklu dosya modunda da dropZone görünür
+  // pdfDropZone eski uyumluluk için gizli kalır — asıl dropZone her şeyi alır
+  const pdfDZ = document.getElementById('pdfDropZone');
+  if (pdfDZ) pdfDZ.style.display = 'none';
+
+  const step2Next = document.getElementById('step2Next');
+  // Devam butonu dosya yüklenince processor.js'in loadFile() tarafından açılır
+  // Kıbrıs'ta cyExcelFiles yüklüyse hemen göster
+  if (c === 'cy' && step2Next) {
+    step2Next.style.display = cyExcelFiles.length > 0 ? 'block' : 'none';
+  }
 }
 
 function setMode(m) {
@@ -190,34 +187,23 @@ function onEurRateChanged() {
 
 // ── ADIM 4: DOSYA YÜKLE ───────────────────────────────────────────────────────
 function initStep4() {
-  // Fatura sonrası modu için başlıkları sıfırla
-  document.getElementById('step4Title').textContent = 'Dosya Yükle';
-  document.getElementById('step4Desc').textContent  = 'Master Excel ve gerekiyorsa PDF yükleyin.';
-  document.getElementById('step4Back').onclick = () => goStep(3);
-
-  // Buton: Excel yüklüyse göster, değilse gizli — loadFile() açacak
   const nextBtn = document.getElementById('step4Next');
-  nextBtn.style.display = masterRows ? 'block' : 'none';
-  nextBtn.onclick = () => { goStep4Next(); };
-
-  // Kur ekranı görünürlüğünü güncelle
+  if (nextBtn) {
+    nextBtn.style.display = masterRows ? 'block' : 'none';
+    nextBtn.onclick = () => { goStep4Next(); };
+  }
   updateEurSectionStep4();
 }
 
-// Adım 4'te kur ekranını göster/gizle — sadece EUR ülkeleri
 function updateEurSectionStep4() {
-  const kurUlkesi = ['be','de','nl','xk','mk'].includes(currentCountry);
+  const kurUlkesi  = ['be','de','nl','xk','mk'].includes(currentCountry);
   const eurSection = document.getElementById('eurSection');
   if (!eurSection) return;
-
-  // Kur gerekmiyorsa veya PDF henüz yüklenmediyse gizli tut
   if (!kurUlkesi || !lastPdfData) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
     return;
   }
-
-  // PDF yüklendi — kur geldiyse gizle, gelmediyse göster
   if (window._pdfKur && window._pdfKur > 0) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
@@ -227,24 +213,14 @@ function updateEurSectionStep4() {
   }
 }
 
-// Adım 4 → Adım 5 geçişi — sadece EUR ülkeleri için kur kontrolü
 function goStep4Next() {
   const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
-
   if (isEurUlke) {
-    // PDF yüklenmediyse uyar
-    if (!lastPdfData) {
-      alert('⚠ Fatura PDF yükleyin.');
-      return;
-    }
+    if (!lastPdfData) { alert('⚠ Fatura PDF yükleyin.'); return; }
     const kur = getEurRate();
     if (!kur || kur <= 0) {
-      // Kur ekranını göster ve uyar
       const eurSection = document.getElementById('eurSection');
-      if (eurSection) {
-        eurSection.classList.add('visible');
-        eurSection.style.display = '';
-      }
+      if (eurSection) { eurSection.classList.add('visible'); eurSection.style.display = ''; }
       alert('⚠ Kur bilgisi giriniz!');
       return;
     }
@@ -254,13 +230,9 @@ function goStep4Next() {
 
 // ── ADIM 5: KG HESAPLAMA ──────────────────────────────────────────────────────
 function initStep5() {
-  // Kıbrıs'a özel — tüm Excel'leri birleştirip KG tablosu göster
-  if (currentCountry === 'cy') {
-    initStep5CY();
-    return;
-  }
+  if (currentCountry === 'cy') { initStep5CY(); return; }
   buildKgTable(masterRows);
-  document.getElementById('kgPanel').style.display      = 'block';
+  document.getElementById('kgPanel').style.display       = 'block';
   document.getElementById('antrepoSection').style.display = 'none';
   document.getElementById('menseBox').classList.remove('visible');
   document.getElementById('downloadBtn').classList.remove('visible');
@@ -270,12 +242,7 @@ function initStep5() {
 }
 
 async function initStep5CY() {
-  if (cyExcelFiles.length === 0) {
-    showStatus('error', '⚠ Önce Excel dosyası seçin.');
-    return;
-  }
-
-  // Tüm Excel'leri oku ve satırları birleştir
+  if (cyExcelFiles.length === 0) { showStatus('error', '⚠ Önce Excel dosyası seçin.'); return; }
   cyMasterRows = [];
   for (const file of cyExcelFiles) {
     const buf  = await fileToArrayBuffer(file);
@@ -283,17 +250,14 @@ async function initStep5CY() {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
     cyMasterRows = cyMasterRows.concat(rows);
   }
-
-  // Mevcut KG tablosunu birleşik satırlarla göster
   buildKgTable(cyMasterRows);
-  document.getElementById('kgPanel').style.display       = 'block';
-  document.getElementById('skuPanel').style.display      = 'block';
+  document.getElementById('kgPanel').style.display        = 'block';
+  document.getElementById('skuPanel').style.display       = 'block';
   document.getElementById('antrepoSection').style.display = 'none';
   document.getElementById('menseBox').classList.remove('visible');
   document.getElementById('menseTaslakSection').style.display = 'none';
-  document.getElementById('downloadBtn').style.display   = 'none';
+  document.getElementById('downloadBtn').style.display    = 'none';
   document.getElementById('downloadBtn').classList.remove('visible');
-
   showStatus('info', `<div class="stat">⏳ ${cyExcelFiles.length} Excel yüklendi — grup kilolarını girin</div>`);
 }
 
@@ -322,11 +286,11 @@ function buildKgTable(rows) {
     tr.innerHTML = '<td colspan="3" style="color:var(--success);padding:10px;">✓ Tüm satırlarda kilo değeri dolu.</td>';
   } else {
     document.getElementById('kgBody').style.display = 'block';
-    document.getElementById('kgArrow').textContent = '▲';
+    document.getElementById('kgArrow').textContent  = '▲';
     needsInput.forEach(({ g, zeroCount }) => {
-      const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
+      const id    = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
       const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
-      const tr = tbody.insertRow();
+      const tr    = tbody.insertRow();
       tr.innerHTML = `
         <td style="color:var(--text);">${g}</td>
         <td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td>
@@ -355,7 +319,6 @@ function toggleExSku() {
 function applyGroupWeights() {
   const rows = currentCountry === 'cy' ? cyMasterRows : masterRows;
   if (!rows) return;
-  // Tablodaki grup kilolarını oku ve kaydet
   const groups = [...new Set(rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   groups.forEach(g => {
     const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
@@ -364,19 +327,16 @@ function applyGroupWeights() {
   });
   try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch(e) {}
 
-  // Her satır için BRÜT/NET hesapla
   workingRows = rows.map(row => {
     const r      = { ...row };
     const sku    = String(r['SKU']).trim();
     const grup   = String(r['ÜRÜN ARA GRUBU']).trim();
     const ag     = parseNum(r['Ürün Ağırlığı (KG)']);
     const miktar = parseNum(r['Miktar']);
-
     let kg;
     if (sku in exceptionSkus)    { kg = parseNum(exceptionSkus[sku]); }
     else if (ag > 0)              { kg = ag; }
     else                          { kg = parseNum(groupWeights[grup] || 0); }
-
     r['_kg']      = kg;
     r['_hamBrut'] = kg * miktar;
     r['BRÜT']     = r['_hamBrut'];
@@ -388,7 +348,6 @@ function applyGroupWeights() {
   document.getElementById('calcTotal').textContent = round2(totalBrut);
   document.getElementById('adjustSection').style.display = 'block';
 
-  // PDF'ten kilo geldiyse otomatik doldur ve uygula
   if (window._pdfBrutKg && window._pdfBrutKg > 0) {
     const brutEl = document.getElementById('targetWeight');
     if (brutEl) brutEl.value = window._pdfBrutKg;
@@ -399,7 +358,6 @@ function applyGroupWeights() {
       applyNetAdjust();
     }
   } else {
-    // Kıbrıs'ta hedef BRÜT girişini gizle, PDF'lerden otomatik okunacak
     if (currentCountry === 'cy') {
       document.getElementById('adjustSection').style.display = 'none';
       document.getElementById('downloadBtn').style.display   = 'block';
@@ -422,9 +380,9 @@ function applyWeightAdjust() {
 
   const multiplier = target / hamTotal;
   const hedefNet   = Math.round(target * 0.9 * 100) / 100;
-
   let toplamBrut = 0, toplamNet = 0;
   const n = workingRows.length;
+
   workingRows = workingRows.map((row, i) => {
     const r = { ...row };
     if (i < n - 1) {
@@ -480,48 +438,38 @@ function applyNetAdjust() {
     return r;
   });
 
-  const finalNet         = workingRows.reduce((s, r) => s + parseNum(r['NET']),  0);
-  const finalBrutDisplay = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
+  const finalNet  = workingRows.reduce((s, r) => s + parseNum(r['NET']),  0);
+  const finalBrut = workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
   const res = document.getElementById('netResult');
   res.className = 'adjust-result visible';
-  res.innerHTML = `✓ BRÜT: ${round2(finalBrutDisplay)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
-
+  res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
   buildAndDownloadReady();
 }
 
 // ── MENŞE AYRIM ───────────────────────────────────────────────────────────────
 function showMenseAyrim() {
   if (!workingRows) return;
-
   const trRows    = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
   const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
-
-  const trBrut    = round2(trRows.reduce((s, r)    => s + parseNum(r['BRÜT']), 0));
-  const trNet     = round2(trRows.reduce((s, r)    => s + parseNum(r['NET']),  0));
+  const trBrut    = round2(trRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
+  const trNet     = round2(trRows.reduce((s, r) => s + parseNum(r['NET']),  0));
   const otherBrut = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const otherNet  = round2(otherRows.reduce((s, r) => s + parseNum(r['NET']),  0));
-
   const fmt = n => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-
   document.getElementById('menseTrBrut').textContent    = fmt(trBrut)    + ' kg BRÜT';
   document.getElementById('menseTrNet').textContent     = 'NET: ' + fmt(trNet) + ' kg';
   document.getElementById('menseOtherBrut').textContent = fmt(otherBrut) + ' kg BRÜT';
   document.getElementById('menseOtherNet').textContent  = 'NET: ' + fmt(otherNet) + ' kg';
-
   document.getElementById('menseBox').classList.add('visible');
   document.getElementById('menseTaslakSection').style.display = 'block';
-
   showStatus('success',
     `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
-     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`
-  );
+     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
 }
 
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
 function buildAndDownloadReady() {
   if (!workingRows) return;
-
-  // Şablonlu backend ülkeleri — Python tarafı üretir
   const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
   if (backendUlkeler.includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
@@ -529,7 +477,6 @@ function buildAndDownloadReady() {
     showStatus('success', '<div class="stat">✓ Hazır — İndir butonuna basın</div>');
     return;
   }
-
   buildOutput(workingRows);
 }
 
@@ -556,43 +503,28 @@ function showStatus(type, html) {
 async function downloadResult() {
   const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb','cy'];
   if (backendUlkeler.includes(currentCountry)) { await downloadRS(); return; }
-
   if (!processedWB) return;
   const suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
   XLSX.writeFile(processedWB, originalFileName + suffix + '.xlsx');
 }
 
 async function downloadRS() {
-  // Kıbrıs'a özel — ayrı fonksiyona yönlendir
-  if (currentCountry === 'cy') {
-    await downloadCY();
-    return;
-  }
-  
-  // Diğer ülkeler — mevcut kod aynen devam eder
-  if (!workingRows || !lastFileData) {
-    showStatus('error', '⚠ Önce kiloları uygulayın.');
-    return;
-  }
+  if (currentCountry === 'cy') { await downloadCY(); return; }
+  if (!workingRows || !lastFileData) { showStatus('error', '⚠ Önce kiloları uygulayın.'); return; }
 
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor... (0s)';
   btn.disabled = true;
   let elapsed = 0;
-  const timer = setInterval(() => {
-    elapsed++;
-    btn.textContent = `⏳ Hazırlanıyor... (${elapsed}s)`;
-  }, 1000);
+  const timer = setInterval(() => { elapsed++; btn.textContent = `⏳ Hazırlanıyor... (${elapsed}s)`; }, 1000);
 
   try {
     const excelB64 = arrayBufferToBase64(lastFileData);
-
     let logoB64 = '';
     try {
       const lr = await fetch('./logo.png');
       if (lr.ok) { const la = await lr.arrayBuffer(); logoB64 = arrayBufferToBase64(la); }
     } catch(e) {}
-
     let pdfB64 = '';
     if (lastPdfData) pdfB64 = arrayBufferToBase64(lastPdfData);
 
@@ -606,11 +538,11 @@ async function downloadRS() {
         logo:          logoB64,
         pdf:           pdfB64,
         ulkeKodu:      currentCountry,
-        hedefBrut:     hedefBrut,
+        hedefBrut,
         hedefNet:      workingRows.reduce((s, r) => s + (r['NET'] || 0), 0),
         depoTipi:      selectedDepo,
         grupKilolari:  groupWeights,
-        exceptionSkus: exceptionSkus,
+        exceptionSkus,
         eurKuru:       getEurRate() || 1.0,
         usdKuru:       getUsdRate() || 1.0,
         koFreight:     parseNum(document.getElementById('koFreightInput')?.value  || '0'),
@@ -621,60 +553,19 @@ async function downloadRS() {
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
-    // INV+PL indir
-    const bin   = atob(data.excel);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    const depoSuffix = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
-    a.href = url;
-    a.download = `INV-PL- ${data.faturaNo} - ${depoSuffix}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // INV+PL
+    _downloadBlob(data.excel, `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'}.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-    // Master Excel indir
-    if (data.master) {
-      const mBin   = atob(data.master);
-      const mBytes = new Uint8Array(mBin.length);
-      for (let i = 0; i < mBin.length; i++) mBytes[i] = mBin.charCodeAt(i);
-      const mBlob = new Blob([mBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const mUrl  = URL.createObjectURL(mBlob);
-      const mA    = document.createElement('a');
-      mA.href = mUrl;
-      mA.download = `${data.faturaNo}.xlsx`;
-      mA.click();
-      URL.revokeObjectURL(mUrl);
-    }
+    // Master
+    if (data.master) _downloadBlob(data.master, `${data.faturaNo}.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-        // Kazakistan — ek Price List dosyası
-    if (data.priceList) {
-      const plBin   = atob(data.priceList);
-      const plBytes = new Uint8Array(plBin.length);
-      for (let i = 0; i < plBin.length; i++) plBytes[i] = plBin.charCodeAt(i);
-      const plBlob = new Blob([plBytes], { type: 'application/pdf' });
-      const plUrl  = URL.createObjectURL(plBlob);
-      const plA    = document.createElement('a');
-      plA.href = plUrl;
-      plA.download = `Price List - ${data.faturaNo}.pdf`;
-      plA.click();
-      URL.revokeObjectURL(plUrl);
-    }
+    // Price List (KZ)
+    if (data.priceList) _downloadBlob(data.priceList, `Price List - ${data.faturaNo}.pdf`, 'application/pdf');
 
-        // Belçika — Mill Test PDF otomatik
-    if (data.millTest) {
-        const mtBin   = atob(data.millTest);
-        const mtBytes = new Uint8Array(mtBin.length);
-        for (let i = 0; i < mtBin.length; i++) mtBytes[i] = mtBin.charCodeAt(i);
-        const mtBlob = new Blob([mtBytes], { type: 'application/pdf' });
-        const mtUrl  = URL.createObjectURL(mtBlob);
-        const mtA    = document.createElement('a');
-        mtA.href = mtUrl;
-        mtA.download = `MILL TEST - ${data.faturaNo}.pdf`;
-        mtA.click();
-        URL.revokeObjectURL(mtUrl);
-    }
+    // Mill Test (BE)
+    if (data.millTest) _downloadBlob(data.millTest, `MILL TEST - ${data.faturaNo}.pdf`, 'application/pdf');
 
     if (data.pdfFields) {
       const pf  = data.pdfFields;
@@ -696,78 +587,51 @@ async function downloadRS() {
   }
 }
 
-async function downloadCY() {
-  if (cyExcelFiles.length === 0) {
-    showStatus('error', '⚠ En az 1 Excel dosyası seçin.');
-    return;
-  }
+function _downloadBlob(b64, fileName, mimeType) {
+  const bin   = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = fileName; a.click();
+  URL.revokeObjectURL(url);
+}
 
+async function downloadCY() {
+  if (cyExcelFiles.length === 0) { showStatus('error', '⚠ En az 1 Excel dosyası seçin.'); return; }
   const btn = document.getElementById('downloadBtn');
   btn.textContent = '⏳ Hazırlanıyor...';
   btn.disabled = true;
-
   try {
-    // Her Excel'i oku ve fatura no ile PDF eşleştir
     const faturalar = [];
-
     for (const excelFile of cyExcelFiles) {
-      // Excel'i base64'e çevir
       const excelBuf = await fileToArrayBuffer(excelFile);
       const excelB64 = arrayBufferToBase64(excelBuf);
-
-      // Excel'den fatura no oku (XLSX.js ile)
-      const wb = XLSX.read(excelBuf, { type: 'array' });
+      const wb   = XLSX.read(excelBuf, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
       const faturaNo = String(rows[0]?.['E-Fatura Seri Numarası'] || '').trim();
-
-      // Aynı fatura no'lu PDF'i bul
       let pdfB64 = '';
       for (const pdfFile of cyPdfFiles) {
-        const pdfBuf = await fileToArrayBuffer(pdfFile);
-        const pdfText = pdfFile.name;
-        // PDF adında fatura no geçiyor mu?
-        if (pdfText.includes(faturaNo.replace('ANT', 'ANT'))) {
-          pdfB64 = arrayBufferToBase64(pdfBuf);
+        if (pdfFile.name.includes(faturaNo)) {
+          pdfB64 = arrayBufferToBase64(await fileToArrayBuffer(pdfFile));
           break;
         }
       }
-
       faturalar.push({ excel: excelB64, pdf: pdfB64, faturaNo });
     }
-
-    // Fatura no'ya göre sırala
     faturalar.sort((a, b) => a.faturaNo.localeCompare(b.faturaNo));
-
-    showStatus('info', `<div class="stat">⏳ ${faturalar.length} fatura backend'e gönderiliyor...</div>`);
-
+    showStatus('info', `<div class="stat">⏳ ${faturalar.length} fatura gönderiliyor...</div>`);
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ulkeKodu:      'cy',
-        faturalar:     faturalar,
-        grupKilolari:  groupWeights,
-        exceptionSkus: exceptionSkus,
-      })
+      body: JSON.stringify({ ulkeKodu: 'cy', faturalar, grupKilolari: groupWeights, exceptionSkus })
     });
-
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-
-    // PL indir
-    const bin   = atob(data.excel);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `PL_Kibris_${faturalar.map(f => f.faturaNo).join('_')}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-
+    _downloadBlob(data.excel, `PL_Kibris_${faturalar.map(f => f.faturaNo).join('_')}.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     showStatus('success', `<div class="stat">✓ İndirildi: ${faturalar.length} fatura</div>`);
-
   } catch(err) {
     showStatus('error', '⚠ ' + err.message);
   } finally {
@@ -786,46 +650,39 @@ function arrayBufferToBase64(buf) {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSharedConfig();
-
-  // LocalStorage'dan kayıtlı verileri yükle
   try { const s = localStorage.getItem('exSkus'); if(s) { const l = JSON.parse(s); exceptionSkus = { ...exceptionSkus, ...l }; } } catch(e) {}
   try { const s = localStorage.getItem('gwData');  if(s) { const l = JSON.parse(s); groupWeights  = { ...groupWeights,  ...l }; } } catch(e) {}
-
   renderExSkuList();
 
-  // Drag & drop desteği
+  // dropZone drag-drop
   const dropZone = document.getElementById('dropZone');
-  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop',      e  => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files);
-  });
-  // NOT: step4Next onclick burada SET EDİLMİYOR
-  // initStep4() goStep(4) çağrısıyla otomatik set eder
+  if (dropZone) {
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop',      e  => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files);
+    });
+  }
 });
 
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────
 function triggerMenseTaslak() {
   if (!workingRows) { showStatus('error', '⚠ Önce menşe hesaplayın.'); return; }
-
   const trRows    = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
   const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
-
   const trKg      = round2(trRows.reduce((s, r)    => s + parseNum(r['BRÜT']), 0));
   const yabanciKg = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const brutKg    = round2(workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const netKg     = round2(workingRows.reduce((s, r) => s + parseNum(r['NET']),  0));
-
   indirMenseTaslak(trKg, yabanciKg, brutKg, netKg);
 }
 
-// Yardımcı — File → ArrayBuffer
 function fileToArrayBuffer(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = e => resolve(e.target.result);
+    r.onload  = e => resolve(e.target.result);
     r.onerror = () => reject(new Error('Dosya okunamadı'));
     r.readAsArrayBuffer(file);
   });

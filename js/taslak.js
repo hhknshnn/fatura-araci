@@ -1,79 +1,68 @@
 // ── TASLAK.JS ─────────────────────────────────────────────────────────────────
-// Taslak Doldur işlemi: form yönetimi, API çağrısı, dosya indirme.
-// Fatura Öncesi → Taslak Doldur akışı buradan yönetilir.
 
-// ── TASLAK ÜLKE CONFIG ────────────────────────────────────────────────────────
-// Her ülke için form alanları tanımlanır.
-// Yeni ülke eklemek için buraya ekle + config/ klasörüne JSON ekle.
 const TASLAK_ULKELER = {
   rs: {
-    label:    'Sırbistan',
-    flag:     'rs',
+    label: 'Sırbistan', flag: 'rs', grup: 'kurumsal',
     template: 'templates/taslak_rs.xlsx',
     alanlar: [
-      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
-      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',     tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',    tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
   ba: {
-    label:    'Bosna',
-    flag:     'ba',
+    label: 'Bosna', flag: 'ba', grup: 'kurumsal',
     template: 'templates/taslak_rs.xlsx',
-        alanlar: [
-      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
-      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    alanlar: [
+      { id: 'referansNo', label: 'Referans No',     tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',    tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
   ge: {
-    label:    'Gürcistan',
-    flag:     'ge',
-    template: 'templates/taslak_ge.xlsx',  // taslak_rs → taslak_ge
+    label: 'Gürcistan', flag: 'ge', grup: 'kurumsal',
+    template: 'templates/taslak_ge.xlsx',
     alanlar: [
-      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun',     label: 'Navlun (USD)',      tip: 'number', placeholder: 'örn: 3100,00' },  // EUR → USD
-      { id: 'sigorta',    label: 'Sigorta (USD)',     tip: 'number', placeholder: 'örn: 14,00' },    // EUR → USD
-      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
-      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No',     tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (USD)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (USD)',    tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
   xk: {
-    label:    'Kosova',
-    flag:     'xk',
+    label: 'Kosova', flag: 'xk', grup: 'kurumsal',
     template: 'templates/taslak_rs.xlsx',
-        alanlar: [
-      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
-      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    alanlar: [
+      { id: 'referansNo', label: 'Referans No',     tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',    tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
   mk: {
-    label:    'Makedonya',
-    flag:     'mk',
+    label: 'Makedonya', flag: 'mk', grup: 'kurumsal',
     template: 'templates/taslak_rs.xlsx',
-        alanlar: [
-      { id: 'referansNo', label: 'Referans No',      tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun',     label: 'Navlun (EUR)',      tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta',    label: 'Sigorta (EUR)',      tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap',        label: 'Kap Sayısı',        tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg',     label: 'Toplam BRÜT (kg)',  tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
-      { id: 'netKg',      label: 'Toplam NET (kg)',    tip: 'number', placeholder: 'Otomatik hesaplanır' },
+    alanlar: [
+      { id: 'referansNo', label: 'Referans No',     tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
+      { id: 'navlun',     label: 'Navlun (EUR)',     tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'sigorta',    label: 'Sigorta (EUR)',    tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
+      { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
   be: {
-    label:    'Belçika',
-    flag:     'be',
+    label: 'Belçika', flag: 'be', grup: 'kurumsal',
     template: 'templates/taslak_be.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
@@ -85,8 +74,7 @@ const TASLAK_ULKELER = {
     ]
   },
   de: {
-    label:    'Almanya',
-    flag:     'de',
+    label: 'Almanya', flag: 'de', grup: 'kurumsal',
     template: 'templates/taslak_de.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
@@ -98,8 +86,7 @@ const TASLAK_ULKELER = {
     ]
   },
   nl: {
-    label:    'Hollanda',
-    flag:     'nl',
+    label: 'Hollanda', flag: 'nl', grup: 'kurumsal',
     template: 'templates/taslak_nl.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Kap Sayısı',       tip: 'number', placeholder: 'örn: 28' },
@@ -111,27 +98,25 @@ const TASLAK_ULKELER = {
     ]
   },
   kz: {
-    label:    'Kazakistan',
-    flag:     'kz',
+    label: 'Kazakistan', flag: 'kz', grup: 'kurumsal',
     template: 'templates/taslak_kz.xlsx',
     alanlar: [
       { id: 'navlun',     label: 'Freight (USD)',     tip: 'number', placeholder: 'örn: 3100,00' },
       { id: 'sigorta',    label: 'Insurance (USD)',   tip: 'number', placeholder: 'örn: 14,00' },
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 33 (22 Palet + 11 Koli)' },
+      { id: 'kap',        label: 'Packages',          tip: 'text',   placeholder: 'örn: 33 (22 Palet + 11 Koli)' },
       { id: 'brutKg',     label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg',      label: 'Toplam NET (kg)',   tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No',       tip: 'text',   prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
-  // ── FRANCHISE ÜLKELER ──────────────────────────────────────────────────────
   cy: {
-    grup: 'franchise', label: 'Kıbrıs', flag: 'cy',
+    label: 'Kıbrıs', flag: 'cy', grup: 'franchise',
     template: 'templates/taslak_cy.xlsx',
     tip: 'kibris',
-    alanlar: [] // Özel form - buildKibrisForm ile oluşturulur
+    alanlar: []
   },
   iq: {
-    grup: 'franchise', label: 'Irak', flag: 'iq',
+    label: 'Irak', flag: 'iq', grup: 'franchise',
     template: 'templates/taslak_iq.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 43 (33 palet + 10 Koli)' },
@@ -141,7 +126,7 @@ const TASLAK_ULKELER = {
     ]
   },
   lr: {
-    grup: 'franchise', label: 'Liberya', flag: 'lr',
+    label: 'Liberya', flag: 'lr', grup: 'franchise',
     template: 'templates/taslak_lr.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
@@ -151,7 +136,7 @@ const TASLAK_ULKELER = {
     ]
   },
   ly: {
-    grup: 'franchise', label: 'Libya', flag: 'ly',
+    label: 'Libya', flag: 'ly', grup: 'franchise',
     template: 'templates/taslak_ly.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
@@ -161,7 +146,7 @@ const TASLAK_ULKELER = {
     ]
   },
   lb: {
-    grup: 'franchise', label: 'Lübnan', flag: 'lb',
+    label: 'Lübnan', flag: 'lb', grup: 'franchise',
     template: 'templates/taslak_lb.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
@@ -171,7 +156,7 @@ const TASLAK_ULKELER = {
     ]
   },
   uz: {
-    grup: 'franchise', label: 'Özbekistan', flag: 'uz',
+    label: 'Özbekistan', flag: 'uz', grup: 'franchise',
     template: 'templates/taslak_uz.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
@@ -181,7 +166,7 @@ const TASLAK_ULKELER = {
     ]
   },
   ru: {
-    grup: 'franchise', label: 'Rusya', flag: 'ru',
+    label: 'Rusya', flag: 'ru', grup: 'franchise',
     template: 'templates/taslak_ru.xlsx',
     alanlar: [
       { id: 'kap',        label: 'Packages',         tip: 'text',   placeholder: 'örn: 28' },
@@ -193,82 +178,127 @@ const TASLAK_ULKELER = {
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let taslakUlke     = null;   // seçili ülke kodu
-let taslakBytes    = null;   // yüklenen taslak Excel'in binary verisi
+let taslakUlke       = null;
+let taslakBytes      = null;
 let taslakDepoTipi   = null;
-let menseTaslakBytes = null;   // menşe adımında yüklenen doldurulmuş taslak
+let menseTaslakBytes = null;
 
-// ── TASLAK PANELI BAŞLAT ──────────────────────────────────────────────────────
+// ── PANELİ BAŞLAT ─────────────────────────────────────────────────────────────
 function initTaslakPanel() {
-  // Wizard adımlarını gizle, taslak panelini göster
   for (let i = 1; i <= 5; i++) {
     const el = document.getElementById('step' + i);
     if (el) el.style.display = 'none';
   }
   document.getElementById('stepTaslak').style.display = 'block';
 
-  // Ülke grid'ini oluştur
-  buildTaslakUlkeGrid();
-
-  // Depo tipi sıfırla
   taslakDepoTipi = null;
   taslakUlke     = null;
   taslakBytes    = null;
 
-  document.getElementById('taslakDepoSection').style.display    = 'none';
-  document.getElementById('taslakFormSection').style.display    = 'none';
-  document.getElementById('taslakIndir').style.display          = 'none';
+  buildTaslakUlkeGrid();
+
+  document.getElementById('taslakDepoSection').style.display = 'none';
+  document.getElementById('taslakFormSection').style.display = 'none';
+  document.getElementById('taslakIndir').style.display       = 'none';
+
+  const status = document.getElementById('taslakStatus');
+  if (status) { status.className = 'status-box'; status.innerHTML = ''; }
 }
 
-// ── ÜLKE GRİD ─────────────────────────────────────────────────────────────────
+// ── ÜLKE GRİD — INV+PL ile aynı yapı ─────────────────────────────────────────
 function buildTaslakUlkeGrid() {
-  const grid = document.getElementById('taslakUlkeGrid');
-  if (!grid) { return; }
-  grid.innerHTML = '';
+  const kurBody  = document.getElementById('tcbody-kurumsal');
+  const fraBody  = document.getElementById('tcbody-franchise');
+  if (!kurBody || !fraBody) return;
 
-  const corporate = Object.entries(TASLAK_ULKELER).filter(([k,v]) => !v.grup || v.grup === 'corporate');
-  const franchise  = Object.entries(TASLAK_ULKELER).filter(([k,v]) => v.grup === 'franchise');
+  kurBody.innerHTML = '';
+  fraBody.innerHTML = '';
 
-  const addGroup = (title, entries) => {
-    if (!entries.length) return;
-    const label = document.createElement('div');
-    label.style.cssText = 'grid-column:1/-1;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;padding:4px 0 2px;border-bottom:1px solid var(--border);margin-bottom:4px;font-family:var(--mono);';
-    label.textContent = title;
-    grid.appendChild(label);
-    entries.forEach(([kod, cfg]) => {
-      const btn = document.createElement('div');
-      btn.className = 'country-btn';
-      btn.id = 'taslak-ulke-' + kod;
-      btn.addEventListener('click', () => selectTaslakUlke(kod));
-      btn.innerHTML = `
-        <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
-        <div class="country-name">${cfg.label}</div>`;
-      grid.appendChild(btn);
+  let kurCount = 0, fraCount = 0;
+
+  Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
+    const row = document.createElement('div');
+    row.className = 'country-row';
+    row.id = 'taslak-ulke-' + kod;
+    row.addEventListener('click', () => selectTaslakUlke(kod));
+    row.innerHTML = `
+      <img class="country-row-flag" src="https://flagcdn.com/40x30/${cfg.flag}.png" alt="">
+      <span class="country-row-name">${cfg.label}</span>
+      <svg class="country-row-check" viewBox="0 0 16 16" fill="none">
+        <path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+
+    if (cfg.grup === 'franchise') {
+      fraBody.appendChild(row);
+      fraCount++;
+    } else {
+      kurBody.appendChild(row);
+      kurCount++;
+    }
+  });
+
+  const kc = document.getElementById('tccount-kurumsal');
+  const fc = document.getElementById('tccount-franchise');
+  if (kc) kc.textContent = kurCount;
+  if (fc) fc.textContent = fraCount;
+}
+
+// ── TASLAK ÜLKE GRİD TOGGLE ───────────────────────────────────────────────────
+function toggleTaslakCountryGroup(id) {
+  const body    = document.getElementById('tcbody-' + id);
+  const chevron = document.getElementById('tcchevron-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chevron) chevron.classList.toggle('open', !isOpen);
+}
+
+// ── TASLAK ÜLKE ARAMA ────────────────────────────────────────────────────────
+function filterTaslakCountryList() {
+  const q = document.getElementById('taslakCountrySearch').value.toLowerCase().trim();
+  let total = 0;
+
+  ['kurumsal', 'franchise'].forEach(gId => {
+    const rows = document.querySelectorAll('#tcbody-' + gId + ' .country-row');
+    let visible = 0;
+    rows.forEach(row => {
+      const name = row.querySelector('.country-row-name').textContent.toLowerCase();
+      const show = !q || name.includes(q);
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
     });
-  };
+    const countEl = document.getElementById('tccount-' + gId);
+    const body    = document.getElementById('tcbody-' + gId);
+    const chevron = document.getElementById('tcchevron-' + gId);
+    if (countEl) countEl.textContent = visible;
+    if (q && visible > 0 && body) {
+      body.classList.add('open');
+      if (chevron) chevron.classList.add('open');
+    }
+    total += visible;
+  });
 
-  addGroup('Corporate Ülkeler', corporate);
-  addGroup('Franchise Ülkeler', franchise);
+  const nr = document.getElementById('taslakCountryNoResults');
+  if (nr) nr.style.display = total === 0 ? 'block' : 'none';
 }
 
 // ── ÜLKE SEÇ ──────────────────────────────────────────────────────────────────
 async function selectTaslakUlke(kod) {
   taslakUlke = kod;
 
-  // Aktif ülkeyi işaretle
-  document.querySelectorAll('#taslakUlkeGrid .country-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('taslak-ulke-' + kod).classList.add('active');
+  document.querySelectorAll('#tcbody-kurumsal .country-row, #tcbody-franchise .country-row')
+    .forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('taslak-ulke-' + kod);
+  if (btn) btn.classList.add('active');
 
-  // Template Excel'i otomatik yükle
   const cfg = TASLAK_ULKELER[kod];
-  if (cfg.template) {
+  if (cfg && cfg.template) {
     try {
       showTaslakStatus('info', '⏳ Taslak yükleniyor...');
       const resp = await fetch('./' + cfg.template, { cache: 'no-store' });
       if (!resp.ok) throw new Error('Template bulunamadı');
       const buf = await resp.arrayBuffer();
       taslakBytes = buf;
-      // Badge göster
       document.getElementById('taslakFileName').textContent = '✓ ' + cfg.label + ' taslağı yüklendi';
       document.getElementById('taslakFileName').style.display = 'inline-flex';
       showTaslakStatus('success', '<div class="stat">✓ Taslak otomatik yüklendi</div>');
@@ -277,7 +307,6 @@ async function selectTaslakUlke(kod) {
     }
   }
 
-  // Depo tipi seçimini göster
   document.getElementById('taslakDepoSection').style.display = 'block';
   document.getElementById('taslakFormSection').style.display = 'none';
   document.getElementById('taslakIndir').style.display       = 'none';
@@ -286,11 +315,8 @@ async function selectTaslakUlke(kod) {
 // ── DEPO TİPİ SEÇ ─────────────────────────────────────────────────────────────
 function selectTaslakDepo(tip) {
   taslakDepoTipi = tip;
-
   document.getElementById('taslak-depo-serbest').classList.toggle('active', tip === 'serbest');
   document.getElementById('taslak-depo-antrepo').classList.toggle('active', tip === 'antrepo');
-
-  // Formu oluştur ve göster
   buildTaslakForm();
   document.getElementById('taslakFormSection').style.display = 'block';
 }
@@ -298,11 +324,10 @@ function selectTaslakDepo(tip) {
 // ── FORM OLUŞTUR ──────────────────────────────────────────────────────────────
 function buildTaslakForm() {
   if (!taslakUlke) return;
-  const formCfg    = TASLAK_ULKELER[taslakUlke];
+  const formCfg   = TASLAK_ULKELER[taslakUlke];
   const container = document.getElementById('taslakFormAlanlari');
   container.innerHTML = '';
 
-  // Kıbrıs özel form
   if (formCfg.tip === 'kibris') {
     buildKibrisForm(container);
     if (taslakBytes) document.getElementById('taslakIndir').style.display = 'block';
@@ -312,15 +337,12 @@ function buildTaslakForm() {
   formCfg.alanlar.forEach(alan => {
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
-
-    // NET kg alanı için bilgi notu
     const isNetKg = alan.id === 'netKg';
     const note = isNetKg
       ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px;">
            ${taslakDepoTipi === 'serbest' ? 'Otomatik: BRÜT × 0.9' : 'Antrepo: elle girin'}
          </div>`
       : '';
-
     div.innerHTML = `
       <div style="font-size:13px;font-weight:500;margin-bottom:6px;">${alan.label}</div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -328,7 +350,7 @@ function buildTaslakForm() {
         <input
           class="target-input"
           id="taslak_${alan.id}"
-          type="${alan.tip === 'number' ? 'text' : 'text'}"
+          type="text"
           inputmode="${alan.tip === 'number' ? 'decimal' : 'text'}"
           placeholder="${alan.placeholder || ''}"
           ${alan.oninput ? `oninput="${alan.oninput}"` : ''}
@@ -339,38 +361,23 @@ function buildTaslakForm() {
     container.appendChild(div);
   });
 
-  // Template varsa indir butonunu göster
   if (taslakBytes) {
     document.getElementById('taslakIndir').style.display = 'block';
   }
 }
 
-// ── NET KG OTOMATİK HESAPLA ───────────────────────────────────────────────────
+// ── NET KG OTOMATİK ──────────────────────────────────────────────────────────
 function hesaplaNet() {
   if (taslakDepoTipi !== 'serbest') return;
   const brutEl = document.getElementById('taslak_brutKg');
   const netEl  = document.getElementById('taslak_netKg');
   if (!brutEl || !netEl) return;
-
   const brut = parseFloat(brutEl.value.replace(',', '.'));
   if (!isNaN(brut) && brut > 0) {
     netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
   } else {
     netEl.value = '';
   }
-}
-
-// ── TASLAK EXCEL YÜKLEYİCİ ───────────────────────────────────────────────────
-function initTaslakDropZone() {
-  const dz = document.getElementById('taslakDropZone');
-  if (!dz) return;
-
-  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
-  dz.addEventListener('dragleave', ()  => dz.classList.remove('dragover'));
-  dz.addEventListener('drop',      e  => {
-    e.preventDefault(); dz.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) handleTaslakFile(e.dataTransfer.files[0]);
-  });
 }
 
 // ── KIBRIS ÖZEL FORM ──────────────────────────────────────────────────────────
@@ -380,11 +387,8 @@ function buildKibrisForm(container) {
     { id: 'tekstilDisi', label: 'Tekstil Dışı' },
     { id: 'kozmetik',    label: 'Kozmetik' },
   ];
-
-  // 3 grup yan yana
   const grid = document.createElement('div');
   grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;';
-
   gruplar.forEach(g => {
     const col = document.createElement('div');
     col.innerHTML = `
@@ -411,7 +415,6 @@ function buildKibrisForm(container) {
   });
   container.appendChild(grid);
 
-  // Referans No
   const refDiv = document.createElement('div');
   refDiv.innerHTML = `
     <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Referans No</div>
@@ -424,11 +427,11 @@ function buildKibrisForm(container) {
 
 function kibrisHesaplaNet(grupId) {
   const brut = parseFloat(
-    (document.getElementById(`kibris_${grupId}_brutKg`)?.value || '').replace(',','.')
+    (document.getElementById(`kibris_${grupId}_brutKg`)?.value || '').replace(',', '.')
   );
   const netEl = document.getElementById(`kibris_${grupId}_netKg`);
   if (netEl && !isNaN(brut) && brut > 0) {
-    netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', {minimumFractionDigits:2});
+    netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
   }
 }
 
@@ -441,16 +444,16 @@ function getKibrisFormData() {
     const net  = document.getElementById(`kibris_${g}_netKg`)?.value?.trim() || '';
     if (kap || brut) {
       data[g + '_kap']    = kap;
-      data[g + '_brutKg'] = parseFloat(brut.replace(',','.')) || 0;
-      data[g + '_netKg']  = parseFloat(net.replace(',','.'))  || 0;
+      data[g + '_brutKg'] = parseFloat(brut.replace(',', '.')) || 0;
+      data[g + '_netKg']  = parseFloat(net.replace(',', '.'))  || 0;
     }
   });
-  // referansNo her zaman ekle — grup dolup dolmadığından bağımsız
   const refEl = document.getElementById('kibris_referansNo');
   data['referansNo'] = refEl ? refEl.value.trim() : '';
   return data;
 }
 
+// ── MENŞE TASLAK DOSYA ────────────────────────────────────────────────────────
 function handleMenseTaslakFile(file) {
   if (!file) return;
   const badge = document.getElementById('menseTaslakDosya');
@@ -465,7 +468,6 @@ function handleTaslakFile(file) {
   const badge = document.getElementById('taslakFileName');
   badge.textContent = '✓ ' + file.name;
   badge.style.display = 'inline-flex';
-
   const r = new FileReader();
   r.onload = e => {
     taslakBytes = e.target.result;
@@ -477,19 +479,15 @@ function handleTaslakFile(file) {
 // ── FORM VERİLERİNİ TOPLA ────────────────────────────────────────────────────
 function getTaslakFormData() {
   if (!taslakUlke) return null;
-  // Kıbrıs özel form
   if (TASLAK_ULKELER[taslakUlke]?.tip === 'kibris') return getKibrisFormData();
-  const formDataCfg    = TASLAK_ULKELER[taslakUlke];
-  const data   = {};
-
+  const formDataCfg = TASLAK_ULKELER[taslakUlke];
+  const data = {};
   for (const alan of formDataCfg.alanlar) {
     const el = document.getElementById('taslak_' + alan.id);
     if (!el) continue;
     const val = el.value.trim();
     if (!val) continue;
-
     if (alan.tip === 'number') {
-      // Türkçe format: 1.234,56 → 1234.56
       let numStr = val;
       if (numStr.includes('.') && numStr.includes(',')) {
         numStr = numStr.replace(/\./g, '').replace(',', '.');
@@ -510,44 +508,27 @@ async function indirTaslak() {
     showTaslakStatus('error', '⚠ Ülke seçin ve taslak Excel yükleyin.');
     return;
   }
-
   const formData = getTaslakFormData();
-  if (!formData) {
-    showTaslakStatus('error', '⚠ Form verisi alınamadı.');
-    return;
-  }
+  if (!formData) { showTaslakStatus('error', '⚠ Form verisi alınamadı.'); return; }
   if (!formData.referansNo && formData.referansNo !== 0) {
     showTaslakStatus('error', '⚠ Referans No zorunludur.');
     return;
   }
-
   const btn = document.getElementById('taslakIndir');
   btn.textContent = '⏳ Hazırlanıyor...';
   btn.disabled = true;
-
   try {
-    if (!taslakBytes) throw new Error('Taslak yüklenmemiş');
     const taslakB64 = arrayBufferToBase64(taslakBytes);
     if (!taslakB64) throw new Error('Base64 dönüşümü başarısız');
-
     const resp = await fetch('/api/taslak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ulkeKodu: taslakUlke,
-        taslak:   taslakB64,
-        formData: formData,
-      })
+      body: JSON.stringify({ ulkeKodu: taslakUlke, taslak: taslakB64, formData })
     });
-
-    const rawText = await resp.text();
-    const data = JSON.parse(rawText);
+    const data = JSON.parse(await resp.text());
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-
-    // İndir
     indir(data.excel, data.dosyaAdi);
     showTaslakStatus('success', `<div class="stat">✓ İndirildi: <span>${data.dosyaAdi}</span></div>`);
-
   } catch(err) {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {
@@ -557,26 +538,15 @@ async function indirTaslak() {
 }
 
 // ── MENŞE → TASLAK ────────────────────────────────────────────────────────────
-// Menşe hesabı tamamlandıktan sonra bu fonksiyon çağrılır.
-// Referans No ile taslağı bulup menşe değerlerini ekler.
 async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
   const refNo = document.getElementById('menseRefNo')?.value?.trim();
-  if (!refNo) {
-    showTaslakStatus('error', '⚠ Referans No girin.');
-    return;
-  }
-  if (!taslakBytes) {
-    showTaslakStatus('error', '⚠ Taslak Excel yükleyin.');
-    return;
-  }
-
+  if (!refNo) { showTaslakStatus('error', '⚠ Referans No girin.'); return; }
+  if (!taslakBytes) { showTaslakStatus('error', '⚠ Taslak Excel yükleyin.'); return; }
   const btn = document.getElementById('menseTaslakIndir');
   btn.textContent = '⏳ Hazırlanıyor...';
   btn.disabled = true;
-
   try {
     const taslakB64 = arrayBufferToBase64(menseTaslakBytes);
-
     const resp = await fetch('/api/taslak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -587,38 +557,16 @@ async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
         menseData: { trKg, yabanciKg },
       })
     });
-
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-
     indir(data.excel, data.dosyaAdi);
     showTaslakStatus('success', `<div class="stat">✓ Menşe taslağı indirildi: <span>${data.dosyaAdi}</span></div>`);
-
   } catch(err) {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {
     btn.textContent = '⬇ Menşe Taslak İndir';
     btn.disabled = false;
   }
-}
-
-// ── YARDIMCI ──────────────────────────────────────────────────────────────────
-function indir(b64, dosyaAdi) {
-  const bin   = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = dosyaAdi; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function showTaslakStatus(tip, html) {
-  const sb = document.getElementById('taslakStatus');
-  if (!sb) return;
-  sb.className = 'status-box visible ' + tip;
-  sb.innerHTML = html;
 }
 
 // ── MENŞE ÜLKE GRİD ──────────────────────────────────────────────────────────
@@ -643,8 +591,6 @@ async function selectMenseUlke(kod) {
   document.querySelectorAll('#menseUlkeGrid .country-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('mense-ulke-' + kod);
   if (btn) btn.classList.add('active');
-
-  // Template otomatik yükle
   const cfg = TASLAK_ULKELER[kod];
   if (cfg && cfg.template) {
     try {
@@ -653,17 +599,30 @@ async function selectMenseUlke(kod) {
       taslakBytes = await resp.arrayBuffer();
       const badge = document.getElementById('menseTaslakYuklendi');
       if (badge) { badge.textContent = '✓ ' + cfg.label + ' taslağı hazır'; badge.style.display = 'inline-flex'; }
-    } catch(e) {
-    }
+    } catch(e) {}
   }
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initTaslakDropZone();
-  buildMenseUlkeGrid();
+// ── YARDIMCI ──────────────────────────────────────────────────────────────────
+function indir(b64, dosyaAdi) {
+  const bin   = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = dosyaAdi; a.click();
+  URL.revokeObjectURL(url);
+}
 
-  // Menşe taslak drop zone
+function showTaslakStatus(tip, html) {
+  const sb = document.getElementById('taslakStatus');
+  if (!sb) return;
+  sb.className = 'status-box visible ' + tip;
+  sb.innerHTML = html;
+}
+
+function initTaslakDropZone() {
   const menseDZ = document.getElementById('menseTaslakDropZone');
   if (menseDZ) {
     menseDZ.addEventListener('dragover',  e => { e.preventDefault(); menseDZ.classList.add('dragover'); });
@@ -673,6 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.dataTransfer.files[0]) handleMenseTaslakFile(e.dataTransfer.files[0]);
     });
   }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTaslakDropZone();
+  buildMenseUlkeGrid();
 });
 
 function arrayBufferToBase64(buf) {
