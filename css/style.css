@@ -270,7 +270,7 @@ body {
 
 /* ── PANELS ───────────────────────────────────────────────────────────────── */
 .panel {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 14px;
   animation: fadeUp 0.2s ease;
