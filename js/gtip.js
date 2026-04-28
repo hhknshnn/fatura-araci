@@ -251,6 +251,7 @@ async function runGtipCheck() {
         `<div class="stat">⚠ ${empty.length} satırda GTİP boş</div>
         <div class="stat">Kontrol edilen: <span>${checked.toLocaleString('tr')} satır</span> · Yanlış GTİP yok</div>`);
       renderEmptyGtipList(empty);
+      
     } else {
       showGtipStatus('error',
         `<div class="stat">⚠ ${invalid.length} yanlış GTİP bulundu</div>
