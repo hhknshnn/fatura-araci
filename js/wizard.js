@@ -93,19 +93,21 @@ function setupStepFaturaOncesi() {
 }
 
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
+// YENİ — bununla değiştir:
 function selectMod(mod) {
   selectedMod = mod;
-  document.getElementById('card-taslak').classList.toggle('active', mod === 'taslak');
-  document.getElementById('card-oncesi').classList.toggle('active', mod === 'oncesi');
-  document.getElementById('card-sonrasi').classList.toggle('active', mod === 'sonrasi');
-  document.getElementById('card-gtip')  && document.getElementById('card-gtip').classList.toggle('active', mod === 'gtip');
-  document.getElementById('card-evrak') && document.getElementById('card-evrak').classList.toggle('active', mod === 'evrak');
+  // Eski HTML'deki kartlar artık yok — null check ile
+  ['card-taslak','card-oncesi','card-sonrasi','card-gtip','card-evrak'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id === 'card-' + mod);
+  });
 
   if (mod === 'taslak') {
     showOnlyStep(0);
-    document.getElementById('stepTaslak').style.display = 'block';
+    const p = document.getElementById('stepTaslak');
+    if (p) p.style.display = 'block';
     updateDots(1);
-    initTaslakPanel();
+    if (typeof initTaslakPanel === 'function') initTaslakPanel();
     return;
   }
   if (mod === 'gtip') {
@@ -120,7 +122,9 @@ function selectMod(mod) {
     updateDots(1);
     return;
   }
-  document.getElementById('step1Next').style.display = 'block';
+  // sonrasi ve oncesi — step1Next artık yok, sidebar hallediyor
+  const btn = document.getElementById('step1Next');
+  if (btn) btn.style.display = 'block';
 }
 
 // ── ADIM 2: DEPO SEÇ ──────────────────────────────────────────────────────────

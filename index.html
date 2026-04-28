@@ -483,79 +483,7 @@
           </button>
         </div>
       </div>
-
-      <!-- ── MENŞE HESAPLA PANELİ (bağımsız) ─────────────────────────── -->
-      <div class="panel" id="stepMense" style="display:none;">
-        <div class="panel-label">Menşe Hesapla</div>
-        <div class="panel-title">Menşe Ayrımı</div>
-        <div class="panel-desc">Master Excel yükleyin, grup kilolarını girin, TR/Yabancı ayrımını hesaplayın.</div>
-
-        <div class="status-box" id="menseStatus"></div>
-
-        <div class="drop-zone" id="menseDropZone">
-          <input type="file" id="menseFileInput" accept=".xlsx,.xls" onchange="handleMenseFile(this.files[0])">
-          <div class="drop-icon">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3>Master Excel Yükle</h3>
-          <p>xlsx/xls dosyasını sürükleyin veya seçin</p>
-          <div class="drop-pills"><span class="drop-pill">.xlsx</span></div>
-          <div class="file-badge" id="menseFileBadge" style="display:none;"></div>
-        </div>
-
-        <div class="kg-panel" id="menseKgPanel" style="display:none;">
-          <div class="kg-header" onclick="toggleMenseKgTable()">
-            <div class="kg-header-title">⚖️ Grup Kiloları <span class="kg-header-badge" id="menseKgBadge"></span></div>
-            <span id="menseKgArrow" style="color:var(--accent);font-size:12px;">▼</span>
-          </div>
-          <div class="kg-body" id="menseKgBody">
-            <table class="kg-table" id="menseKgTable">
-              <tr><th>ÜRÜN ARA GRUBU</th><th>Birim Kilo (KG)</th><th style="color:var(--gold);">0/Boş satır</th></tr>
-            </table>
-          </div>
-        </div>
-
-        <button class="btn-secondary" id="menseApplyBtn" onclick="applyMenseWeights()" style="display:none;width:100%;">
-          ✓ Kiloları Uygula ve Hesapla
-        </button>
-
-        <div id="menseAdjustSection" style="display:none;">
-          <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">
-            Hesaplanan toplam BRÜT: <span id="menseCalcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg
-          </div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
-          <div class="target-row">
-            <input class="target-input" id="menseTargetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
-            <button class="btn-secondary" onclick="applyMenseWeightAdjust()">Uygula</button>
-          </div>
-        </div>
-
-        <div class="mense-box" id="menseResultBox">
-          <div class="mense-row">
-            <div>
-              <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
-              <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseResTrBrut">— kg</div>
-              <div class="mense-sub" id="menseResTrNet">NET: —</div>
-            </div>
-          </div>
-          <div class="mense-row">
-            <div>
-              <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
-              <div class="mense-sub">Diğer tüm menşeler</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseResOtherBrut">— kg</div>
-              <div class="mense-sub" id="menseResOtherNet">NET: —</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       <!-- ── GTİP KONTROL PANELİ ──────────────────────────────────────── -->
       <div class="panel" id="stepGtip" style="display:none;">
@@ -617,7 +545,7 @@ function sidebarSelect(mod) {
   document.getElementById('nav-' + mod).classList.add('active');
 
   // Tüm panel gruplarını gizle
-  ['step1','step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
+  ['step1','step2','step3','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -644,8 +572,7 @@ function sidebarSelect(mod) {
     // wizard.js'deki selectedMod'u set et
     if (typeof selectMod === 'function') selectMod('sonrasi', true);
   } else if (mod === 'oncesi') {
-    document.getElementById('stepMense').style.display = 'block';
-    initMensePanel();
+    if (typeof selectMod === 'function') selectMod('oncesi');
   } else if (mod === 'taslak') {
     document.getElementById('stepTaslak').style.display = 'flex';
     if (typeof initTaslakPanel === 'function') initTaslakPanel();
@@ -700,6 +627,18 @@ function goStep(n) {
   if (n === 3 && typeof initStep5 === 'function') {
     setTimeout(initStep5, 0);
   }
+}
+function showOnlyStep(n) {
+  // wizard.js bu fonksiyonu çağırır — yeni panel isimlerine yönlendir
+  ['step1','step2','step3','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  // Eski adım → yeni panel mapping
+  // 0 = hepsi gizli, 1-2 = step1 (depo), 3-4 = step2 (ülke+dosya), 5 = step3 (kg)
+  const map = { 1:'step1', 2:'step1', 3:'step2', 4:'step2', 5:'step3' };
+  const target = map[n];
+  if (target) document.getElementById(target).style.display = 'block';
 }
 
 function updateTopbarBadges() {
