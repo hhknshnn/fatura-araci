@@ -128,8 +128,51 @@ function updateTopbarBadges() {
   }
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+// ── Ülke listesi — toggle, arama, active sync ─────────────────────────────────
+function toggleCountryGroup(id) {
+  const body    = document.getElementById('cbody-' + id);
+  const chevron = document.getElementById('cchevron-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chevron) chevron.classList.toggle('open', !isOpen);
+}
+
+function filterCountryList() {
+  const q = document.getElementById('countrySearchInput').value.toLowerCase().trim();
+  let total = 0;
+
+  ['kurumsal', 'franchise'].forEach(gId => {
+    const rows = document.querySelectorAll('#cbody-' + gId + ' .country-row');
+    let visible = 0;
+    rows.forEach(row => {
+      const name = row.querySelector('.country-row-name').textContent.toLowerCase();
+      const show = !q || name.includes(q);
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const countEl   = document.getElementById('ccount-' + gId);
+    const body      = document.getElementById('cbody-' + gId);
+    const chevron   = document.getElementById('cchevron-' + gId);
+    if (countEl) countEl.textContent = visible;
+    if (q && visible > 0 && body) {
+      body.classList.add('open');
+      if (chevron) chevron.classList.add('open');
+    }
+    total += visible;
+  });
+
+  const nr = document.getElementById('countryNoResults');
+  if (nr) nr.style.display = total === 0 ? 'block' : 'none';
+}
+
+// wizard.js selectCountry uyumluluğu — country-row'lara country-btn class'ı DOMContentLoaded'da ekleniyor
 document.addEventListener('DOMContentLoaded', () => {
+  // country-row'lara country-btn class'ı ekle — wizard.js uyumluluğu için
+  document.querySelectorAll('.country-row').forEach(row => {
+    row.classList.add('country-btn');
+  });
+
   // Kullanıcı adı
   const savedName = localStorage.getItem('fa_username') || 'Kullanıcı';
   document.getElementById('sidebarUserName').textContent = savedName;

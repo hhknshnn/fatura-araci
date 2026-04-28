@@ -128,12 +128,14 @@
             <div class="mode-icon">🏭</div>
             <div>
               <div class="mode-title">Serbest Depo</div>
+              <div class="mode-desc">NET = BRÜT × 0.9</div>
             </div>
           </div>
           <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
             <div class="mode-icon">🏗️</div>
             <div>
               <div class="mode-title">Antrepo</div>
+              <div class="mode-desc">Hedef NET ayrıca girilir</div>
             </div>
           </div>
         </div>
@@ -151,77 +153,119 @@
 
         <!-- Ülke seçimi -->
         <div>
-          <div class="section-lbl">Kurumsal</div>
-          <div class="country-grid" id="countryGrid">
-            <div class="country-btn" id="country-rs" onclick="selectCountry('rs')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/rs.png" alt=""></div>
-              <div class="country-name">Sırbistan</div>
+          <div class="country-search-row">
+            <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input type="text" id="countrySearchInput" class="country-search-input" placeholder="Ülke ara..." oninput="filterCountryList()">
+          </div>
+
+          <div class="country-group" id="cgroup-kurumsal">
+            <div class="country-group-header" onclick="toggleCountryGroup('kurumsal')">
+              <span class="country-group-label">Kurumsal</span>
+              <div class="country-group-meta">
+                <span class="country-group-count" id="ccount-kurumsal">9</span>
+                <span class="country-group-chevron open" id="cchevron-kurumsal">▼</span>
+              </div>
             </div>
-            <div class="country-btn" id="country-ba" onclick="selectCountry('ba')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/ba.png" alt=""></div>
-              <div class="country-name">Bosna</div>
-            </div>
-            <div class="country-btn" id="country-ge" onclick="selectCountry('ge')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/ge.png" alt=""></div>
-              <div class="country-name">Gürcistan</div>
-            </div>
-            <div class="country-btn" id="country-xk" onclick="selectCountry('xk')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/xk.png" alt=""></div>
-              <div class="country-name">Kosova</div>
-            </div>
-            <div class="country-btn" id="country-mk" onclick="selectCountry('mk')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/mk.png" alt=""></div>
-              <div class="country-name">Makedonya</div>
-            </div>
-            <div class="country-btn" id="country-be" onclick="selectCountry('be')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/be.png" alt=""></div>
-              <div class="country-name">Belçika</div>
-            </div>
-            <div class="country-btn" id="country-de" onclick="selectCountry('de')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/de.png" alt=""></div>
-              <div class="country-name">Almanya</div>
-            </div>
-            <div class="country-btn" id="country-nl" onclick="selectCountry('nl')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/nl.png" alt=""></div>
-              <div class="country-name">Hollanda</div>
-            </div>
-            <div class="country-btn" id="country-kz" onclick="selectCountry('kz')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/kz.png" alt=""></div>
-              <div class="country-name">Kazakistan</div>
+            <div class="country-group-body open" id="cbody-kurumsal">
+              <div class="country-row" id="country-rs" onclick="selectCountry('rs')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/rs.png" alt="">
+                <span class="country-row-name">Sırbistan</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-ba" onclick="selectCountry('ba')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/ba.png" alt="">
+                <span class="country-row-name">Bosna</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-ge" onclick="selectCountry('ge')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/ge.png" alt="">
+                <span class="country-row-name">Gürcistan</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-xk" onclick="selectCountry('xk')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/xk.png" alt="">
+                <span class="country-row-name">Kosova</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-mk" onclick="selectCountry('mk')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/mk.png" alt="">
+                <span class="country-row-name">Makedonya</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-be" onclick="selectCountry('be')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/be.png" alt="">
+                <span class="country-row-name">Belçika</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-de" onclick="selectCountry('de')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/de.png" alt="">
+                <span class="country-row-name">Almanya</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-nl" onclick="selectCountry('nl')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/nl.png" alt="">
+                <span class="country-row-name">Hollanda</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-kz" onclick="selectCountry('kz')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/kz.png" alt="">
+                <span class="country-row-name">Kazakistan</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
             </div>
           </div>
 
-          <div class="section-lbl" style="margin-top:14px;">Franchise</div>
-          <div class="country-grid" id="countryGridFranchise">
-            <div class="country-btn" id="country-cy" onclick="selectCountry('cy')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/cy.png" alt=""></div>
-              <div class="country-name">Kıbrıs</div>
+          <div class="country-group" id="cgroup-franchise">
+            <div class="country-group-header" onclick="toggleCountryGroup('franchise')">
+              <span class="country-group-label">Franchise</span>
+              <div class="country-group-meta">
+                <span class="country-group-count" id="ccount-franchise">7</span>
+                <span class="country-group-chevron" id="cchevron-franchise">▼</span>
+              </div>
             </div>
-            <div class="country-btn" id="country-iq" onclick="selectCountry('iq')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/iq.png" alt=""></div>
-              <div class="country-name">Irak</div>
-            </div>
-            <div class="country-btn" id="country-ly" onclick="selectCountry('ly')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/ly.png" alt=""></div>
-              <div class="country-name">Libya</div>
-            </div>
-            <div class="country-btn" id="country-lr" onclick="selectCountry('lr')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/lr.png" alt=""></div>
-              <div class="country-name">Liberya</div>
-            </div>
-            <div class="country-btn" id="country-lb" onclick="selectCountry('lb')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/lb.png" alt=""></div>
-              <div class="country-name">Lübnan</div>
-            </div>
-            <div class="country-btn" id="country-uz" onclick="selectCountry('uz')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/uz.png" alt=""></div>
-              <div class="country-name">Özbekistan</div>
-            </div>
-            <div class="country-btn" id="country-ru" onclick="selectCountry('ru')">
-              <div class="country-flag"><img src="https://flagcdn.com/40x30/ru.png" alt=""></div>
-              <div class="country-name">Rusya</div>
+            <div class="country-group-body" id="cbody-franchise">
+              <div class="country-row" id="country-cy" onclick="selectCountry('cy')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/cy.png" alt="">
+                <span class="country-row-name">Kıbrıs</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-iq" onclick="selectCountry('iq')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/iq.png" alt="">
+                <span class="country-row-name">Irak</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-ly" onclick="selectCountry('ly')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/ly.png" alt="">
+                <span class="country-row-name">Libya</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-lr" onclick="selectCountry('lr')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/lr.png" alt="">
+                <span class="country-row-name">Liberya</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-lb" onclick="selectCountry('lb')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/lb.png" alt="">
+                <span class="country-row-name">Lübnan</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-uz" onclick="selectCountry('uz')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/uz.png" alt="">
+                <span class="country-row-name">Özbekistan</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="country-row" id="country-ru" onclick="selectCountry('ru')">
+                <img class="country-row-flag" src="https://flagcdn.com/40x30/ru.png" alt="">
+                <span class="country-row-name">Rusya</span>
+                <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
             </div>
           </div>
+
+          <div id="countryNoResults" style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı</div>
         </div>
 
         <!-- KZ gruplandırma modu -->
@@ -260,9 +304,9 @@
         </div>
 
         <!-- Gizli — eski referanslar için -->
-        <!-- <div id="pdfDropZone" style="display:none;">
+        <div id="pdfDropZone" style="display:none;">
           <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
-        </div> -->
+        </div>
 
         <!-- PDF bilgileri -->
         <div class="pdf-info" id="pdfInfo">
