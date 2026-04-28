@@ -171,6 +171,8 @@ function selectCountry(c) {
 
   // PDF drop zone: backend şablonu olan ülkeler
   const backendUlkeler = ['rs','ba','ge','xk','mk','be','de','nl','kz','ru','uz','iq','ly','lr','lb'];
+  const dz = document.getElementById('dropZone');
+  if (dz) dz.style.display = 'block';
   document.getElementById('pdfDropZone').style.display = backendUlkeler.includes(c) ? 'block' : 'none';
 
   document.getElementById('step3Next').style.display = 'block';
