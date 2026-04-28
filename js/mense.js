@@ -10,7 +10,7 @@ function initMensePanel() {
   menseRows        = null;
   menseWorkingRows = null;
 
-  const ids = ['menseFileBadge','mensePdfBadge','menseKgPanel','menseApplyBtn','menseAdjustSection'];
+  const ids = ['menseFileBadge','mensePdfBadge','menseKgPanel','menseApplyBtn','menseAdjustSection','menseTaslakSection'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -248,6 +248,20 @@ function showMenseResult() {
   showMenseStatus('success',
     `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
      <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
+
+  // wizard.js'in triggerMenseTaslak() fonksiyonu workingRows'u kullanır — senkronize et
+  workingRows = menseWorkingRows;
+
+  // menseTaslakSection'ı stepMense paneline taşı (DOM'da bir kez yapılır)
+  const taslakSec = document.getElementById('menseTaslakSection');
+  const stepMense = document.getElementById('stepMense');
+  if (taslakSec && stepMense && taslakSec.parentElement.id !== 'stepMense') {
+    stepMense.appendChild(taslakSec);
+  }
+  if (taslakSec) taslakSec.style.display = 'block';
+
+  // taslak.js'teki buildMenseUlkeGrid fonksiyonunu çağır
+  if (typeof buildMenseUlkeGrid === 'function') buildMenseUlkeGrid();
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────────
