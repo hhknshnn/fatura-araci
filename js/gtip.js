@@ -247,10 +247,9 @@ async function runGtipCheck() {
         `<div class="stat">✓ Tüm GTİP'ler doğru</div>
          <div class="stat">Kontrol edilen: <span>${checked.toLocaleString('tr')} satır</span></div>`);
     } else if (invalid.length === 0 && empty.length > 0) {
-      showGtipStatus('success',
-        `<div class="stat">✓ Tüm GTİP'ler doğru</div>
-         <div class="stat">Kontrol edilen: <span>${checked.toLocaleString('tr')} satır</span></div>
-         <div class="stat" style="color:var(--gold);">⚠ ${empty.length} satırda GTİP boş</div>`);
+      showGtipStatus('info',
+        `<div class="stat">⚠ ${empty.length} satırda GTİP boş</div>
+        <div class="stat">Kontrol edilen: <span>${checked.toLocaleString('tr')} satır</span> · Yanlış GTİP yok</div>`);
       renderEmptyGtipList(empty);
     } else {
       showGtipStatus('error',
