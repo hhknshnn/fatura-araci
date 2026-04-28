@@ -128,7 +128,9 @@ function selectDepo(depo) {
   selectedDepo = depo;
   document.getElementById('mode-serbest').classList.toggle('active', depo === 'serbest');
   document.getElementById('mode-antrepo').classList.toggle('active', depo === 'antrepo');
-  document.getElementById('step2Next').style.display = 'block';
+  const btn = document.getElementById('step1Next') || document.getElementById('step2Next');
+  if (btn) btn.style.display = 'block';
+  if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 }
 
 // ── ADIM 3: ÜLKE SEÇ ──────────────────────────────────────────────────────────
