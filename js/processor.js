@@ -37,8 +37,7 @@ function handleMultiFile(files) {
     const badge = document.getElementById('fileName');
     badge.textContent = `✓ ${cyExcelFiles.length} Excel, ${cyPdfFiles.length} PDF seçildi`;
     badge.style.display = 'inline-flex';
-    // Devam butonunu göster
-    const nextBtn = document.getElementById('step4Next');
+    const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
     if (nextBtn && cyExcelFiles.length > 0) nextBtn.style.display = 'block';
     return;
   }
@@ -124,7 +123,7 @@ function handlePdf(file) {
 function loadFile(data) {
   processedWB = null; workingRows = null; masterRows = null;
 
-  const nextBtn = document.getElementById('step4Next');
+  const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
   if (nextBtn) nextBtn.style.display = 'none';
 
   try {
