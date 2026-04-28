@@ -484,6 +484,79 @@
         </div>
       </div>
 
+      <!-- ── MENŞE HESAPLA PANELİ (bağımsız) ─────────────────────────── -->
+      <div class="panel" id="stepMense" style="display:none;">
+        <div class="panel-label">Menşe Hesapla</div>
+        <div class="panel-title">Menşe Ayrımı</div>
+        <div class="panel-desc">Master Excel yükleyin, grup kilolarını girin, TR/Yabancı ayrımını hesaplayın.</div>
+
+        <div class="status-box" id="menseStatus"></div>
+
+        <div class="drop-zone" id="menseDropZone">
+          <input type="file" id="menseFileInput" accept=".xlsx,.xls" onchange="handleMenseFile(this.files[0])">
+          <div class="drop-icon">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h3>Master Excel Yükle</h3>
+          <p>xlsx/xls dosyasını sürükleyin veya seçin</p>
+          <div class="drop-pills"><span class="drop-pill">.xlsx</span></div>
+          <div class="file-badge" id="menseFileBadge" style="display:none;"></div>
+        </div>
+
+        <div class="kg-panel" id="menseKgPanel" style="display:none;">
+          <div class="kg-header" onclick="toggleMenseKgTable()">
+            <div class="kg-header-title">⚖️ Grup Kiloları <span class="kg-header-badge" id="menseKgBadge"></span></div>
+            <span id="menseKgArrow" style="color:var(--accent);font-size:12px;">▼</span>
+          </div>
+          <div class="kg-body" id="menseKgBody">
+            <table class="kg-table" id="menseKgTable">
+              <tr><th>ÜRÜN ARA GRUBU</th><th>Birim Kilo (KG)</th><th style="color:var(--gold);">0/Boş satır</th></tr>
+            </table>
+          </div>
+        </div>
+
+        <button class="btn-secondary" id="menseApplyBtn" onclick="applyMenseWeights()" style="display:none;width:100%;">
+          ✓ Kiloları Uygula ve Hesapla
+        </button>
+
+        <div id="menseAdjustSection" style="display:none;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">
+            Hesaplanan toplam BRÜT: <span id="menseCalcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg
+          </div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
+          <div class="target-row">
+            <input class="target-input" id="menseTargetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
+            <button class="btn-secondary" onclick="applyMenseWeightAdjust()">Uygula</button>
+          </div>
+        </div>
+
+        <div class="mense-box" id="menseResultBox">
+          <div class="mense-row">
+            <div>
+              <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
+              <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mense-val" id="menseResTrBrut">— kg</div>
+              <div class="mense-sub" id="menseResTrNet">NET: —</div>
+            </div>
+          </div>
+          <div class="mense-row">
+            <div>
+              <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
+              <div class="mense-sub">Diğer tüm menşeler</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mense-val" id="menseResOtherBrut">— kg</div>
+              <div class="mense-sub" id="menseResOtherNet">NET: —</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── GTİP KONTROL PANELİ ──────────────────────────────────────── -->
       <div class="panel" id="stepGtip" style="display:none;">
         <div class="panel-label">GTİP Kontrol</div>
@@ -544,7 +617,7 @@ function sidebarSelect(mod) {
   document.getElementById('nav-' + mod).classList.add('active');
 
   // Tüm panel gruplarını gizle
-  ['step1','step2','step3','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
+  ['step1','step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -571,10 +644,8 @@ function sidebarSelect(mod) {
     // wizard.js'deki selectedMod'u set et
     if (typeof selectMod === 'function') selectMod('sonrasi', true);
   } else if (mod === 'oncesi') {
-    document.getElementById('wizardSteps').style.display = 'none';
-    if (typeof selectMod === 'function') selectMod('oncesi');
-    // selectMod → showOnlyStep(4) → step2'yi açar
-  
+    document.getElementById('stepMense').style.display = 'block';
+    initMensePanel();
   } else if (mod === 'taslak') {
     document.getElementById('stepTaslak').style.display = 'flex';
     if (typeof initTaslakPanel === 'function') initTaslakPanel();
@@ -631,15 +702,6 @@ function goStep(n) {
   }
 }
 
-function showOnlyStep(n) {
-  ['step1','step2','step3'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  const map = { 1:'step1', 2:'step1', 3:'step2', 4:'step2', 5:'step3' };
-  const target = map[n];
-  if (target) document.getElementById(target).style.display = 'block';
-}
 function updateTopbarBadges() {
   const countryBadge = document.getElementById('topbarCountry');
   const depoBadge    = document.getElementById('topbarDepo');
@@ -664,6 +726,160 @@ function updateTopbarBadges() {
 
 // wizard.js'deki updateDots → updateWizardDots'a yönlendir
 function updateDots(n) { updateWizardDots(n); }
+
+// ── Menşe Hesapla — bağımsız panel logic ──────────────────────────────────
+let menseRows = null;
+let menseWorkingRows = null;
+
+function initMensePanel() {
+  menseRows = null;
+  menseWorkingRows = null;
+  document.getElementById('menseFileBadge').style.display = 'none';
+  document.getElementById('menseKgPanel').style.display = 'none';
+  document.getElementById('menseApplyBtn').style.display = 'none';
+  document.getElementById('menseAdjustSection').style.display = 'none';
+  document.getElementById('menseResultBox').classList.remove('visible');
+  const sb = document.getElementById('menseStatus');
+  sb.className = 'status-box'; sb.innerHTML = '';
+}
+
+function handleMenseFile(file) {
+  if (!file) return;
+  const badge = document.getElementById('menseFileBadge');
+  badge.textContent = '⏳ Yükleniyor...';
+  badge.style.display = 'inline-flex';
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!rows.length) throw new Error('Dosya boş');
+      menseRows = rows;
+      badge.textContent = '✓ ' + rows.length.toLocaleString('tr') + ' satır yüklendi';
+      buildMenseKgTable(rows);
+      document.getElementById('menseKgPanel').style.display = 'block';
+      document.getElementById('menseApplyBtn').style.display = 'block';
+      showMenseStatus('info', '<div class="stat">✓ Dosya yüklendi — grup kilolarını girin ve hesaplayın</div>');
+    } catch(err) {
+      badge.textContent = '⚠ ' + err.message;
+    }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function buildMenseKgTable(rows) {
+  const groups = [...new Set(rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))].sort();
+  const tbody = document.getElementById('menseKgTable');
+  while (tbody.rows.length > 1) tbody.deleteRow(1);
+  const needsInput = [];
+  groups.forEach(g => {
+    const zeroCount = rows.filter(r => String(r['ÜRÜN ARA GRUBU']) === g && parseNum(r['Ürün Ağırlığı (KG)']) === 0).length;
+    if (zeroCount > 0) needsInput.push({ g, zeroCount });
+  });
+  document.getElementById('menseKgBadge').textContent = needsInput.length > 0 ? `${needsInput.length} grup eksik` : 'Tümü dolu';
+  if (needsInput.length === 0) {
+    const tr = tbody.insertRow();
+    tr.innerHTML = '<td colspan="3" style="color:var(--success);padding:10px;">✓ Tüm satırlarda kilo değeri dolu.</td>';
+  } else {
+    document.getElementById('menseKgBody').style.display = 'block';
+    document.getElementById('menseKgArrow').textContent = '▲';
+    needsInput.forEach(({ g, zeroCount }) => {
+      const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
+      const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
+      const tr = tbody.insertRow();
+      tr.innerHTML = `<td>${g}</td><td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td><td style="color:var(--gold);">${zeroCount}</td>`;
+    });
+  }
+}
+
+function toggleMenseKgTable() {
+  const b = document.getElementById('menseKgBody');
+  const a = document.getElementById('menseKgArrow');
+  const open = b.style.display === 'block';
+  b.style.display = open ? 'none' : 'block';
+  a.textContent = open ? '▼' : '▲';
+}
+
+function applyMenseWeights() {
+  if (!menseRows) return;
+  const groups = [...new Set(menseRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
+  groups.forEach(g => {
+    const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
+    const el = document.getElementById(id);
+    if (el && el.value !== '') groupWeights[g] = parseNum(el.value);
+  });
+  try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch(e) {}
+
+  menseWorkingRows = menseRows.map(row => {
+    const r = { ...row };
+    const sku  = String(r['SKU']).trim();
+    const grup = String(r['ÜRÜN ARA GRUBU']).trim();
+    const ag   = parseNum(r['Ürün Ağırlığı (KG)']);
+    const mik  = parseNum(r['Miktar']);
+    let kg;
+    if (sku in exceptionSkus)  { kg = parseNum(exceptionSkus[sku]); }
+    else if (ag > 0)            { kg = ag; }
+    else                        { kg = parseNum(groupWeights[grup] || 0); }
+    r['_kg'] = kg; r['_hamBrut'] = kg * mik;
+    r['BRÜT'] = r['_hamBrut']; r['NET'] = r['BRÜT'] * 0.9;
+    return r;
+  });
+
+  const total = menseWorkingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
+  document.getElementById('menseCalcTotal').textContent = round2(total);
+  document.getElementById('menseAdjustSection').style.display = 'block';
+  showMenseStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(total)} kg</span> — Hedef kilo girin</div>`);
+}
+
+function applyMenseWeightAdjust() {
+  if (!menseWorkingRows) return;
+  const target = parseNum(document.getElementById('menseTargetWeight').value);
+  if (!target || target <= 0) { alert('Geçerli bir hedef BRÜT kilo girin.'); return; }
+  const hamTotal = menseWorkingRows.reduce((s, r) => s + parseNum(r['_hamBrut']), 0);
+  if (hamTotal <= 0) return;
+  const mult = target / hamTotal;
+  const hedefNet = Math.round(target * 0.9 * 100) / 100;
+  let topBrut = 0, topNet = 0;
+  const n = menseWorkingRows.length;
+  menseWorkingRows = menseWorkingRows.map((row, i) => {
+    const r = { ...row };
+    if (i < n - 1) {
+      r['BRÜT'] = Math.round(parseNum(r['_hamBrut']) * mult * 100) / 100;
+      r['NET']  = Math.round(r['BRÜT'] * 0.9 * 100) / 100;
+      topBrut += r['BRÜT']; topNet += r['NET'];
+    } else {
+      r['BRÜT'] = Math.round((target - topBrut) * 100) / 100;
+      r['NET']  = Math.round((hedefNet - topNet) * 100) / 100;
+    }
+    return r;
+  });
+  showMenseResult();
+}
+
+function showMenseResult() {
+  if (!menseWorkingRows) return;
+  const fmt = n => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+  const trRows    = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
+  const otherRows = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
+  const trBrut    = round2(trRows.reduce((s, r)    => s + parseNum(r['BRÜT']), 0));
+  const trNet     = round2(trRows.reduce((s, r)    => s + parseNum(r['NET']),  0));
+  const otherBrut = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
+  const otherNet  = round2(otherRows.reduce((s, r) => s + parseNum(r['NET']),  0));
+  document.getElementById('menseResTrBrut').textContent    = fmt(trBrut) + ' kg BRÜT';
+  document.getElementById('menseResTrNet').textContent     = 'NET: ' + fmt(trNet) + ' kg';
+  document.getElementById('menseResOtherBrut').textContent = fmt(otherBrut) + ' kg BRÜT';
+  document.getElementById('menseResOtherNet').textContent  = 'NET: ' + fmt(otherNet) + ' kg';
+  document.getElementById('menseResultBox').classList.add('visible');
+  showMenseStatus('success',
+    `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
+     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
+}
+
+function showMenseStatus(type, html) {
+  const sb = document.getElementById('menseStatus');
+  sb.className = 'status-box visible ' + type;
+  sb.innerHTML = html;
+}
 
 // Başlangıçta sonrasi modunu göster
 document.addEventListener('DOMContentLoaded', () => {
