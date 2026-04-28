@@ -493,17 +493,22 @@
         <div class="status-box" id="menseStatus"></div>
 
         <div class="drop-zone" id="menseDropZone">
-          <input type="file" id="menseFileInput" accept=".xlsx,.xls" onchange="handleMenseFile(this.files[0])">
+          <input type="file" id="menseFileInput" accept=".xlsx,.xls,.pdf" multiple
+                 onchange="handleMenseMultiFile(this.files)">
           <div class="drop-icon">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
           </div>
-          <h3>Master Excel Yükle</h3>
-          <p>xlsx/xls dosyasını sürükleyin veya seçin</p>
-          <div class="drop-pills"><span class="drop-pill">.xlsx</span></div>
+          <h3>Excel ve PDF birlikte sürükleyin</h3>
+          <p>veya tıklayarak seçin · aynı anda ikisi de yüklenebilir</p>
+          <div class="drop-pills">
+            <span class="drop-pill">.xlsx</span>
+            <span class="drop-pill">.pdf</span>
+          </div>
           <div class="file-badge" id="menseFileBadge" style="display:none;"></div>
+          <div class="file-badge" id="mensePdfBadge" style="display:none;margin-top:6px;"></div>
         </div>
 
         <div class="kg-panel" id="menseKgPanel" style="display:none;">
@@ -608,290 +613,8 @@
 <script src="js/taslak.js"></script>
 <script src="js/gtip.js"></script>
 <script src="js/evrak.js"></script>
-
-<script>
-// ── Sidebar navigasyon ─────────────────────────────────────────────────────
-function sidebarSelect(mod) {
-  // Tüm nav-item'ları pasif yap
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('nav-' + mod).classList.add('active');
-
-  // Tüm panel gruplarını gizle
-  ['step1','step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  document.getElementById('wizardSteps').style.display = 'none';
-
-  // Topbar güncelle
-  const titles = {
-    sonrasi: 'INV + PL Oluştur',
-    taslak:  'Taslak Doldur',
-    oncesi:  'Menşe Hesapla',
-    gtip:    'GTİP Kontrol',
-    evrak:   'Ek Evrak Üret',
-  };
-  document.getElementById('topbarTitle').textContent = titles[mod] || mod;
-  document.getElementById('topbarCountry').style.display = 'none';
-  document.getElementById('topbarDepo').style.display = 'none';
-  document.getElementById('topbarRight').innerHTML = '';
-
-  if (mod === 'sonrasi') {
-    // wizard başlatılıyor
-    document.getElementById('wizardSteps').style.display = 'flex';
-    document.getElementById('step1').style.display = 'flex';
-    updateWizardDots(1);
-    // wizard.js'deki selectedMod'u set et
-    if (typeof selectMod === 'function') selectMod('sonrasi', true);
-  } else if (mod === 'oncesi') {
-    document.getElementById('stepMense').style.display = 'block';
-    initMensePanel();
-  } else if (mod === 'taslak') {
-    document.getElementById('stepTaslak').style.display = 'flex';
-    if (typeof initTaslakPanel === 'function') initTaslakPanel();
-  } else if (mod === 'gtip') {
-    document.getElementById('stepGtip').style.display = 'flex';
-    if (typeof exitGtipPanel === 'function') {/* reset */}
-  } else if (mod === 'evrak') {
-    document.getElementById('stepEvrak').style.display = 'flex';
-    if (typeof initEvrakPanel === 'function') initEvrakPanel();
-  }
-}
-
-// ── Wizard adım göstergeleri ───────────────────────────────────────────────
-function updateWizardDots(activeStep) {
-  for (let i = 1; i <= 3; i++) {
-    const dot = document.getElementById('dot' + i);
-    const lbl = document.getElementById('lbl' + i);
-    if (!dot) continue;
-    dot.className = 'step-dot ' + (i < activeStep ? 'done' : i === activeStep ? 'active' : 'idle');
-    if (lbl) lbl.className = 'step-label' + (i === activeStep ? ' active' : i < activeStep ? ' done' : '');
-    if (i < 3) {
-      const line = document.getElementById('line' + i);
-      if (line) line.className = 'step-line' + (i < activeStep ? ' done' : '');
-    }
-  }
-}
-
-// goStep override — wizard adımları yeni 3'lü sisteme
-function goStep(n) {
-  const panelMap = { 1: 'step1', 2: 'step2', 3: 'step3' };
-  ['step1','step2','step3'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  const target = panelMap[n];
-  if (target) document.getElementById(target).style.display = 'flex';
-  updateWizardDots(n);
-
-  // Topbar country/depo badge güncelle
-  updateTopbarBadges();
-
-  // wizard.js'ye haber ver (eski adım numaraları: 2→step2, 3→step3, 4→step4, 5→step5)
-  // Mapping: yeni 1→eski 2 (depo), yeni 2→eski 3+4 (ulke+dosya), yeni 3→eski 5 (kg)
-  const legacyMap = { 1: 2, 2: 3, 3: 5 };
-  if (typeof initStep !== 'undefined' && legacyMap[n]) {
-    // step init fonksiyonlarını çağır
-  }
-  if (n === 2 && typeof initStep4 === 'function') {
-    // Ülke+dosya adımı başladığında step4 init çalıştır (kur mantığı için)
-    setTimeout(initStep4, 0);
-  }
-  if (n === 3 && typeof initStep5 === 'function') {
-    setTimeout(initStep5, 0);
-  }
-}
-
-function updateTopbarBadges() {
-  const countryBadge = document.getElementById('topbarCountry');
-  const depoBadge    = document.getElementById('topbarDepo');
-
-  if (typeof currentCountry !== 'undefined' && currentCountry) {
-    const names = { rs:'Sırbistan', ba:'Bosna', ge:'Gürcistan', xk:'Kosova', mk:'Makedonya',
-                    be:'Belçika', de:'Almanya', nl:'Hollanda', kz:'Kazakistan', cy:'Kıbrıs',
-                    iq:'Irak', ly:'Libya', lr:'Liberya', lb:'Lübnan', uz:'Özbekistan', ru:'Rusya' };
-    countryBadge.textContent = names[currentCountry] || currentCountry;
-    countryBadge.style.display = '';
-  } else {
-    countryBadge.style.display = 'none';
-  }
-
-  if (typeof selectedDepo !== 'undefined' && selectedDepo) {
-    depoBadge.textContent = selectedDepo === 'antrepo' ? 'Antrepo' : 'Serbest Depo';
-    depoBadge.style.display = '';
-  } else {
-    depoBadge.style.display = 'none';
-  }
-}
-
-// wizard.js'deki updateDots → updateWizardDots'a yönlendir
-function updateDots(n) { updateWizardDots(n); }
-
-// ── Menşe Hesapla — bağımsız panel logic ──────────────────────────────────
-let menseRows = null;
-let menseWorkingRows = null;
-
-function initMensePanel() {
-  menseRows = null;
-  menseWorkingRows = null;
-  document.getElementById('menseFileBadge').style.display = 'none';
-  document.getElementById('menseKgPanel').style.display = 'none';
-  document.getElementById('menseApplyBtn').style.display = 'none';
-  document.getElementById('menseAdjustSection').style.display = 'none';
-  document.getElementById('menseResultBox').classList.remove('visible');
-  const sb = document.getElementById('menseStatus');
-  sb.className = 'status-box'; sb.innerHTML = '';
-}
-
-function handleMenseFile(file) {
-  if (!file) return;
-  const badge = document.getElementById('menseFileBadge');
-  badge.textContent = '⏳ Yükleniyor...';
-  badge.style.display = 'inline-flex';
-  const r = new FileReader();
-  r.onload = e => {
-    try {
-      const wb   = XLSX.read(e.target.result, { type: 'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-      if (!rows.length) throw new Error('Dosya boş');
-      menseRows = rows;
-      badge.textContent = '✓ ' + rows.length.toLocaleString('tr') + ' satır yüklendi';
-      buildMenseKgTable(rows);
-      document.getElementById('menseKgPanel').style.display = 'block';
-      document.getElementById('menseApplyBtn').style.display = 'block';
-      showMenseStatus('info', '<div class="stat">✓ Dosya yüklendi — grup kilolarını girin ve hesaplayın</div>');
-    } catch(err) {
-      badge.textContent = '⚠ ' + err.message;
-    }
-  };
-  r.readAsArrayBuffer(file);
-}
-
-function buildMenseKgTable(rows) {
-  const groups = [...new Set(rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))].sort();
-  const tbody = document.getElementById('menseKgTable');
-  while (tbody.rows.length > 1) tbody.deleteRow(1);
-  const needsInput = [];
-  groups.forEach(g => {
-    const zeroCount = rows.filter(r => String(r['ÜRÜN ARA GRUBU']) === g && parseNum(r['Ürün Ağırlığı (KG)']) === 0).length;
-    if (zeroCount > 0) needsInput.push({ g, zeroCount });
-  });
-  document.getElementById('menseKgBadge').textContent = needsInput.length > 0 ? `${needsInput.length} grup eksik` : 'Tümü dolu';
-  if (needsInput.length === 0) {
-    const tr = tbody.insertRow();
-    tr.innerHTML = '<td colspan="3" style="color:var(--success);padding:10px;">✓ Tüm satırlarda kilo değeri dolu.</td>';
-  } else {
-    document.getElementById('menseKgBody').style.display = 'block';
-    document.getElementById('menseKgArrow').textContent = '▲';
-    needsInput.forEach(({ g, zeroCount }) => {
-      const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
-      const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
-      const tr = tbody.insertRow();
-      tr.innerHTML = `<td>${g}</td><td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td><td style="color:var(--gold);">${zeroCount}</td>`;
-    });
-  }
-}
-
-function toggleMenseKgTable() {
-  const b = document.getElementById('menseKgBody');
-  const a = document.getElementById('menseKgArrow');
-  const open = b.style.display === 'block';
-  b.style.display = open ? 'none' : 'block';
-  a.textContent = open ? '▼' : '▲';
-}
-
-function applyMenseWeights() {
-  if (!menseRows) return;
-  const groups = [...new Set(menseRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
-  groups.forEach(g => {
-    const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
-    const el = document.getElementById(id);
-    if (el && el.value !== '') groupWeights[g] = parseNum(el.value);
-  });
-  try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch(e) {}
-
-  menseWorkingRows = menseRows.map(row => {
-    const r = { ...row };
-    const sku  = String(r['SKU']).trim();
-    const grup = String(r['ÜRÜN ARA GRUBU']).trim();
-    const ag   = parseNum(r['Ürün Ağırlığı (KG)']);
-    const mik  = parseNum(r['Miktar']);
-    let kg;
-    if (sku in exceptionSkus)  { kg = parseNum(exceptionSkus[sku]); }
-    else if (ag > 0)            { kg = ag; }
-    else                        { kg = parseNum(groupWeights[grup] || 0); }
-    r['_kg'] = kg; r['_hamBrut'] = kg * mik;
-    r['BRÜT'] = r['_hamBrut']; r['NET'] = r['BRÜT'] * 0.9;
-    return r;
-  });
-
-  const total = menseWorkingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0);
-  document.getElementById('menseCalcTotal').textContent = round2(total);
-  document.getElementById('menseAdjustSection').style.display = 'block';
-  showMenseStatus('info', `<div class="stat">Ham BRÜT: <span>${round2(total)} kg</span> — Hedef kilo girin</div>`);
-}
-
-function applyMenseWeightAdjust() {
-  if (!menseWorkingRows) return;
-  const target = parseNum(document.getElementById('menseTargetWeight').value);
-  if (!target || target <= 0) { alert('Geçerli bir hedef BRÜT kilo girin.'); return; }
-  const hamTotal = menseWorkingRows.reduce((s, r) => s + parseNum(r['_hamBrut']), 0);
-  if (hamTotal <= 0) return;
-  const mult = target / hamTotal;
-  const hedefNet = Math.round(target * 0.9 * 100) / 100;
-  let topBrut = 0, topNet = 0;
-  const n = menseWorkingRows.length;
-  menseWorkingRows = menseWorkingRows.map((row, i) => {
-    const r = { ...row };
-    if (i < n - 1) {
-      r['BRÜT'] = Math.round(parseNum(r['_hamBrut']) * mult * 100) / 100;
-      r['NET']  = Math.round(r['BRÜT'] * 0.9 * 100) / 100;
-      topBrut += r['BRÜT']; topNet += r['NET'];
-    } else {
-      r['BRÜT'] = Math.round((target - topBrut) * 100) / 100;
-      r['NET']  = Math.round((hedefNet - topNet) * 100) / 100;
-    }
-    return r;
-  });
-  showMenseResult();
-}
-
-function showMenseResult() {
-  if (!menseWorkingRows) return;
-  const fmt = n => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  const trRows    = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
-  const otherRows = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
-  const trBrut    = round2(trRows.reduce((s, r)    => s + parseNum(r['BRÜT']), 0));
-  const trNet     = round2(trRows.reduce((s, r)    => s + parseNum(r['NET']),  0));
-  const otherBrut = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
-  const otherNet  = round2(otherRows.reduce((s, r) => s + parseNum(r['NET']),  0));
-  document.getElementById('menseResTrBrut').textContent    = fmt(trBrut) + ' kg BRÜT';
-  document.getElementById('menseResTrNet').textContent     = 'NET: ' + fmt(trNet) + ' kg';
-  document.getElementById('menseResOtherBrut').textContent = fmt(otherBrut) + ' kg BRÜT';
-  document.getElementById('menseResOtherNet').textContent  = 'NET: ' + fmt(otherNet) + ' kg';
-  document.getElementById('menseResultBox').classList.add('visible');
-  showMenseStatus('success',
-    `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
-     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
-}
-
-function showMenseStatus(type, html) {
-  const sb = document.getElementById('menseStatus');
-  sb.className = 'status-box visible ' + type;
-  sb.innerHTML = html;
-}
-
-// Başlangıçta sonrasi modunu göster
-document.addEventListener('DOMContentLoaded', () => {
-  sidebarSelect('sonrasi');
-
-  // Kullanıcı adı — localStorage'dan oku veya default
-  const savedName = localStorage.getItem('fa_username') || 'Kullanıcı';
-  document.getElementById('sidebarUserName').textContent = savedName;
-  const initials = savedName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
-  document.getElementById('sidebarAvatar').textContent = initials || '?';
-});
-</script>
+<script src="js/mense.js"></script>
+<script src="js/shell.js"></script>
 
 </body>
 </html>
