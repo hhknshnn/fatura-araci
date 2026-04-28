@@ -572,9 +572,8 @@ function sidebarSelect(mod) {
     if (typeof selectMod === 'function') selectMod('sonrasi', true);
   } else if (mod === 'oncesi') {
     document.getElementById('wizardSteps').style.display = 'none';
-    document.getElementById('step1').style.display = 'none';
-    document.getElementById('step3').style.display = 'flex';
-    if (typeof selectMod === 'function') selectMod('oncesi', true);
+    if (typeof selectMod === 'function') selectMod('oncesi');
+  
   } else if (mod === 'taslak') {
     document.getElementById('stepTaslak').style.display = 'flex';
     if (typeof initTaslakPanel === 'function') initTaslakPanel();
@@ -631,6 +630,15 @@ function goStep(n) {
   }
 }
 
+function showOnlyStep(n) {
+  ['step1','step2','step3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const map = { 1:'step1', 2:'step1', 3:'step2', 4:'step2', 5:'step3' };
+  const target = map[n];
+  if (target) document.getElementById(target).style.display = 'flex';
+}
 function updateTopbarBadges() {
   const countryBadge = document.getElementById('topbarCountry');
   const depoBadge    = document.getElementById('topbarDepo');
