@@ -1096,7 +1096,7 @@ def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
     freight_value   = float((pdf_fields or {}).get('navlun',  0) or 0) / eur_kuru
     insurance_value = float((pdf_fields or {}).get('sigorta', 0) or 0) / eur_kuru
-    return _generate_excel_eur(
+    excel_out, fatura_no, master_out = _generate_excel_eur(
         df, grup_kilolari, hedef_brut, exception_skus,
         pdf_fields, hedef_net, depo_tipi, eur_kuru,
         freight_value, insurance_value,
@@ -1104,6 +1104,25 @@ def generate_excel_be(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         inv_cols=BE_INV_COLS, pl_cols=BE_PL_COLS,
         df_original=df_original
     )
+    # Mill Test PDF üret
+    mill_test_out = None
+    try:
+        import evrak as _evrak
+        # fatura_date: _generate_excel_eur içinde df'ten okunur
+        # Biz fatura_no'dan tarihi bilmiyoruz ama df_original'dan alabiliriz
+        _df = df_original if df_original is not None else df
+        _fatura_date = _df['Fatura Tarihi'].iloc[0]
+        if hasattr(_fatura_date, 'date'):
+            _fatura_date = _fatura_date.date()
+        form_data = {
+            'faturaNo':     fatura_no,
+            'faturaTarihi': str(_fatura_date),
+        }
+        mill_test_bytes, _ = _evrak.generate_evrak_pdf('be', 'mill_test', form_data)
+        mill_test_out = mill_test_bytes
+    except Exception as _mt_err:
+        print(f'Mill Test PDF üretim hatası: {_mt_err}')
+    return excel_out, fatura_no, master_out, mill_test_out
 
 def generate_excel_de(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                       pdf_fields=None, hedef_net=0, depo_tipi='serbest', eur_kuru=1.0, df_original=None):
@@ -2705,7 +2724,7 @@ class handler(BaseHTTPRequestHandler):
                     hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)    
             elif ulke_kodu == 'be':
                 eur_kuru = float(body.get('eurKuru', 1.0))
-                excel_out, fatura_no, master_out = generate_excel_be(
+                excel_out, fatura_no, master_out, mill_test_out = generate_excel_be(
                     df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                     hedef_net=hedef_net, depo_tipi=depo_tipi, eur_kuru=eur_kuru,
                     df_original=df_original)
@@ -2759,6 +2778,9 @@ class handler(BaseHTTPRequestHandler):
             }
             if ulke_kodu == 'kz' and locals().get('price_list_out'):
                 response_data['priceList'] = base64.b64encode(price_list_out).decode('utf-8')
+            result = json.dumps(response_data)
+            if ulke_kodu == 'be' and locals().get('mill_test_out'):
+                response_data['millTest'] = base64.b64encode(mill_test_out).decode('utf-8')
             result = json.dumps(response_data)
 
             self.send_response(200)

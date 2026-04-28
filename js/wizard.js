@@ -654,6 +654,20 @@ async function downloadRS() {
       URL.revokeObjectURL(plUrl);
     }
 
+        // Belçika — Mill Test PDF otomatik
+    if (data.millTest) {
+        const mtBin   = atob(data.millTest);
+        const mtBytes = new Uint8Array(mtBin.length);
+        for (let i = 0; i < mtBin.length; i++) mtBytes[i] = mtBin.charCodeAt(i);
+        const mtBlob = new Blob([mtBytes], { type: 'application/pdf' });
+        const mtUrl  = URL.createObjectURL(mtBlob);
+        const mtA    = document.createElement('a');
+        mtA.href = mtUrl;
+        mtA.download = `MILL TEST - ${data.faturaNo}.pdf`;
+        mtA.click();
+        URL.revokeObjectURL(mtUrl);
+    }
+
     if (data.pdfFields) {
       const pf  = data.pdfFields;
       const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
