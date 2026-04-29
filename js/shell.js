@@ -4,7 +4,7 @@
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
 // step1 artık yok — step2 başlangıç paneli
 function hideAllPanels() {
-  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
+  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -25,6 +25,7 @@ function sidebarSelect(mod) {
     oncesi:  'Menşe Hesapla',
     gtip:    'GTİP Kontrol',
     evrak:   'Ek Evrak Üret',
+    
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -54,6 +55,11 @@ function sidebarSelect(mod) {
     document.getElementById('stepEvrak').style.display = 'flex';
     if (typeof initEvrakPanel === 'function') initEvrakPanel();
   }
+    else if (mod === 'gecmis') {
+    document.getElementById('stepGecmis').style.display = 'flex';
+    if (typeof initGecmisPanel === 'function') initGecmisPanel();
+  }
+
 }
 
 // ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────

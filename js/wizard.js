@@ -578,6 +578,23 @@ async function downloadRS() {
       document.getElementById('pdfInfo').classList.add('visible');
     }
 
+    // ── STORAGE'A KAYDET (arka planda, hata olsa indirme etkilenmez) ──────────────
+    try {
+      await fetch('/api/storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ulke:      currentCountry,
+          faturaNo:  data.faturaNo,
+          dosyaTuru: 'inv_pl',
+          excel:     data.excel,
+          pdf:       pdfB64 || '',
+        })
+      });
+    } catch(e) {
+      console.warn('Storage kayıt hatası:', e);
+    }
+
     showStatus('success', `<div class="stat">✓ İndirildi: <span>${data.faturaNo}</span></div>`);
 
   } catch(err) {
@@ -667,6 +684,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.dataTransfer.files.length) handleMultiFile(e.dataTransfer.files);
     });
   }
+  // Sayfa açılışında geçmiş kayıt sayısını kontrol et
+  if (typeof checkGecmisCount === 'function') checkGecmisCount();
 });
 
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────

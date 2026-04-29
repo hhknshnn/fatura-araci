@@ -69,6 +69,13 @@
         </svg>
         Ek Evrak
       </div>
+      <div class="nav-item" id="nav-gecmis" onclick="sidebarSelect('gecmis')" style="display:none;" id="nav-gecmis-item">
+        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Son İşlemler
+      </div>
     </nav>
 
     <div class="sidebar-footer">
@@ -659,6 +666,14 @@
           ⬇ PDF İndir
         </button>
       </div>
+      <!-- ── SON İŞLEMLER PANELİ ─────────────────────────────────────────────── -->
+      <div class="panel" id="stepGecmis" style="display:none;">
+        <div class="panel-label">Son İşlemler</div>
+        <div class="panel-title">Kayıtlı Dosyalar</div>
+        <div class="panel-desc">Son 36 saatteki işlemler. Seçince dosyayı tekrar indirebilirsin.</div>
+        <div class="status-box" id="gecmisStatus"></div>
+        <div id="gecmisList" style="margin-top:8px;"></div>
+      </div>
 
     </div><!-- /content-area -->
   </div><!-- /main-area -->
@@ -673,6 +688,8 @@
 <script src="js/evrak.js"></script>
 <script src="js/mense.js"></script>
 <script src="js/shell.js"></script>
+<script src="js/gecmis.js"></script>
+
 
 </body>
 </html>
