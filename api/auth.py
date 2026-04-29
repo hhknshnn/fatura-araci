@@ -34,10 +34,15 @@ def kv_get(key):
     req = urllib.request.Request(url, headers=kv_headers())
     try:
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+            raw = resp.read()
+            result = json.loads(raw)
+            # Çift serialize edilmişse tekrar parse et
+            if isinstance(result, str):
+                result = json.loads(result)
+            return result
     except Exception:
         return None
-
+    
 def kv_put(key, value, ttl=None):
     qs = f'?expiration_ttl={ttl}' if ttl else ''
     url = kv_base_url() + '/values/' + urllib.parse.quote(key, safe='') + qs
