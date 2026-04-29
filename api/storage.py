@@ -134,6 +134,9 @@ def list_records():
     records = []
     for k in keys:
         key_name = k.get('name', '')
+        # user: ve session: key'lerine DOKUNMA
+        if key_name.startswith('user:') or key_name.startswith('session:'):
+            continue
         meta = kv_get(key_name)
         if not meta:
             continue
