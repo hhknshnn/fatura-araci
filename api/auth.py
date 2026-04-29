@@ -138,17 +138,15 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         """GET /api/auth → oturum kontrolü (me)"""
         try:
-            token = get_token_from_headers(dict(self.headers))
-            session = get_session(token)
-            if not session:
-                self._json({'success': False, 'error': 'Oturum geçersiz'}, 401)
-                return
+            # GEÇICI DEBUG — test sonrası sil
             self._json({
-                'success':     True,
-                'username':    session['username'],
-                'displayName': session['displayName'],
-                'role':        session['role'],
+                'debug': {
+                    'CF_ACCOUNT_ID':   CF_ACCOUNT_ID[:6] + '...' if CF_ACCOUNT_ID else 'BOŞ',
+                    'CF_API_TOKEN':    CF_API_TOKEN[:6] + '...' if CF_API_TOKEN else 'BOŞ',
+                    'CF_KV_NAMESPACE': CF_KV_NAMESPACE[:6] + '...' if CF_KV_NAMESPACE else 'BOŞ',
+                }
             })
+            return
         except Exception as e:
             self._error(e)
 
