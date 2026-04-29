@@ -130,11 +130,13 @@ def delete_session(token):
 
 # ── TOKEN'DAN SESSION AL ──────────────────────────────────────────────────────
 def get_token_from_headers(headers):
-    auth = headers.get('Authorization', '') or headers.get('authorization', '')
-    if auth.startswith('Bearer '):
-        return auth[7:]
+    # Vercel header anahtarları farklı case'de gelebilir
+    for key in headers:
+        if key.lower() == 'authorization':
+            val = headers[key]
+            if val.startswith('Bearer '):
+                return val[7:]
     return None
-
 
 # ── VERCEL HANDLER ────────────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
