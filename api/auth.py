@@ -120,7 +120,6 @@ def delete_session(token):
 
 # ── TOKEN'DAN SESSION AL ──────────────────────────────────────────────────────
 def get_token_from_headers(headers):
-    # Vercel header anahtarları farklı case'de gelebilir
     for key in headers:
         if key.lower() == 'authorization':
             val = headers[key]
