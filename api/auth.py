@@ -88,16 +88,6 @@ def create_user(username, password, display_name, role='user'):
     kv_put(key, data)
     return data
 
-def ensure_admin():
-    """İlk admin yoksa oluştur."""
-    existing = get_user('hakan')
-    if not existing:
-        create_user(
-            username='hakan',
-            password='12345',
-            display_name='Hakan',
-            role='admin',
-        )
 
 
 # ── SESSION İŞLEMLERİ ────────────────────────────────────────────────────────
@@ -149,7 +139,6 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         """GET /api/auth → oturum kontrolü (me)"""
         try:
-            ensure_admin()
             token = get_token_from_headers(dict(self.headers))
             session = get_session(token)
             if not session:
@@ -166,7 +155,6 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            ensure_admin()
             length = int(self.headers.get('Content-Length', 0))
             body   = json.loads(self.rfile.read(length))
             action = body.get('action', 'login')

@@ -129,7 +129,8 @@ async function doLogout() {
   } catch(e) {}
   sessionStorage.removeItem(AUTH_TOKEN_KEY);
   window.currentUser = null;
-  showLoginOverlay();
+  // Login ekranına yönlendir
+  window.location.reload();
 }
 
 // ── AUTH HEADER YARDIMCISI ────────────────────────────────────────────────────
