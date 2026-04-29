@@ -28,7 +28,6 @@ async function initGecmisPanel() {
 
     if (records.length === 0) {
       showGecmisStatus('info', '<div class="stat">Henüz kayıtlı işlem yok.</div>');
-      // Sidebar ikonunu gizle
       const navEl = document.getElementById('nav-gecmis-item');
       if (navEl) navEl.style.display = 'none';
       return;
@@ -56,15 +55,18 @@ function renderGecmisList(records) {
     const kalanSaat = Math.max(0, Math.floor(kalanMs / 3600000));
     const ulkeLabel = ULKE_LABELS[rec.ulke] || rec.ulke;
     const turlabel  = DOSYA_TURU_LABELS[rec.dosyaTuru] || rec.dosyaTuru;
+    // Kullanıcı adı — yeni kayıtlarda gelir, eskilerinde boş olabilir
+    const userLabel = rec.user ? `👤 ${rec.user}` : '';
 
     const card = document.createElement('div');
     card.className = 'card';
     card.style.cssText = 'margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;';
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span class="badge badge-blue">${ulkeLabel}</span>
           <span class="badge badge-amber">${turlabel}</span>
+          ${userLabel ? `<span style="font-size:11px;color:var(--text3);">${userLabel}</span>` : ''}
         </div>
         <span style="font-size:10px;color:var(--text3);">⏱ ${kalanSaat}s kaldı</span>
       </div>
@@ -133,7 +135,6 @@ async function silGecmisKayit(event, key, el) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key })
     });
-    // Kartı DOM'dan kaldır
     el.closest('.card').remove();
     const remaining = document.querySelectorAll('#gecmisList .card').length;
     if (remaining === 0) {
@@ -164,7 +165,6 @@ function showGecmisStatus(type, html) {
 }
 
 // ── SIDEBAR İKONUNU GÖSTER ───────────────────────────────────────────────────
-// Uygulama açılışında kayıt varsa sidebar'da göster
 async function checkGecmisCount() {
   try {
     const resp = await fetch('/api/storage');

@@ -8,10 +8,38 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/auth.css">
 </head>
 <body>
 
-<div class="app-shell">
+<!-- ── LOGIN OVERLAY ─────────────────────────────────────────────────────── -->
+<div class="login-overlay" id="loginOverlay" style="display:none;">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-mark">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95"/>
+        </svg>
+      </div>
+      <div>
+        <div class="login-title">Fatura Aracı</div>
+        <div class="login-sub">v2.0 · Lojistik Evrak</div>
+      </div>
+    </div>
+    <div class="login-field">
+      <label>Kullanıcı Adı</label>
+      <input class="login-input" id="loginUsername" type="text" placeholder="kullanıcı adınız" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>Şifre</label>
+      <input class="login-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="app-shell" id="app-shell">
 
   <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
   <aside class="sidebar">
@@ -69,6 +97,7 @@
         </svg>
         Ek Evrak
       </div>
+
       <div class="nav-item" id="nav-gecmis-item" onclick="sidebarSelect('gecmis')" style="display:none;">
         <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
@@ -76,6 +105,17 @@
         </svg>
         Son İşlemler
       </div>
+
+      <!-- Admin only -->
+      <div class="nav-item" id="nav-users-item" onclick="sidebarSelect('users')" style="display:none;">
+        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
+          <circle cx="6" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M1 13c0-2.5 2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M12 7v4M14 9h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Kullanıcılar
+      </div>
+
     </nav>
 
     <div class="sidebar-footer">
@@ -83,9 +123,15 @@
         <div class="user-avatar" id="sidebarAvatar">?</div>
         <div>
           <div class="user-name" id="sidebarUserName">Kullanıcı</div>
-          <div class="user-role">Lojistik Ekibi</div>
+          <div class="user-role" id="sidebarUserRole">Lojistik Ekibi</div>
         </div>
       </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Çıkış Yap
+      </button>
     </div>
   </aside>
 
@@ -666,6 +712,7 @@
           ⬇ PDF İndir
         </button>
       </div>
+
       <!-- ── SON İŞLEMLER PANELİ ─────────────────────────────────────────────── -->
       <div class="panel" id="stepGecmis" style="display:none;">
         <div class="panel-label">Son İşlemler</div>
@@ -673,6 +720,88 @@
         <div class="panel-desc">Son 36 saatteki işlemler. Seçince dosyayı tekrar indirebilirsin.</div>
         <div class="status-box" id="gecmisStatus"></div>
         <div id="gecmisList" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- ── KULLANICILAR PANELİ (admin only) ────────────────────────────────── -->
+      <div class="panel" id="stepUsers" style="display:none;">
+        <div class="panel-label">Yönetim</div>
+        <div class="panel-title">Kullanıcılar</div>
+        <div class="panel-desc">Kullanıcı ekle, sil veya şifre sıfırla.</div>
+
+        <div class="status-box" id="usersStatus"></div>
+
+        <!-- Kendi şifreni değiştir -->
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div class="card-title" style="margin-bottom:0;">Şifremi Değiştir</div>
+            <button class="btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="showSelfChangePassForm()">🔑 Değiştir</button>
+          </div>
+          <div id="selfChangePassForm" style="display:none;margin-top:12px;">
+            <div class="users-field">
+              <label>Mevcut Şifre</label>
+              <input class="users-input" id="selfOldPass" type="password" placeholder="••••••">
+            </div>
+            <div class="users-field">
+              <label>Yeni Şifre</label>
+              <input class="users-input" id="selfNewPass" type="password" placeholder="en az 4 karakter">
+            </div>
+            <div class="users-form-btns">
+              <button class="btn-secondary" onclick="submitSelfChangePass()">Kaydet</button>
+              <button class="btn-ghost" onclick="document.getElementById('selfChangePassForm').style.display='none'">İptal</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kullanıcı ekle butonu -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="section-lbl" style="margin-bottom:0;">Kullanıcı Listesi</div>
+          <button class="btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="showAddUserForm()">+ Kullanıcı Ekle</button>
+        </div>
+
+        <!-- Kullanıcı ekleme formu -->
+        <div class="users-add-form" id="usersAddForm" style="display:none;">
+          <div class="users-form-title">Yeni Kullanıcı</div>
+          <div class="users-field">
+            <label>Ad Soyad</label>
+            <input class="users-input" id="newUserName" type="text" placeholder="örn: Ayşe Kaya">
+          </div>
+          <div class="users-field">
+            <label>Kullanıcı Adı</label>
+            <input class="users-input" id="newUserUsername" type="text" placeholder="örn: ayse (küçük harf)">
+          </div>
+          <div class="users-field">
+            <label>Şifre</label>
+            <input class="users-input" id="newUserPassword" type="password" placeholder="en az 4 karakter">
+          </div>
+          <div class="users-field">
+            <label>Rol</label>
+            <select class="users-select" id="newUserRole">
+              <option value="user">Kullanıcı</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="users-form-btns">
+            <button class="btn-secondary" onclick="submitAddUser()">Ekle</button>
+            <button class="btn-ghost" onclick="showAddUserForm()">İptal</button>
+          </div>
+        </div>
+
+        <!-- Şifre sıfırlama formu -->
+        <div class="users-change-pass-form" id="usersChangePassForm" style="display:none;">
+          <div class="users-form-title">Şifre Sıfırla — <span id="resetPassDisplayName"></span></div>
+          <input type="hidden" id="resetPassUsername">
+          <div class="users-field">
+            <label>Yeni Şifre</label>
+            <input class="users-input" id="resetPassNew" type="password" placeholder="en az 4 karakter">
+          </div>
+          <div class="users-form-btns">
+            <button class="btn-secondary" onclick="submitResetPass()">Kaydet</button>
+            <button class="btn-ghost" onclick="hideResetPassForm()">İptal</button>
+          </div>
+        </div>
+
+        <!-- Kullanıcı listesi -->
+        <div id="usersListContainer"></div>
       </div>
 
     </div><!-- /content-area -->
@@ -689,7 +818,8 @@
 <script src="js/mense.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/gecmis.js"></script>
-
+<script src="js/auth.js"></script>
+<script src="js/users.js"></script>
 
 </body>
 </html>

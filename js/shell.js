@@ -2,9 +2,8 @@
 // Sidebar navigasyon, wizard adım yönetimi ve topbar güncellemeleri.
 
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
-// step1 artık yok — step2 başlangıç paneli
 function hideAllPanels() {
-  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis'].forEach(id => {
+  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -16,9 +15,10 @@ function sidebarSelect(mod) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navEl = document.getElementById('nav-' + mod);
   if (navEl) navEl.classList.add('active');
-  // gecmis için ayrıca id'si farklı — onu da aktif yap
   const navGecmis = document.getElementById('nav-gecmis-item');
   if (mod === 'gecmis' && navGecmis) navGecmis.classList.add('active');
+  const navUsers = document.getElementById('nav-users-item');
+  if (mod === 'users' && navUsers) navUsers.classList.add('active');
 
   hideAllPanels();
 
@@ -29,6 +29,7 @@ function sidebarSelect(mod) {
     gtip:    'GTİP Kontrol',
     evrak:   'Ek Evrak Üret',
     gecmis:  'Son İşlemler',
+    users:   'Kullanıcılar',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -60,11 +61,19 @@ function sidebarSelect(mod) {
   } else if (mod === 'gecmis') {
     document.getElementById('stepGecmis').style.display = 'flex';
     if (typeof initGecmisPanel === 'function') initGecmisPanel();
+
+  } else if (mod === 'users') {
+    // Admin kontrolü — sadece admin görebilir
+    if (window.currentUser?.role !== 'admin') {
+      sidebarSelect('sonrasi');
+      return;
+    }
+    document.getElementById('stepUsers').style.display = 'flex';
+    if (typeof initUsersPanel === 'function') initUsersPanel();
   }
 }
 
 // ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────
-// 3 adımdan 2 adıma indirildi: (1) Depo+Ülke+Dosya  (2) KG+Hesap
 function updateWizardDots(activeStep) {
   for (let i = 1; i <= 2; i++) {
     const dot  = document.getElementById('dot' + i);
@@ -77,11 +86,9 @@ function updateWizardDots(activeStep) {
   }
 }
 
-// wizard.js'in updateDots() çağrılarını buraya yönlendir
 function updateDots(n) { updateWizardDots(n); }
 
 // ── GÖSTER / GİZLE ────────────────────────────────────────────────────────────
-// Yeni: 1→step2, 2→step3
 function showOnlyStep(n) {
   hideAllPanels();
   const map = { 1:'step2', 2:'step3' };
@@ -90,8 +97,6 @@ function showOnlyStep(n) {
 }
 
 // ── ADIM GEÇİŞİ ──────────────────────────────────────────────────────────────
-// goStep(1) = Depo+Ülke+Dosya paneli
-// goStep(2) = KG+Hesap paneli
 function goStep(n) {
   ['step2','step3'].forEach(id => {
     const el = document.getElementById(id);
@@ -177,10 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
     row.classList.add('country-btn');
   });
 
-  const savedName = localStorage.getItem('fa_username') || 'Kullanıcı';
-  document.getElementById('sidebarUserName').textContent = savedName;
-  const initials = savedName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-  document.getElementById('sidebarAvatar').textContent = initials || '?';
-
-  sidebarSelect('sonrasi');
+  // Auth kontrolü — önce login overlay aç, başarıysa app'i başlat
+  authCheck().then(() => {
+    // authCheck applySession çağırır, o da admin sekmeyi açar/kapar
+    sidebarSelect('sonrasi');
+    if (typeof checkGecmisCount === 'function') checkGecmisCount();
+  });
 });

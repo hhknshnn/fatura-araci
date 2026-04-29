@@ -585,6 +585,7 @@ async function downloadRS() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ulke:      currentCountry,
+          user:      window.currentUser?.displayName || window.currentUser?.username || '',
           faturaNo:  data.faturaNo,
           dosyaTuru: 'inv_pl',
           excel:     data.excel,
