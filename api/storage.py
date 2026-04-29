@@ -83,21 +83,38 @@ def r2_delete(key):
     get_r2_client().delete_object(Bucket=CF_R2_BUCKET, Key=key)
 
 # ── KAYDET ────────────────────────────────────────────────────────────────────
-def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None):
+def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None,
+                master_bytes=None, price_list_bytes=None, mill_test_bytes=None):
     timestamp = int(time.time())
     key_base  = f'{ulke}_{fatura_no}_{dosya_turu}_{timestamp}'
     r2_keys   = {}
 
     if excel_bytes:
-        r2_key = f'{key_base}.xlsx'
+        r2_key = f'{key_base}_invpl.xlsx'
         r2_upload(r2_key, excel_bytes,
                   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         r2_keys['excel'] = r2_key
 
     if pdf_bytes:
-        r2_key = f'{key_base}.pdf'
+        r2_key = f'{key_base}_fatura.pdf'
         r2_upload(r2_key, pdf_bytes, 'application/pdf')
         r2_keys['pdf'] = r2_key
+
+    if master_bytes:
+        r2_key = f'{key_base}_master.xlsx'
+        r2_upload(r2_key, master_bytes,
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        r2_keys['master'] = r2_key
+
+    if price_list_bytes:
+        r2_key = f'{key_base}_pricelist.pdf'
+        r2_upload(r2_key, price_list_bytes, 'application/pdf')
+        r2_keys['priceList'] = r2_key
+
+    if mill_test_bytes:
+        r2_key = f'{key_base}_milltest.pdf'
+        r2_upload(r2_key, mill_test_bytes, 'application/pdf')
+        r2_keys['millTest'] = r2_key
 
     metadata = {
         'ulke':      ulke,
@@ -198,10 +215,15 @@ class handler(BaseHTTPRequestHandler):
             if not ulke or not fatura_no:
                 raise ValueError('ulke ve faturaNo zorunlu')
 
-            excel_bytes = base64.b64decode(excel_b64) if excel_b64 else None
-            pdf_bytes   = base64.b64decode(pdf_b64)   if pdf_b64   else None
+            excel_bytes      = base64.b64decode(excel_b64)                 if excel_b64                 else None
+            pdf_bytes        = base64.b64decode(pdf_b64)                   if pdf_b64                   else None
+            master_bytes     = base64.b64decode(body.get('master', ''))    if body.get('master')        else None
+            price_list_bytes = base64.b64decode(body.get('priceList', '')) if body.get('priceList')     else None
+            mill_test_bytes  = base64.b64decode(body.get('millTest', ''))  if body.get('millTest')      else None
 
-            key = save_record(ulke, fatura_no, dosya_turu, excel_bytes, pdf_bytes)
+            key = save_record(ulke, fatura_no, dosya_turu,
+                            excel_bytes, pdf_bytes,
+                            master_bytes, price_list_bytes, mill_test_bytes)
 
             result = json.dumps({'success': True, 'key': key})
             self.send_response(200)

@@ -83,25 +83,40 @@ function renderGecmisList(records) {
 
 // ── İNDİR ────────────────────────────────────────────────────────────────────
 async function indirGecmisKayit(key, faturaNo) {
-  showGecmisStatus('info', '<div class="stat">⏳ Dosya indiriliyor...</div>');
+  showGecmisStatus('info', '<div class="stat">⏳ Dosyalar indiriliyor...</div>');
   try {
     const resp = await fetch('/api/storage?key=' + encodeURIComponent(key));
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
     const files = data.files || {};
+    let count = 0;
 
     if (files.excel) {
-      _downloadB64(files.excel,
-        `${faturaNo}.xlsx`,
+      _downloadB64(files.excel, `INV-PL-${faturaNo}.xlsx`,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      count++;
+    }
+    if (files.master) {
+      _downloadB64(files.master, `${faturaNo}.xlsx`,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      count++;
     }
     if (files.pdf) {
-      _downloadB64(files.pdf, `${faturaNo}.pdf`, 'application/pdf');
+      _downloadB64(files.pdf, `${faturaNo}_fatura.pdf`, 'application/pdf');
+      count++;
+    }
+    if (files.priceList) {
+      _downloadB64(files.priceList, `Price List - ${faturaNo}.pdf`, 'application/pdf');
+      count++;
+    }
+    if (files.millTest) {
+      _downloadB64(files.millTest, `MILL TEST - ${faturaNo}.pdf`, 'application/pdf');
+      count++;
     }
 
     showGecmisStatus('success',
-      `<div class="stat">✓ İndirildi: <span>${faturaNo}</span></div>`);
+      `<div class="stat">✓ ${count} dosya indirildi: <span>${faturaNo}</span></div>`);
 
   } catch(err) {
     showGecmisStatus('error', '<div class="stat">⚠ ' + err.message + '</div>');

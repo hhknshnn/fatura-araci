@@ -589,6 +589,9 @@ async function downloadRS() {
           dosyaTuru: 'inv_pl',
           excel:     data.excel,
           pdf:       pdfB64 || '',
+          master:     data.master     || '',
+          priceList:  data.priceList  || '',
+          millTest:   data.millTest   || '',
         })
       });
     } catch(e) {
