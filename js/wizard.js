@@ -34,19 +34,22 @@ async function loadSharedConfig() {
 }
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
+// Eski: step sayıları 1-5 arası, step1=depo, step2=ülke+dosya, step5=kg
+// Yeni: goStep(1)=ülke+dosya (step2 paneli), goStep(2)=kg (step3 paneli)
 function goStep(n) {
-  if (selectedMod === 'oncesi' && n === 2) {
+  // oncesi modu: geri butonu step2'ye döner
+  if (selectedMod === 'oncesi' && n === 1) {
     setupStepFaturaOncesi();
-    showOnlyStep(4);
-    updateDots(4);
-    currentStep = 4;
+    showOnlyStep(1);
+    updateDots(1);
+    currentStep = 1;
     return;
   }
   showOnlyStep(n);
   updateDots(n);
   currentStep = n;
-  if (n === 4) initStep4();
-  if (n === 5) initStep5();
+  if (n === 1) initStep4(); // ülke+dosya paneli açılırken kur alanını güncelle
+  if (n === 2) initStep5(); // kg paneli açılırken tabloyu kur
 }
 
 function showOnlyStep(n) {
@@ -77,15 +80,17 @@ function updateDots(active) {
   }
 }
 
+// Eski: step4Next'e bakıyordu
+// Yeni: step2Next'e bakıyor
 function setupStepFaturaOncesi() {
-  const nextBtn = document.getElementById('step4Next');
+  const nextBtn = document.getElementById('step2Next');
   if (nextBtn) {
     nextBtn.style.display = masterRows ? 'block' : 'none';
-    nextBtn.onclick = () => { goStep(5); };
+    nextBtn.onclick = () => { goStep(2); };
   }
 }
-
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
+// step1Next butonu artık yok, selectMod sonrasi için ekstra iş yapmıyor
 function selectMod(mod) {
   selectedMod = mod;
   ['card-taslak','card-oncesi','card-sonrasi','card-gtip','card-evrak'].forEach(id => {
@@ -113,20 +118,17 @@ function selectMod(mod) {
     updateDots(1);
     return;
   }
-  const btn = document.getElementById('step1Next');
-  if (btn) btn.style.display = 'block';
+  // sonrasi modu — step2 shell.js tarafından zaten açıldı, burada iş yok
 }
-
 // ── ADIM 2: DEPO SEÇ ──────────────────────────────────────────────────────────
+// Eski: depo seçince step1Next butonunu gösteriyordu
+// Yeni: sadece state set eder, buton mantığı yok (step2Next dosya+ülkeye bağlı)
 function selectDepo(depo) {
   selectedDepo = depo;
   document.getElementById('mode-serbest').classList.toggle('active', depo === 'serbest');
   document.getElementById('mode-antrepo').classList.toggle('active', depo === 'antrepo');
-  const btn = document.getElementById('step1Next') || document.getElementById('step2Next');
-  if (btn) btn.style.display = 'block';
   if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 }
-
 // ── ADIM 3: ÜLKE SEÇ ──────────────────────────────────────────────────────────
 function selectCountry(c) {
   currentCountry = c;

@@ -98,46 +98,16 @@
     <!-- CONTENT -->
     <div class="content-area" id="contentArea">
 
-      <!-- ── WIZARD STEPS ────────────────────────────────────────────────── -->
+      <!-- ── WIZARD STEPS ────────────────────────────────────────────────────── -->
       <div class="wizard-steps" id="wizardSteps" style="display:none;">
         <div class="step-item">
           <div class="step-dot active" id="dot1">1</div>
-          <span class="step-label active" id="lbl1">Depo</span>
+          <span class="step-label active" id="lbl1">Depo & Ülke & Dosyalar</span>
         </div>
         <div class="step-line" id="line1"></div>
         <div class="step-item">
           <div class="step-dot idle" id="dot2">2</div>
-          <span class="step-label" id="lbl2">Ülke & Dosyalar</span>
-        </div>
-        <div class="step-line" id="line2"></div>
-        <div class="step-item">
-          <div class="step-dot idle" id="dot3">3</div>
-          <span class="step-label" id="lbl3">KG & Hesap</span>
-        </div>
-      </div>
-
-      <!-- ── ADIM 1: DEPO ───────────────────────────────────────────────── -->
-      <div class="panel" id="step1" style="display:none;">
-        <div class="panel-label">Adım 1</div>
-        <div class="panel-title">Depo Tipi</div>
-        <div class="panel-desc">Sevkiyat depo tipini seçin.</div>
-        <div class="mode-options" id="step2Options">
-          <div class="mode-btn" id="mode-serbest" onclick="selectDepo('serbest')">
-            <div class="mode-icon">🏭</div>
-            <div>
-              <div class="mode-title">Serbest Depo</div>
-            </div>
-          </div>
-          <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
-            <div class="mode-icon">🏗️</div>
-            <div>
-              <div class="mode-title">Antrepo</div>
-            </div>
-          </div>
-        </div>
-        <div class="nav-row">
-          <div></div>
-          <button class="btn-secondary" id="step1Next" onclick="goStep(2)" style="display:none;">Devam →</button>
+          <span class="step-label" id="lbl2">KG & Hesap</span>
         </div>
       </div>
 
@@ -146,6 +116,26 @@
         <div class="panel-label">Adım 2</div>
         <div class="panel-title">Ülke & Dosyalar</div>
         <div class="panel-desc">Hedef ülkeyi seçin, Excel ve PDF dosyalarını yükleyin.</div>
+        
+          <!-- ── DEPO TİPİ — en üstte, ülke seçiminden önce ────────────────────── -->
+          <div>
+            <div class="section-lbl">Depo Tipi</div>
+            <div class="mode-options" id="step2Options">
+              <div class="mode-btn" id="mode-serbest" onclick="selectDepo('serbest')">
+                <div class="mode-icon">🏭</div>
+                <div>
+                  <div class="mode-title">Serbest Depo</div>
+                </div>
+              </div>
+              <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
+                <div class="mode-icon">🏗️</div>
+                <div>
+                  <div class="mode-title">Antrepo</div>
+                  <div class="mode-desc">NET elle girilir</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
         <!-- Ülke arama -->
         <div>
@@ -351,8 +341,8 @@
         </div>
 
         <div class="nav-row">
-          <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
-          <button class="btn-secondary" id="step2Next" onclick="goStep(3)" style="display:none;">Devam →</button>
+          <div></div>
+          <button class="btn-secondary" id="step2Next" onclick="goStep(2)" style="display:none;">Devam →</button>
         </div>
       </div>
 
@@ -469,7 +459,7 @@
         </div>
 
         <div class="nav-row">
-          <button class="btn-ghost" onclick="goStep(2)">← Geri</button>
+          <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
         </div>
 
         <button class="btn-primary" id="downloadBtn" onclick="downloadResult()">

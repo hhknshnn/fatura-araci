@@ -1,10 +1,10 @@
 // ── SHELL.JS ──────────────────────────────────────────────────────────────────
 // Sidebar navigasyon, wizard adım yönetimi ve topbar güncellemeleri.
-// HTML/CSS ile arasındaki köprü — iş logic'i ilgili modüllerde.
 
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
+// step1 artık yok — step2 başlangıç paneli
 function hideAllPanels() {
-  ['step1','step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
+  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -13,14 +13,12 @@ function hideAllPanels() {
 
 // ── SIDEBAR NAVİGASYON ────────────────────────────────────────────────────────
 function sidebarSelect(mod) {
-  // Nav item'ları güncelle
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navEl = document.getElementById('nav-' + mod);
   if (navEl) navEl.classList.add('active');
 
   hideAllPanels();
 
-  // Topbar
   const titles = {
     sonrasi: 'INV + PL Oluştur',
     taslak:  'Taslak Doldur',
@@ -34,8 +32,9 @@ function sidebarSelect(mod) {
   document.getElementById('topbarRight').innerHTML       = '';
 
   if (mod === 'sonrasi') {
+    // step2 artık hem depo hem ülke+dosya içeriyor — doğrudan aç
     document.getElementById('wizardSteps').style.display = 'flex';
-    document.getElementById('step1').style.display       = 'flex';
+    document.getElementById('step2').style.display       = 'flex';
     updateWizardDots(1);
     if (typeof selectMod === 'function') selectMod('sonrasi');
 
@@ -57,9 +56,10 @@ function sidebarSelect(mod) {
   }
 }
 
-// ── WIZARD ADIM GÖSTERGELERİ ──────────────────────────────────────────────────
+// ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────
+// 3 adımdan 2 adıma indirildi: (1) Depo+Ülke+Dosya  (2) KG+Hesap
 function updateWizardDots(activeStep) {
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 2; i++) {
     const dot  = document.getElementById('dot' + i);
     const lbl  = document.getElementById('lbl' + i);
     const line = document.getElementById('line' + i);
@@ -70,39 +70,39 @@ function updateWizardDots(activeStep) {
   }
 }
 
-// wizard.js updateDots → buraya yönlendir
+// wizard.js'in updateDots() çağrılarını buraya yönlendir
 function updateDots(n) { updateWizardDots(n); }
 
-// ── GÖSTER / GİZLE (wizard.js'in showOnlyStep'i bunu çağırır) ────────────────
+// ── GÖSTER / GİZLE ────────────────────────────────────────────────────────────
+// Eski: 1→step1, 2→step1, 3→step2, 4→step2, 5→step3
+// Yeni: 1→step2, 2→step3
 function showOnlyStep(n) {
   hideAllPanels();
-  // Eski adım numarası → yeni panel mapping
-  // 0 = hepsi gizli
-  // 1,2 = step1 (depo)
-  // 3,4 = step2 (ülke+dosya)
-  // 5   = step3 (kg+hesap)
-  const map = { 1:'step1', 2:'step1', 3:'step2', 4:'step2', 5:'step3' };
+  const map = { 1:'step2', 2:'step3' };
   const target = map[n];
   if (target) document.getElementById(target).style.display = 'block';
 }
 
-// ── ADIM GEÇİŞİ (wizard.js'in goStep'ini override eder) ──────────────────────
+// ── ADIM GEÇİŞİ ──────────────────────────────────────────────────────────────
+// goStep(1) = Depo+Ülke+Dosya paneli
+// goStep(2) = KG+Hesap paneli
 function goStep(n) {
-  const panelMap = { 1:'step1', 2:'step2', 3:'step3' };
-  ['step1','step2','step3'].forEach(id => {
+  ['step2','step3'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+  const panelMap = { 1:'step2', 2:'step3' };
   const target = panelMap[n];
   if (target) document.getElementById(target).style.display = 'flex';
   updateWizardDots(n);
   updateTopbarBadges();
 
-  if (n === 2 && typeof initStep4 === 'function') setTimeout(initStep4, 0);
-  if (n === 3 && typeof initStep5 === 'function') setTimeout(initStep5, 0);
+  // Her adım açılırken ilgili init fonksiyonu çalıştır
+  if (n === 1 && typeof initStep4 === 'function') setTimeout(initStep4, 0);
+  if (n === 2 && typeof initStep5 === 'function') setTimeout(initStep5, 0);
 }
 
-// ── TOPBAR BADGE GÜNCELLEMESİ ─────────────────────────────────────────────────
+// ── TOPBAR BADGE GÜNCELLEMESİ ────────────────────────────────────────────────
 function updateTopbarBadges() {
   const countryBadge = document.getElementById('topbarCountry');
   const depoBadge    = document.getElementById('topbarDepo');
@@ -128,7 +128,7 @@ function updateTopbarBadges() {
   }
 }
 
-// ── Ülke listesi — toggle, arama, active sync ─────────────────────────────────
+// ── ÜLKE LİSTESİ — toggle, arama ─────────────────────────────────────────────
 function toggleCountryGroup(id) {
   const body    = document.getElementById('cbody-' + id);
   const chevron = document.getElementById('cchevron-' + id);
@@ -151,9 +151,9 @@ function filterCountryList() {
       row.style.display = show ? '' : 'none';
       if (show) visible++;
     });
-    const countEl   = document.getElementById('ccount-' + gId);
-    const body      = document.getElementById('cbody-' + gId);
-    const chevron   = document.getElementById('cchevron-' + gId);
+    const countEl = document.getElementById('ccount-' + gId);
+    const body    = document.getElementById('cbody-' + gId);
+    const chevron = document.getElementById('cchevron-' + gId);
     if (countEl) countEl.textContent = visible;
     if (q && visible > 0 && body) {
       body.classList.add('open');
@@ -166,7 +166,7 @@ function filterCountryList() {
   if (nr) nr.style.display = total === 0 ? 'block' : 'none';
 }
 
-// wizard.js selectCountry uyumluluğu — country-row'lara country-btn class'ı DOMContentLoaded'da ekleniyor
+// ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   // country-row'lara country-btn class'ı ekle — wizard.js uyumluluğu için
   document.querySelectorAll('.country-row').forEach(row => {
@@ -179,6 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const initials = savedName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   document.getElementById('sidebarAvatar').textContent = initials || '?';
 
-  // Başlangıç ekranı
+  // Başlangıç ekranı — sonrasi modu ile aç
   sidebarSelect('sonrasi');
 });
