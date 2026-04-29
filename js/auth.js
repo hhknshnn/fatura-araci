@@ -112,6 +112,8 @@ function applySession(data) {
 
   // localStorage'daki eski username'i de güncelle (shell.js uyumluluğu)
   try { localStorage.setItem('fa_username', data.displayName || data.username); } catch(e) {}
+  if (typeof checkGecmisCount === 'function') checkGecmisCount();
+
 }
 
 // ── ÇIKIŞ YAP ────────────────────────────────────────────────────────────────
