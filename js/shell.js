@@ -16,6 +16,9 @@ function sidebarSelect(mod) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navEl = document.getElementById('nav-' + mod);
   if (navEl) navEl.classList.add('active');
+  // gecmis için ayrıca id'si farklı — onu da aktif yap
+  const navGecmis = document.getElementById('nav-gecmis-item');
+  if (mod === 'gecmis' && navGecmis) navGecmis.classList.add('active');
 
   hideAllPanels();
 
@@ -25,7 +28,7 @@ function sidebarSelect(mod) {
     oncesi:  'Menşe Hesapla',
     gtip:    'GTİP Kontrol',
     evrak:   'Ek Evrak Üret',
-    
+    gecmis:  'Son İşlemler',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -33,7 +36,6 @@ function sidebarSelect(mod) {
   document.getElementById('topbarRight').innerHTML       = '';
 
   if (mod === 'sonrasi') {
-    // step2 artık hem depo hem ülke+dosya içeriyor — doğrudan aç
     document.getElementById('wizardSteps').style.display = 'flex';
     document.getElementById('step2').style.display       = 'flex';
     updateWizardDots(1);
@@ -54,12 +56,11 @@ function sidebarSelect(mod) {
   } else if (mod === 'evrak') {
     document.getElementById('stepEvrak').style.display = 'flex';
     if (typeof initEvrakPanel === 'function') initEvrakPanel();
-  }
-    else if (mod === 'gecmis') {
+
+  } else if (mod === 'gecmis') {
     document.getElementById('stepGecmis').style.display = 'flex';
     if (typeof initGecmisPanel === 'function') initGecmisPanel();
   }
-
 }
 
 // ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────
@@ -80,7 +81,6 @@ function updateWizardDots(activeStep) {
 function updateDots(n) { updateWizardDots(n); }
 
 // ── GÖSTER / GİZLE ────────────────────────────────────────────────────────────
-// Eski: 1→step1, 2→step1, 3→step2, 4→step2, 5→step3
 // Yeni: 1→step2, 2→step3
 function showOnlyStep(n) {
   hideAllPanels();
@@ -103,7 +103,6 @@ function goStep(n) {
   updateWizardDots(n);
   updateTopbarBadges();
 
-  // Her adım açılırken ilgili init fonksiyonu çalıştır
   if (n === 1 && typeof initStep4 === 'function') setTimeout(initStep4, 0);
   if (n === 2 && typeof initStep5 === 'function') setTimeout(initStep5, 0);
 }
@@ -174,17 +173,14 @@ function filterCountryList() {
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // country-row'lara country-btn class'ı ekle — wizard.js uyumluluğu için
   document.querySelectorAll('.country-row').forEach(row => {
     row.classList.add('country-btn');
   });
 
-  // Kullanıcı adı
   const savedName = localStorage.getItem('fa_username') || 'Kullanıcı';
   document.getElementById('sidebarUserName').textContent = savedName;
   const initials = savedName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   document.getElementById('sidebarAvatar').textContent = initials || '?';
 
-  // Başlangıç ekranı — sonrasi modu ile aç
   sidebarSelect('sonrasi');
 });
