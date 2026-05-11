@@ -414,11 +414,31 @@ def _sku_grupla(df):
     agg_dict['Miktar'] = 'sum'
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
-def generate_master_excel(df_original, brut_list, net_list):
+def generate_master_excel(df_original, brut_list, net_list, hedef_net=0, depo_tipi='serbest'):
     """Stilize master Excel — header mavi+beyaz, auto width, zebra, freeze, filter."""
     df = df_original.copy()
     df['BRÜT'] = brut_list
-    df['NET']  = net_list
+
+    # Antrepo: hedef_net varsa BRÜT oranına göre satırlara dağıt
+    # Serbest depo: NET = BRÜT × 0.9 (eski davranış korunur)
+    if depo_tipi == 'antrepo' and hedef_net > 0:
+        toplam_brut = sum(brut_list)
+        if toplam_brut > 0:
+            master_net = []
+            toplam_net_m = 0.0
+            n_m = len(brut_list)
+            for i_m, b_m in enumerate(brut_list):
+                if i_m < n_m - 1:
+                    val_m = round((b_m / toplam_brut) * hedef_net, 2)
+                    master_net.append(val_m)
+                    toplam_net_m += val_m
+                else:
+                    master_net.append(round(hedef_net - toplam_net_m, 2))
+            df['NET'] = master_net
+        else:
+            df['NET'] = [round(b * 0.9, 2) for b in brut_list]
+    else:
+        df['NET'] = [round(b * 0.9, 2) for b in brut_list]
 
     miktar_arr = df['Miktar'].apply(parse_num)
     brut_arr   = df['BRÜT'].apply(parse_num)
@@ -1064,7 +1084,9 @@ def _generate_excel_eur(df, grup_kilolari, hedef_brut, exception_skus,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    # Antrepo NET'ini master'a da yansıt
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1355,7 +1377,9 @@ def generate_excel_kz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    # Antrepo NET'ini master'a da yansıt
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
 
     # Price List PDF — INV ile aynı SKU-gruplandırılmış df'ten üretilir
     try:
@@ -1553,7 +1577,8 @@ def generate_excel_ru(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -1733,7 +1758,8 @@ def generate_excel_uz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
@@ -1908,7 +1934,8 @@ def _generate_excel_usd(df, grup_kilolari, hedef_brut, exception_skus,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -2113,7 +2140,8 @@ def generate_excel_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 
@@ -2316,7 +2344,8 @@ def generate_excel_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 def generate_excel_cy(faturalar, grup_kilolari, exception_skus):
@@ -2640,7 +2669,8 @@ def generate_excel(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     buf=io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    master_out = generate_master_excel(df_for_master, brut_original, net_original)
+    master_out = generate_master_excel(df_for_master, brut_original, net_original,
+                                        hedef_net=hedef_net, depo_tipi=depo_tipi)
     return buf.getvalue(), fatura_no, master_out
 
 
