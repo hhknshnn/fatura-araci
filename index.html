@@ -43,8 +43,7 @@
 
   <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
   <aside class="sidebar">
-    <a class="sidebar-logo" href="/" onclick="location.reload();return false;">
-      <div class="logo-mark">
+    <a class="sidebar-logo" href="#" onclick="return false;">      <div class="logo-mark">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95"/>
         </svg>
@@ -57,7 +56,16 @@
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">İşlemler</div>
-
+      <div class="nav-section-label">GENEL</div>
+      <div class="nav-item" id="nav-dashboard" onclick="sidebarSelect('dashboard')">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-item" id="nav-sevkiyatlar" onclick="sidebarSelect('sevkiyatlar')">
+        <span class="nav-icon">🚢</span>
+        <span class="nav-label">Sevkiyatlar</span>
+      </div>
+      <div class="nav-section-label">İŞLEMLER</div>
       <div class="nav-item active" id="nav-sonrasi" onclick="sidebarSelect('sonrasi')">
         <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
           <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor"/>
@@ -150,7 +158,138 @@
 
     <!-- CONTENT -->
     <div class="content-area" id="contentArea">
+    
+    <!-- Dashboard Paneli -->
+    <div class="panel" id="stepDashboard" style="display:none;">
+      <div class="panel-label">Genel Bakış</div>
+      <div class="panel-title">Dashboard</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;margin-top:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Toplam Sevkiyat</div>
+          <div class="stat-value" id="dash-toplam">-</div>
+          <div class="stat-sub">Tüm zamanlar</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Yolda</div>
+          <div class="stat-value" style="color:#e3a008;" id="dash-yolda">-</div>
+          <div class="stat-sub">Aktif sevkiyat</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Teslim Edildi</div>
+          <div class="stat-value" style="color:#0e9f6e;" id="dash-teslim">-</div>
+          <div class="stat-sub">Tamamlanan</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Toplam EUR</div>
+          <div class="stat-value" id="dash-eur">-</div>
+          <div class="stat-sub">Fatura bedeli</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div class="dash-card">
+          <div class="dash-card-title">Ülkelere göre sevkiyat</div>
+          <div id="dash-ulke-chart" style="margin-top:12px;"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Son sevkiyatlar</div>
+          <div id="dash-son-sevkiyatlar" style="margin-top:12px;"></div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title">Hızlı işlemler</div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button class="btn-primary" onclick="sidebarSelect('sonrasi')">+ INV + PL Oluştur</button>
+          <button class="btn-secondary" onclick="sidebarSelect('taslak')">Taslak Doldur</button>
+          <button class="btn-secondary" onclick="sidebarSelect('sevkiyatlar')">Sevkiyatları Gör</button>
+        </div>
+      </div>
+    </div>
 
+    <!-- Sevkiyatlar Paneli -->
+    <div class="panel" id="stepSevkiyatlar" style="display:none;">
+      <div class="panel-label">Lojistik</div>
+      <div class="panel-title">Sevkiyatlar</div>
+      <div style="display:flex;gap:10px;margin-top:16px;margin-bottom:16px;align-items:center;">
+        <select id="filter-ulke" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);">
+          <option value="">Tüm ülkeler</option>
+          <option value="Sırbistan">Sırbistan</option>
+          <option value="Bosna">Bosna</option>
+          <option value="Gürcistan">Gürcistan</option>
+          <option value="Kosova">Kosova</option>
+          <option value="Makedonya">Makedonya</option>
+          <option value="Belçika">Belçika</option>
+          <option value="Almanya">Almanya</option>
+          <option value="Hollanda">Hollanda</option>
+          <option value="Kazakistan">Kazakistan</option>
+          <option value="Kıbrıs">Kıbrıs</option>
+          <option value="Irak">Irak</option>
+          <option value="Libya">Libya</option>
+          <option value="Liberya">Liberya</option>
+          <option value="Lübnan">Lübnan</option>
+          <option value="Özbekistan">Özbekistan</option>
+          <option value="Rusya">Rusya</option>
+        </select>
+        <select id="filter-durum" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);">
+          <option value="">Tüm durumlar</option>
+          <option value="YOLDA">Yolda</option>
+          <option value="Varış Gümrük">Varış Gümrük</option>
+          <option value="Gümrükleme">Gümrükleme</option>
+          <option value="TESLİM EDİLDİ">Teslim Edildi</option>
+        </select>
+        <button class="btn-secondary" onclick="downloadMaliyetRaporu()" style="margin-left:auto;">⬇ Maliyet Raporu İndir</button>
+      </div>
+      <div style="background:var(--card-bg);border-radius:12px;border:0.5px solid var(--border);overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--bg-secondary);">
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Dosya No</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Fatura No</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Ülke</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Nakliye Firması</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Plaka</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Fatura EUR</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Yükleme</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Durum</th>
+            </tr>
+          </thead>
+          <tbody id="shipments-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-secondary);">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sevkiyat Detay Paneli -->
+    <div id="shipment-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:100;" onclick="closeShipmentDetail()"></div>
+    <div id="shipment-detail-panel" style="display:none;position:fixed;top:0;right:0;width:420px;height:100vh;background:var(--card-bg);border-left:0.5px solid var(--border);z-index:101;flex-direction:column;overflow-y:auto;">
+      <div style="padding:20px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:var(--text);" id="detail-dosya-no">-</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;"><span id="detail-ulke">-</span> · <span id="detail-fatura-no">-</span></div>
+        </div>
+        <button onclick="closeShipmentDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-secondary);">✕</button>
+      </div>
+      <input type="hidden" id="detail-id">
+      <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <div><label style="font-size:12px;color:var(--text-secondary);">Nakliye Firması</label><input id="edit-nakliye" type="text" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Plaka</label><input id="edit-plaka" type="text" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Durum</label><select id="edit-durum" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"><option value="YOLDA">Yolda</option><option value="Varış Gümrük">Varış Gümrük</option><option value="Gümrükleme">Gümrükleme</option><option value="TESLİM EDİLDİ">Teslim Edildi</option></select></div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-top:4px;">TARİHLER</div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Varış Tarihi</label><input id="edit-varis" type="date" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Gümrükleme Bitiş</label><input id="edit-gumruk-bitis" type="date" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-top:4px;">MALİYET BİLGİLERİ</div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">İhracat Beyanname TL</label><input id="edit-beyanname-tl" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">İhracat Beyanname EUR</label><input id="edit-beyanname-eur" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Araç Bekleme Masrafı</label><input id="edit-bekleme" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Brokerage Fee EUR</label><input id="edit-brokerage" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">Gümrük Vergisi EUR</label><input id="edit-gumruk-v" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;color:var(--text-secondary);">KDV EUR</label><input id="edit-kdv" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+      </div>
+      <div style="padding:20px;border-top:0.5px solid var(--border);display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1;" onclick="saveShipmentDetail()">Kaydet</button>
+        <button class="btn-secondary" onclick="closeShipmentDetail()">İptal</button>
+      </div>
+    </div>
       <!-- ── WIZARD STEPS ────────────────────────────────────────────────────── -->
       <div class="wizard-steps" id="wizardSteps" style="display:none;">
         <div class="step-item">
@@ -820,6 +959,8 @@
 <script src="js/gecmis.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/users.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/shipments.js"></script>
 
 </body>
 </html>

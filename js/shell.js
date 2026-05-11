@@ -3,7 +3,7 @@
 
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
 function hideAllPanels() {
-  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers'].forEach(id => {
+  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers','stepDashboard','stepSevkiyatlar'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -23,13 +23,15 @@ function sidebarSelect(mod) {
   hideAllPanels();
 
   const titles = {
-    sonrasi: 'INV + PL Oluştur',
-    taslak:  'Taslak Doldur',
-    oncesi:  'Menşe Hesapla',
-    gtip:    'GTİP Kontrol',
-    evrak:   'Ek Evrak Üret',
-    gecmis:  'Son İşlemler',
-    users:   'Kullanıcılar',
+    sonrasi:     'INV + PL Oluştur',
+    taslak:      'Taslak Doldur',
+    oncesi:      'Menşe Hesapla',
+    gtip:        'GTİP Kontrol',
+    evrak:       'Ek Evrak Üret',
+    gecmis:      'Son İşlemler',
+    users:       'Kullanıcılar',
+    dashboard:   'Dashboard',
+    sevkiyatlar: 'Sevkiyatlar',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -63,13 +65,20 @@ function sidebarSelect(mod) {
     if (typeof initGecmisPanel === 'function') initGecmisPanel();
 
   } else if (mod === 'users') {
-    // Admin kontrolü — sadece admin görebilir
     if (window.currentUser?.role !== 'admin') {
       sidebarSelect('sonrasi');
       return;
     }
     document.getElementById('stepUsers').style.display = 'flex';
     if (typeof initUsersPanel === 'function') initUsersPanel();
+
+  } else if (mod === 'dashboard') {
+    document.getElementById('stepDashboard').style.display = 'block';
+    if (typeof loadDashboard === 'function') loadDashboard();
+
+  } else if (mod === 'sevkiyatlar') {
+    document.getElementById('stepSevkiyatlar').style.display = 'block';
+    if (typeof loadShipments === 'function') loadShipments();
   }
 }
 
@@ -182,10 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
     row.classList.add('country-btn');
   });
 
-  // Auth kontrolü — önce login overlay aç, başarıysa app'i başlat
   authCheck().then(() => {
-    // authCheck applySession çağırır, o da admin sekmeyi açar/kapar
-    sidebarSelect('sonrasi');
+    sidebarSelect('dashboard');
     if (typeof checkGecmisCount === 'function') checkGecmisCount();
   });
 });

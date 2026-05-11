@@ -7,6 +7,7 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
+from api.shipments import shipments_get, shipments_post, shipments_put
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -280,6 +281,15 @@ def api_storage():
         return storage_delete()
     return storage_post()
 
+@app.route('/api/shipments', methods=['GET', 'POST', 'PUT', 'OPTIONS'])
+def api_shipments():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return shipments_get()
+    if request.method == 'PUT':
+        return shipments_put()
+    return shipments_post()
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
