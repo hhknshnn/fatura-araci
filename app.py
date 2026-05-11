@@ -15,6 +15,10 @@ import evrak as evrak_mod
 import generate as gen_mod
 import taslak as taslak_mod
 
+from api.db import init_db
+from api.auth import auth_get, auth_post
+from api.users import users_get, users_post, users_delete
+from api.storage import storage_get, storage_post, storage_delete
 
 def read_port():
     try:
@@ -25,6 +29,7 @@ def read_port():
 
 
 app = Flask(__name__, static_folder=None)
+init_db()
 
 STATIC_DIRS = {'css', 'js', 'templates', 'fonts', 'assets', 'config'}
 
@@ -247,6 +252,33 @@ def api_evrak():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
 
+@app.route('/api/auth', methods=['GET', 'POST', 'OPTIONS'])
+def api_auth():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return auth_get()
+    return auth_post()
+
+@app.route('/api/users', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
+def api_users():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return users_get()
+    if request.method == 'DELETE':
+        return users_delete()
+    return users_post()
+
+@app.route('/api/storage', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
+def api_storage():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return storage_get()
+    if request.method == 'DELETE':
+        return storage_delete()
+    return storage_post()
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
