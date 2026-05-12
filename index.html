@@ -210,7 +210,7 @@
       <div class="panel-label">Lojistik</div>
       <div class="panel-title">Sevkiyatlar</div>
       <div style="display:flex;gap:10px;margin-top:16px;margin-bottom:16px;align-items:center;">
-        <select id="filter-ulke" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);">
+        <select id="filter-ulke" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--surface);color:var(--text);">
           <option value="">Tüm ülkeler</option>
           <option value="Sırbistan">Sırbistan</option>
           <option value="Bosna">Bosna</option>
@@ -229,7 +229,7 @@
           <option value="Özbekistan">Özbekistan</option>
           <option value="Rusya">Rusya</option>
         </select>
-        <select id="filter-durum" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);">
+        <select id="filter-durum" onchange="filterShipments()" style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--surface);color:var(--text);">
           <option value="">Tüm durumlar</option>
           <option value="YOLDA">Yolda</option>
           <option value="Varış Gümrük">Varış Gümrük</option>
@@ -238,57 +238,107 @@
         </select>
         <button class="btn-secondary" onclick="downloadMaliyetRaporu()" style="margin-left:auto;">⬇ Maliyet Raporu İndir</button>
       </div>
-      <div style="background:var(--card-bg);border-radius:12px;border:0.5px solid var(--border);overflow:hidden;">
+      <div style="background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border2);overflow:auto;">
         <table style="width:100%;border-collapse:collapse;">
           <thead>
-            <tr style="background:var(--bg-secondary);">
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Dosya No</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Fatura No</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Ülke</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Nakliye Firması</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Plaka</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Fatura EUR</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Yükleme</th>
-              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text-secondary);font-weight:500;">Durum</th>
+            <tr style="background:var(--surface2);">
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Dosya No</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Fatura No</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Ülke</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Nakliye Firması</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Plaka</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Fatura EUR</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Yükleme</th>
+              <th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--text3);font-weight:500;">Durum</th>
             </tr>
           </thead>
           <tbody id="shipments-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-secondary);">Yükleniyor...</td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3);">Yükleniyor...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-
     <!-- Sevkiyat Detay Paneli -->
-    <div id="shipment-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:100;" onclick="closeShipmentDetail()"></div>
-    <div id="shipment-detail-panel" style="display:none;position:fixed;top:0;right:0;width:420px;height:100vh;background:var(--card-bg);border-left:0.5px solid var(--border);z-index:101;flex-direction:column;overflow-y:auto;">
-      <div style="padding:20px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+    <div id="shipment-overlay" onclick="closeShipmentDetail()"></div>
+    <div id="shipment-detail-panel">
+      <div class="detail-header">
         <div>
-          <div style="font-size:15px;font-weight:500;color:var(--text);" id="detail-dosya-no">-</div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;"><span id="detail-ulke">-</span> · <span id="detail-fatura-no">-</span></div>
+          <div class="detail-header-title" id="detail-dosya-no">-</div>
+          <div class="detail-header-meta"><span id="detail-ulke">-</span> · <span id="detail-fatura-no">-</span></div>
         </div>
-        <button onclick="closeShipmentDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-secondary);">✕</button>
+        <button class="detail-close-btn" onclick="closeShipmentDetail()">✕</button>
       </div>
       <input type="hidden" id="detail-id">
-      <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
-        <div><label style="font-size:12px;color:var(--text-secondary);">Nakliye Firması</label><input id="edit-nakliye" type="text" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Plaka</label><input id="edit-plaka" type="text" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Durum</label><select id="edit-durum" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"><option value="YOLDA">Yolda</option><option value="Varış Gümrük">Varış Gümrük</option><option value="Gümrükleme">Gümrükleme</option><option value="TESLİM EDİLDİ">Teslim Edildi</option></select></div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-top:4px;">TARİHLER</div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Varış Tarihi</label><input id="edit-varis" type="date" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Gümrükleme Bitiş</label><input id="edit-gumruk-bitis" type="date" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-top:4px;">MALİYET BİLGİLERİ</div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">İhracat Beyanname TL</label><input id="edit-beyanname-tl" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">İhracat Beyanname EUR</label><input id="edit-beyanname-eur" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Araç Bekleme Masrafı</label><input id="edit-bekleme" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Brokerage Fee EUR</label><input id="edit-brokerage" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">Gümrük Vergisi EUR</label><input id="edit-gumruk-v" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><label style="font-size:12px;color:var(--text-secondary);">KDV EUR</label><input id="edit-kdv" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--card-bg);color:var(--text);box-sizing:border-box;"></div>
+      <div class="detail-body">
+
+        <div class="detail-section-label">Genel Bilgiler</div>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <label>Nakliye Firması</label>
+            <input id="edit-nakliye" type="text" placeholder="örn: RAPID">
+          </div>
+          <div class="detail-field">
+            <label>Plaka</label>
+            <input id="edit-plaka" type="text" placeholder="örn: 34ABC123">
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <label>Durum</label>
+          <select id="edit-durum">
+            <option value="YOLDA">Yolda</option>
+            <option value="Varış Gümrük">Varış Gümrük</option>
+            <option value="Gümrükleme">Gümrükleme</option>
+            <option value="TESLİM EDİLDİ">Teslim Edildi</option>
+          </select>
+        </div>
+
+        <div class="detail-section-label">Tarihler</div>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <label>Varış Tarihi</label>
+            <input id="edit-varis" type="date">
+          </div>
+          <div class="detail-field">
+            <label>Gümrükleme Bitiş</label>
+            <input id="edit-gumruk-bitis" type="date">
+          </div>
+        </div>
+
+        <div class="detail-section-label">Maliyet Bilgileri</div>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <label>İhracat Beyanname TL</label>
+            <input id="edit-beyanname-tl" type="number" placeholder="0">
+          </div>
+          <div class="detail-field">
+            <label>İhracat Beyanname EUR</label>
+            <input id="edit-beyanname-eur" type="number" placeholder="0">
+          </div>
+          <div class="detail-field">
+            <label>Araç Bekleme</label>
+            <input id="edit-bekleme" type="number" placeholder="0">
+          </div>
+          <div class="detail-field">
+            <label>Brokerage Fee EUR</label>
+            <input id="edit-brokerage" type="number" placeholder="0">
+          </div>
+          <div class="detail-field">
+            <label>Gümrük Vergisi EUR</label>
+            <input id="edit-gumruk-v" type="number" placeholder="0">
+          </div>
+          <div class="detail-field">
+            <label>KDV EUR</label>
+            <input id="edit-kdv" type="number" placeholder="0">
+          </div>
+        </div>
+
       </div>
-      <div style="padding:20px;border-top:0.5px solid var(--border);display:flex;gap:10px;">
-        <button class="btn-primary" style="flex:1;" onclick="saveShipmentDetail()">Kaydet</button>
-        <button class="btn-secondary" onclick="closeShipmentDetail()">İptal</button>
+      <div class="detail-footer">
+        <button class="btn-ghost" onclick="closeShipmentDetail()">İptal</button>
+        <button class="btn-secondary" onclick="saveShipmentDetail()">Kaydet</button>
       </div>
+    </div>
     </div>
       <!-- ── WIZARD STEPS ────────────────────────────────────────────────────── -->
       <div class="wizard-steps" id="wizardSteps" style="display:none;">

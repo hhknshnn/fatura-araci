@@ -7,7 +7,7 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_export
+from api.shipments import shipments_get, shipments_post, shipments_put
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -50,12 +50,11 @@ def index():
     return send_file(os.path.join(BASE_DIR, 'index.html'))
 
 
+@app.route('/<path:filename>')
 @app.route('/config.json')
 def serve_config_json():
     return send_file(os.path.join(BASE_DIR, 'config.json'), mimetype='application/json')
 
-
-@app.route('/<path:filename>')
 def static_files(filename):
     top = filename.split('/')[0]
     if top in STATIC_DIRS:
@@ -258,7 +257,6 @@ def api_evrak():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
 
-
 @app.route('/api/auth', methods=['GET', 'POST', 'OPTIONS'])
 def api_auth():
     if request.method == 'OPTIONS':
@@ -266,7 +264,6 @@ def api_auth():
     if request.method == 'GET':
         return auth_get()
     return auth_post()
-
 
 @app.route('/api/users', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
 def api_users():
@@ -278,7 +275,6 @@ def api_users():
         return users_delete()
     return users_post()
 
-
 @app.route('/api/storage', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
 def api_storage():
     if request.method == 'OPTIONS':
@@ -289,7 +285,6 @@ def api_storage():
         return storage_delete()
     return storage_post()
 
-
 @app.route('/api/shipments', methods=['GET', 'POST', 'PUT', 'OPTIONS'])
 def api_shipments():
     if request.method == 'OPTIONS':
@@ -299,13 +294,6 @@ def api_shipments():
     if request.method == 'PUT':
         return shipments_put()
     return shipments_post()
-    
-@app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
-def api_shipments_export():
-    if request.method == 'OPTIONS':
-        return app.make_default_options_response()
-    return shipments_export()
-
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
