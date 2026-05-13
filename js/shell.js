@@ -15,6 +15,8 @@ function toggleSidebar() {
 }
 
 function hideAllPanels() {
+  document.getElementById('contentArea').style.padding = '';
+
   ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers','stepDashboard','stepSevkiyatlar'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -90,6 +92,7 @@ function sidebarSelect(mod) {
 
   } else if (mod === 'sevkiyatlar') {
     document.getElementById('stepSevkiyatlar').style.display = 'block';
+    document.getElementById('contentArea').style.padding = '0';
     if (typeof loadShipments === 'function') loadShipments();
   }
 }
@@ -203,8 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
     row.classList.add('country-btn');
   });
 
-  authCheck().then(() => {
+  // authCheck().then(() => {
     sidebarSelect('dashboard');
     if (typeof checkGecmisCount === 'function') checkGecmisCount();
-  });
+  // });
 });

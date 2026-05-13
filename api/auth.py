@@ -3,6 +3,7 @@
 
 import json
 import hashlib
+import bcrypt
 import secrets
 import time
 import traceback
@@ -13,7 +14,10 @@ SESSION_TTL = 8 * 60 * 60  # 8 saat
 
 # ── ŞİFRE HASH ───────────────────────────────────────────────────────────────
 def hash_password(password):
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 
 # ── KULLANICI İŞLEMLERİ ───────────────────────────────────────────────────────
@@ -133,7 +137,7 @@ def _handle_login(body):
         return jsonify({'success': False, 'error': 'Kullanıcı adı ve şifre gerekli'}), 400
 
     user = get_user(username)
-    if not user or user['passwordHash'] != hash_password(password):
+    if not user or not check_password(password, user['passwordHash']):
         return jsonify({'success': False, 'error': 'Kullanıcı adı veya şifre hatalı'}), 401
 
     token = create_session(username, user['displayName'], user['role'])
@@ -167,7 +171,7 @@ def _handle_change_password(body):
         return jsonify({'success': False, 'error': 'Şifre en az 4 karakter olmalı'}), 400
 
     user = get_user(session['username'])
-    if not user or user['passwordHash'] != hash_password(old_password):
+    if not user or not check_password(old_password, user['passwordHash']):
         return jsonify({'success': False, 'error': 'Mevcut şifre hatalı'}), 401
 
     conn = get_conn()

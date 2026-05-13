@@ -17,7 +17,10 @@ def get_all_shipments(ulke=None, durum=None):
         SELECT id, ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
                mal_bedeli_eur, navlun_eur, sigorta_eur, eur_kuru, fatura_bedeli_eur,
                fatura_bedeli_tl, durum, yukleme_tarihi, gumruk_tarihi,
-               varis_tarihi, gumrukleme_bitis, created_at
+               varis_tarihi, gumrukleme_bitis, created_at,
+               mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
+               arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
+               toplam_maliyet_eur
         FROM shipments
         WHERE 1=1
     '''
@@ -32,7 +35,7 @@ def get_all_shipments(ulke=None, durum=None):
         query += ' AND upper(durum) = upper(%s)'
         params.append(durum)
 
-    query += ' ORDER BY ihracat_dosya_no ASC'
+    query += ' ORDER BY ihracat_dosya_no DESC'
 
     cur.execute(query, params)
     rows = cur.fetchall()
@@ -179,15 +182,17 @@ def get_dashboard_stats():
 
 
 # ── MALİYET RAPORU EXPORT ────────────────────────────────────────────────────
-def export_shipments(ulke=None):
+def export_shipments(ulke=None, durum=None, depo=None):
     """Sevkiyatları Excel olarak döndür."""
+    rows = get_all_shipments(ulke=ulke, durum=durum)
+    if depo:
+        rows = [r for r in rows if str(r.get('fatura_no', '')).startswith(depo)]
     try:
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment
     except ImportError:
         return jsonify({'error': 'openpyxl kurulu değil'}), 500
 
-    rows = get_all_shipments(ulke=ulke)
     if not rows:
         return jsonify({'error': 'Veri bulunamadı'}), 404
 
@@ -196,9 +201,13 @@ def export_shipments(ulke=None):
     ws.title = 'Maliyet Raporu'
 
     headers = [
-        'İhracat Dosya No', 'Fatura No', 'Ülke', 'Nakliye Firması', 'Plaka',
-        'Fatura Bedeli (EUR)', 'Fatura Bedeli (TL)', 'Yükleme Tarihi',
-        'Varış Tarihi', 'Durum',
+        'İhracat Dosya No', 'Fatura No', 'Depo', 'Ülke', 'Nakliye Firması', 'Plaka',
+        'Fatura Bedeli TL', 'Fatura Bedeli EUR', 'Mal Bedeli EUR',
+        'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
+        'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
+        'İhracat Beyanname TL', 'İhracat Beyanname EUR',
+        'Araç Bekleme', 'Brokerage EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
+        'Durum',
     ]
 
     # Header satırı
@@ -210,19 +219,44 @@ def export_shipments(ulke=None):
         cell.fill      = header_fill
         cell.alignment = Alignment(horizontal='center', vertical='center')
 
-
+    from openpyxl.styles import numbers
+    
+    TL_FMT  = '#,##0.00 ₺'
+    EUR_FMT = '#,##0.00 €'
+    NUM_FMT = '#,##0.0000'
     # Veri satırları
     for row_idx, s in enumerate(rows, start=2):
-        ws.cell(row=row_idx, column=1,  value=s.get('ihracat_dosya_no', ''))
-        ws.cell(row=row_idx, column=2,  value=s.get('fatura_no', ''))
-        ws.cell(row=row_idx, column=3,  value=s.get('ulke', ''))
-        ws.cell(row=row_idx, column=4,  value=s.get('nakliye_firmasi', ''))
-        ws.cell(row=row_idx, column=5,  value=s.get('plaka', ''))
-        ws.cell(row=row_idx, column=6,  value=s.get('fatura_bedeli_eur', 0))
-        ws.cell(row=row_idx, column=7,  value=s.get('fatura_bedeli_tl', 0))
-        ws.cell(row=row_idx, column=8,  value=s.get('yukleme_tarihi', ''))
-        ws.cell(row=row_idx, column=9,  value=s.get('varis_tarihi', ''))
-        ws.cell(row=row_idx, column=10, value=s.get('durum', ''))
+        fatura_no = s.get('fatura_no', '')
+        depo = 'ANT' if str(fatura_no).startswith('ANT') else 'IHR'
+        
+        def c(col, val, fmt=None):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            if fmt: cell.number_format = fmt
+            return cell
+
+        c(1,  s.get('ihracat_dosya_no', ''))
+        c(2,  fatura_no)
+        c(3,  depo)
+        c(4,  s.get('ulke', ''))
+        c(5,  s.get('nakliye_firmasi', ''))
+        c(6,  s.get('plaka', ''))
+        c(7,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
+        c(8,  float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
+        c(9,  float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
+        c(10, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
+        c(11, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
+        c(12, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
+        c(13, s.get('yukleme_tarihi', ''))
+        c(14, s.get('gumruk_tarihi', ''))
+        c(15, s.get('varis_tarihi', ''))
+        c(16, s.get('gumrukleme_bitis', ''))
+        c(17, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
+        c(18, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
+        c(19, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(20, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(21, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(22, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(23, s.get('durum', ''))
     
     # Veri satırları yazıldıktan sonra otomatik genişlik ayarla
     for col_idx in range(1, len(headers) + 1):
@@ -269,24 +303,32 @@ def _normalize_durum(raw):
 
 def _row_to_dict(row):
     return {
-        'id':                row[0],
-        'ihracat_dosya_no':  row[1],
-        'fatura_no':         row[2],
-        'ulke':              row[3],
-        'nakliye_firmasi':   row[4],
-        'plaka':             row[5],
-        'mal_bedeli_eur':    float(row[6]  or 0),
-        'navlun_eur':        float(row[7]  or 0),
-        'sigorta_eur':       float(row[8]  or 0),
-        'eur_kuru':          float(row[9]  or 0),
-        'fatura_bedeli_eur': float(row[10] or 0),
-        'fatura_bedeli_tl':  float(row[11] or 0),
-        'durum':             row[12],
-        'yukleme_tarihi':    str(row[13]) if row[13] else None,
-        'gumruk_tarihi':     str(row[14]) if row[14] else None,
-        'varis_tarihi':      str(row[15]) if row[15] else None,
-        'gumrukleme_bitis':  str(row[16]) if row[16] else None,
-        'created_at':        row[17],
+        'id':                    row[0],
+        'ihracat_dosya_no':      row[1],
+        'fatura_no':             row[2],
+        'ulke':                  row[3],
+        'nakliye_firmasi':       row[4],
+        'plaka':                 row[5],
+        'mal_bedeli_eur':        float(row[6]  or 0),
+        'navlun_eur':            float(row[7]  or 0),
+        'sigorta_eur':           float(row[8]  or 0),
+        'eur_kuru':              float(row[9]  or 0),
+        'fatura_bedeli_eur':     float(row[10] or 0),
+        'fatura_bedeli_tl':      float(row[11] or 0),
+        'durum':                 row[12],
+        'yukleme_tarihi':        str(row[13]) if row[13] else None,
+        'gumruk_tarihi':         str(row[14]) if row[14] else None,
+        'varis_tarihi':          str(row[15]) if row[15] else None,
+        'gumrukleme_bitis':      str(row[16]) if row[16] else None,
+        'created_at':            row[17],
+        'mal_bedeli_tl':         float(row[18] or 0),
+        'ihracat_beyanname_tl':  float(row[19] or 0),
+        'ihracat_beyanname_eur': float(row[20] or 0),
+        'arac_bekleme':          float(row[21] or 0),
+        'brokerage_eur':         float(row[22] or 0),
+        'gumruk_vergisi_eur':    float(row[23] or 0),
+        'kdv_eur':               float(row[24] or 0),
+        'toplam_maliyet_eur':    float(row[25] or 0),
     }
 
 
@@ -327,8 +369,22 @@ def shipments_put():
     update_shipment(int(sid), body)
     return jsonify({'success': True})
 
+def shipments_delete():
+    """DELETE /api/shipments — sevkiyat sil"""
+    body = request.get_json() or {}
+    sid  = body.get('id')
+    if not sid:
+        return jsonify({'success': False, 'error': 'id gerekli'}), 400
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute('DELETE FROM shipments WHERE id = %s', (int(sid),))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'success': True})
 
 def shipments_export():
-    """GET /api/shipments/export — Excel raporu"""
-    ulke = request.args.get('ulke')
-    return export_shipments(ulke=ulke)
+    ulke  = request.args.get('ulke')
+    durum = request.args.get('durum')
+    depo  = request.args.get('depo')
+    return export_shipments(ulke=ulke, durum=durum, depo=depo)

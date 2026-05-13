@@ -7,7 +7,8 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_export
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export
+from api.kur import get_tcmb_kurlar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -91,6 +92,7 @@ def api_generate():
             pdf_fields = gen_mod.parse_pdf(base64.b64decode(pdf_b64))
 
         price_list_out = None
+        mill_test_out = None
 
         if ulke_kodu == 'cy':
             faturalar = body.get('faturalar', [])
@@ -136,7 +138,7 @@ def api_generate():
             excel_out, fatura_no, master_out = gen_mod.generate_excel_uz(
                 df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
         elif ulke_kodu == 'be':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_be(
+            excel_out, fatura_no, master_out, mill_test_out = gen_mod.generate_excel_be(
                 df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
                 eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
         elif ulke_kodu == 'de':
@@ -176,6 +178,8 @@ def api_generate():
         }
         if price_list_out:
             resp['priceList'] = base64.b64encode(price_list_out).decode()
+        if mill_test_out:
+            resp['millTest'] = base64.b64encode(mill_test_out).decode()
         return jsonify(resp)
 
     except Exception as e:
@@ -290,7 +294,7 @@ def api_storage():
     return storage_post()
 
 
-@app.route('/api/shipments', methods=['GET', 'POST', 'PUT', 'OPTIONS'])
+@app.route('/api/shipments', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def api_shipments():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
@@ -298,6 +302,8 @@ def api_shipments():
         return shipments_get()
     if request.method == 'PUT':
         return shipments_put()
+    if request.method == 'DELETE':
+        return shipments_delete()
     return shipments_post()
     
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
@@ -306,6 +312,12 @@ def api_shipments_export():
         return app.make_default_options_response()
     return shipments_export()
 
+@app.route('/api/kur', methods=['GET', 'OPTIONS'])
+def api_kur():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    kurlar = get_tcmb_kurlar()
+    return jsonify({'success': True, 'kurlar': kurlar})
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':

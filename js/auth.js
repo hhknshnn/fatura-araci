@@ -6,6 +6,13 @@ const AUTH_TOKEN_KEY = 'fa_auth_token';
 
 // ── MEVCUT OTURUMU KONTROL ET ─────────────────────────────────────────────────
 async function authCheck() {
+  // GEÇİCİ: login devre dışı
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('app-shell').style.display    = 'flex';
+  window.currentUser = { username: 'hakan', displayName: 'Hakan', role: 'admin', token: '' };
+  const adminNav = document.getElementById('nav-users-item');
+  if (adminNav) adminNav.style.display = 'flex';
+  return;
   const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   if (!token) {
     showLoginOverlay();

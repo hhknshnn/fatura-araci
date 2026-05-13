@@ -641,7 +641,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function arrayBufferToBase64(buf) {
   const b = new Uint8Array(buf);
+  const chunkSize = 8192;
   let s = '';
-  for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+  for (let i = 0; i < b.byteLength; i += chunkSize) {
+    s += String.fromCharCode(...b.subarray(i, i + chunkSize));
+  }
   return btoa(s);
 }

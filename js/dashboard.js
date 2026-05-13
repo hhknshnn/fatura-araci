@@ -4,7 +4,7 @@
 async function loadDashboard() {
   // Dashboard istatistiklerini API'den çek
   try {
-    const token = localStorage.getItem('auth_token');
+    const token = sessionStorage.getItem('fa_auth_token');
     const res = await fetch('/api/shipments?mode=dashboard', {
       headers: { 'Authorization': `Bearer ${token}` }
     });

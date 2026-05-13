@@ -599,6 +599,75 @@ async function downloadRS() {
       console.warn('Storage kayıt hatası:', e);
     }
 
+    // ── SEVKİYAT TABLOSUNA OTOMATIK KAYDET ───────────────────────────────────
+    try {
+      // Güncel kur bilgisini çek
+      const kurResp = await fetch('/api/kur');
+      const kurData = await kurResp.json();
+      const kurlar  = kurData.kurlar || {};
+
+      // Ülkeye göre EUR dönüşümü
+      const EUR_ULKELER = ['be', 'de', 'nl', 'xk', 'mk'];
+      const USD_ULKELER = ['iq', 'ly', 'lr', 'lb'];
+      const TRY_ULKELER = ['rs', 'ba', 'ge', 'kz', 'ru', 'uz', 'cy'];
+
+      let fatura_bedeli_eur = 0;
+      let mal_bedeli_eur    = 0;
+      let navlun_eur        = 0;
+      let sigorta_eur       = 0;
+      let eur_kuru          = 0;
+
+      // Fatura tutarını hesapla
+      const pdfKur = data.pdfFields?.kur || 0; // PDF'ten gelen TRY/EUR kur
+
+      if (EUR_ULKELER.includes(currentCountry)) {
+        // Zaten EUR — direkt kullan
+        eur_kuru        = parseFloat(document.getElementById('eurRateInput')?.value?.replace(',','.') || 0);
+        fatura_bedeli_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) / eur_kuru * parseNum(r['Miktar'] || 0)), 0);
+        navlun_eur      = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
+        sigorta_eur     = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+      } else if (USD_ULKELER.includes(currentCountry)) {
+        // USD → EUR
+        eur_kuru        = kurlar.TRY || 0;
+        const usdRate   = kurlar.USD || 1;
+        fatura_bedeli_eur = workingRows.reduce((s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0), 0) / usdRate;
+        navlun_eur      = 0;
+        sigorta_eur     = 0;
+      } else {
+        // TRY → EUR
+        eur_kuru        = pdfKur > 0 ? pdfKur : (kurlar.TRY || 0);
+        if (eur_kuru > 0) {
+          fatura_bedeli_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0)), 0) / eur_kuru;
+          navlun_eur      = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
+          sigorta_eur     = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+        }
+      }
+
+      // Ülke adını DB formatına çevir
+      const ULKE_MAP = {
+        rs: 'SIRBİSTAN', ba: 'BOSNA', ge: 'GÜRCİSTAN', xk: 'KOSOVA',
+        mk: 'MAKEDONYA', be: 'BELÇİKA', de: 'ALMANYA', nl: 'HOLLANDA',
+        kz: 'KAZAKİSTAN', ru: 'RUSYA', uz: 'ÖZBEKİSTAN', cy: 'KIBRIS',
+        iq: 'IRAK', ly: 'LİBYA', lr: 'LİBERYA', lb: 'LÜBNAN',
+      };
+
+      await fetch('/api/shipments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
+        body: JSON.stringify({
+          fatura_no:         data.faturaNo,
+          ulke:              ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
+          durum:             'YOLDA',
+          fatura_bedeli_eur: Math.round(fatura_bedeli_eur * 100) / 100,
+          navlun_eur:        Math.round(navlun_eur * 100) / 100,
+          sigorta_eur:       Math.round(sigorta_eur * 100) / 100,
+          eur_kuru:          Math.round(eur_kuru * 10000) / 10000,
+        })
+      });
+    } catch(e) {
+      console.warn('Sevkiyat otomatik kayıt hatası:', e);
+    }
+
     showStatus('success', `<div class="stat">✓ İndirildi: <span>${data.faturaNo}</span></div>`);
 
   } catch(err) {
@@ -665,8 +734,11 @@ async function downloadCY() {
 
 function arrayBufferToBase64(buf) {
   const b = new Uint8Array(buf);
+  const chunkSize = 8192;
   let s = '';
-  for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+  for (let i = 0; i < b.byteLength; i += chunkSize) {
+    s += String.fromCharCode(...b.subarray(i, i + chunkSize));
+  }
   return btoa(s);
 }
 
