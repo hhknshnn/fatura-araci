@@ -58,6 +58,8 @@ function handleFile(file) {
   const badge = document.getElementById('fileName');
   badge.textContent = '✓ ' + file.name;
   badge.style.display = 'inline-flex';
+  const dosyaSec = document.getElementById('dosyaNoSection');
+  if (dosyaSec) dosyaSec.style.display = 'block';
   const r = new FileReader();
   r.onload = e => {
     lastFileData = e.target.result;

@@ -623,9 +623,11 @@ async function downloadRS() {
       if (EUR_ULKELER.includes(currentCountry)) {
         // Zaten EUR — direkt kullan
         eur_kuru        = parseFloat(document.getElementById('eurRateInput')?.value?.replace(',','.') || 0);
-        fatura_bedeli_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) / eur_kuru * parseNum(r['Miktar'] || 0)), 0);
-        navlun_eur      = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
-        sigorta_eur     = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+        const mal_toplam_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) / eur_kuru * parseNum(r['Miktar'] || 0)), 0);
+        navlun_eur        = parseFloat(data.pdfFields?.navlun  || 0) / eur_kuru;
+        sigorta_eur       = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+        fatura_bedeli_eur = mal_toplam_eur + navlun_eur + sigorta_eur;
+        mal_bedeli_eur    = mal_toplam_eur;
       } else if (USD_ULKELER.includes(currentCountry)) {
         // USD → EUR
         eur_kuru        = kurlar.TRY || 0;
@@ -637,9 +639,11 @@ async function downloadRS() {
         // TRY → EUR
         eur_kuru        = pdfKur > 0 ? pdfKur : (kurlar.TRY || 0);
         if (eur_kuru > 0) {
-          fatura_bedeli_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0)), 0) / eur_kuru;
-          navlun_eur      = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
-          sigorta_eur     = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+          const mal_toplam = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0)), 0);
+          navlun_eur       = parseFloat(data.pdfFields?.navlun  || 0) / eur_kuru;
+          sigorta_eur      = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+          fatura_bedeli_eur = (mal_toplam / eur_kuru) + navlun_eur + sigorta_eur;
+          mal_bedeli_eur    = mal_toplam / eur_kuru;
         }
       }
 
@@ -651,10 +655,13 @@ async function downloadRS() {
         iq: 'IRAK', ly: 'LİBYA', lr: 'LİBERYA', lb: 'LÜBNAN',
       };
 
-      await fetch('/api/shipments', {
+      const dosyaNoEl = document.getElementById('ihracatDosyaNo');
+      const ihracatDosyaNo = dosyaNoEl?.value?.trim() ? '2026-' + dosyaNoEl.value.trim() : '';
+      const sevkRes  = await fetch('/api/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
         body: JSON.stringify({
+          ihracat_dosya_no: ihracatDosyaNo,
           fatura_no:         data.faturaNo,
           ulke:              ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
           durum:             'YOLDA',
@@ -664,6 +671,10 @@ async function downloadRS() {
           eur_kuru:          Math.round(eur_kuru * 10000) / 10000,
         })
       });
+      const sevkData = await sevkRes.json();
+      if (!sevkData.success && sevkData.error?.includes('zaten kayıtlı')) {
+        showStatus('info', `<div class="stat">⚠ Bu fatura zaten Sevkiyatlar\'da kayıtlı — yeni kayıt oluşturulmadı.</div>`);
+      }
     } catch(e) {
       console.warn('Sevkiyat otomatik kayıt hatası:', e);
     }
@@ -783,4 +794,55 @@ function fileToArrayBuffer(file) {
     r.onerror = () => reject(new Error('Dosya okunamadı'));
     r.readAsArrayBuffer(file);
   });
+}
+
+async function checkDosyaNoAndProceed() {
+  const dosyaNoEl = document.getElementById('ihracatDosyaNo');
+  const dosyaNo = dosyaNoEl?.value?.trim();
+  
+  if (dosyaNo) {
+    // Backend'de fatura_no kontrolü — ama biz dosya_no kontrol edeceğiz
+    // Önce mevcut sevkiyatları çek ve ihracat_dosya_no'ya bak
+    try {
+      const token = sessionStorage.getItem('fa_auth_token');
+      const res = await fetch('/api/shipments', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const tamDosyaNo = '2026-' + dosyaNo;
+        const duplicate = data.shipments.find(s => s.ihracat_dosya_no === tamDosyaNo);
+        if (duplicate) {
+          // Popup göster
+          showDuplicateWarning(tamDosyaNo);
+          return;
+        }
+      }
+    } catch(e) {
+      console.warn('Duplicate kontrol hatası:', e);
+    }
+  }
+  goStep(2);
+}
+
+function showDuplicateWarning(dosyaNo) {
+  // Mevcut popup varsa sil
+  const existing = document.getElementById('duplicate-popup');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'duplicate-popup';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xl);padding:28px 32px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.16);text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;">Dosya No Zaten Mevcut</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px;"><b>${dosyaNo}</b> numaralı dosya Sevkiyatlar'da zaten kayıtlı.<br>Devam etmek istiyor musunuz?</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="document.getElementById('duplicate-popup').remove()" style="padding:9px 20px;border-radius:var(--radius-md);border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);font-size:13px;cursor:pointer;">İptal</button>
+        <button onclick="document.getElementById('duplicate-popup').remove();goStep(2);" style="padding:9px 20px;border-radius:var(--radius-md);border:none;background:var(--error);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;">Yine de Devam Et</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }

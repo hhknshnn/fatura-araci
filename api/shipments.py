@@ -61,6 +61,18 @@ def get_shipment(shipment_id):
 
 # ── SEVKİYAT OLUŞTUR ─────────────────────────────────────────────────────────
 def create_shipment(data):
+    # Duplicate fatura_no kontrolü
+    fatura_no = data.get('fatura_no', '')
+    if fatura_no:
+        conn = get_conn()
+        cur  = conn.cursor()
+        cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            raise ValueError(f'Bu fatura no zaten kayıtlı: {fatura_no}')
+        cur.close()
+        conn.close()
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute('''
@@ -354,10 +366,12 @@ def shipments_get():
 
 
 def shipments_post():
-    """POST /api/shipments — yeni sevkiyat oluştur"""
-    body   = request.get_json() or {}
-    new_id = create_shipment(body)
-    return jsonify({'success': True, 'id': new_id})
+    body = request.get_json() or {}
+    try:
+        new_id = create_shipment(body)
+        return jsonify({'success': True, 'id': new_id})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 def shipments_put():
