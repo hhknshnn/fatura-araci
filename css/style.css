@@ -51,7 +51,7 @@ body {
 }
 
 /* ── SIDEBAR ──────────────────────────────────────────────────────────────── */
-.sidebar {
+.sidebar { position: relative;
   width: var(--sidebar-w);
   flex-shrink: 0;
   background: var(--surface);
@@ -881,7 +881,7 @@ body {
 
 /* ── RESPONSIVE (dar ekran fallback) ─────────────────────────────────────── */
 @media (max-width: 640px) {
-  .sidebar { display: none; }
+  .sidebar { position: relative; display: none; }
   .two-col { grid-template-columns: 1fr; }
 }
 
@@ -1319,3 +1319,7 @@ body {
   border-left: none;
   border-right: none;
 }
+/* Sidebar toggle */
+.sidebar { position: relative; transition: width 0.2s ease; }
+.sidebar.collapsed { width: 0 !important; overflow: hidden; }
+

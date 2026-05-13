@@ -3,6 +3,60 @@
 
 let allShipments = [];
 
+
+// Sticky yatay scroll bar — viewport'a yapışık
+function initStickyScroll() {
+  const wrapper = document.getElementById('shipments-table-wrapper');
+  if (!wrapper) return;
+
+  // Sahte scroll bar div'i oluştur
+  const fakeScroll = document.createElement('div');
+  fakeScroll.id = 'fake-scrollbar';
+  fakeScroll.style.cssText = `
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 50;
+    background: var(--surface2);
+    border-top: 0.5px solid var(--border2);
+  `;
+
+  // İçine tablo genişliğinde boş div
+  const fakeInner = document.createElement('div');
+  fakeInner.id = 'fake-scrollbar-inner';
+  fakeScroll.appendChild(fakeInner);
+  document.body.appendChild(fakeScroll);
+
+  // Genişlikleri senkronize et
+  function syncWidth() {
+    fakeInner.style.width = wrapper.scrollWidth + 'px';
+    // Wrapper görünür değilse gizle
+    const rect = wrapper.getBoundingClientRect();
+    fakeScroll.style.display = rect.width > 0 ? 'block' : 'none';
+  }
+
+  // Scroll senkronizasyonu
+  wrapper.addEventListener('scroll', () => {
+    fakeScroll.scrollLeft = wrapper.scrollLeft;
+  });
+  fakeScroll.addEventListener('scroll', () => {
+    wrapper.scrollLeft = fakeScroll.scrollLeft;
+  });
+
+  // Tablo yüklenince ve resize'da genişliği güncelle
+  syncWidth();
+  window.addEventListener('resize', syncWidth);
+
+  // renderShipments sonrası da güncelle
+  const origRender = window.renderShipments;
+  window.renderShipments = function(list) {
+    origRender(list);
+    setTimeout(syncWidth, 50);
+  };
+}
 // Veritabanından gelen durum değerlerini normalize et
 // İmport scriptinden 'Yolda', 'yolda', 'YOLDA' gibi farklı formlar gelebilir
 function normalizeDurum(raw) {
@@ -41,6 +95,8 @@ async function loadShipments(ulke = '', durum = '') {
 
     allShipments = data.shipments;
     renderShipments(allShipments);
+    // İlk yüklemede sticky scroll'u başlat
+    if (!document.getElementById('fake-scrollbar')) initStickyScroll();
   } catch (e) {
     console.error('Sevkiyatlar yüklenemedi:', e);
   }
@@ -51,7 +107,7 @@ function renderShipments(list) {
   if (!tbody) return;
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3);">Sevkiyat bulunamadı</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text3);">Sevkiyat bulunamadı</td></tr>`;
     return;
   }
 
@@ -59,14 +115,16 @@ function renderShipments(list) {
       const durumNorm = normalizeDurum(s.durum);
       return `
       <tr style="border-bottom:0.5px solid var(--border);cursor:pointer;" onclick="openShipmentDetail(${s.id})">
-        <td style="padding:10px 16px;font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;">${s.ihracat_dosya_no || '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.fatura_no || '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.fatura_bedeli_eur ? s.fatura_bedeli_eur.toFixed(0) + ' €' : '-'}</td>
-        <td style="padding:10px 16px;font-size:13px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
-        <td style="padding:10px 16px;white-space:nowrap;">
+        <td style="padding:6px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${s.ihracat_dosya_no || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.fatura_no || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.fatura_bedeli_eur ? s.fatura_bedeli_eur.toFixed(0) + ' €' : '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.varis_tarihi || '-'}</td>
+        <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.toplam_maliyet_eur ? s.toplam_maliyet_eur.toFixed(0) + ' €' : '-'}</td> 
+        <td style="padding:6px 12px;white-space:nowrap;">
           <span style="font-size:11px;font-weight:500;padding:3px 8px;border-radius:4px;${durumStyle(durumNorm)}">${durumNorm}</span>
         </td>
       </tr>`;

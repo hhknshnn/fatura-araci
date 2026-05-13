@@ -2,6 +2,18 @@
 // Sidebar navigasyon, wizard adım yönetimi ve topbar güncellemeleri.
 
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
+// Sidebar toggle
+function toggleSidebar() {
+  const sb = document.querySelector(".sidebar");
+  sb.classList.toggle("collapsed");
+  const collapsed = sb.classList.contains("collapsed");
+  const fs = document.getElementById("fake-scrollbar");
+  if (fs) fs.style.left = collapsed ? "0" : "220px";
+  // Tablo alanını genişlet
+  const main = document.querySelector(".main-area");
+  if (main) main.style.marginLeft = collapsed ? "0" : "";
+}
+
 function hideAllPanels() {
   ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers','stepDashboard','stepSevkiyatlar'].forEach(id => {
     const el = document.getElementById(id);

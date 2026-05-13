@@ -209,7 +209,7 @@ def export_shipments(ulke=None):
         cell.font      = header_font
         cell.fill      = header_fill
         cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.column_dimensions[cell.column_letter].width = max(len(header) + 4, 14)
+
 
     # Veri satırları
     for row_idx, s in enumerate(rows, start=2):
@@ -223,6 +223,16 @@ def export_shipments(ulke=None):
         ws.cell(row=row_idx, column=8,  value=s.get('yukleme_tarihi', ''))
         ws.cell(row=row_idx, column=9,  value=s.get('varis_tarihi', ''))
         ws.cell(row=row_idx, column=10, value=s.get('durum', ''))
+    
+    # Veri satırları yazıldıktan sonra otomatik genişlik ayarla
+    for col_idx in range(1, len(headers) + 1):
+        col_letter = ws.cell(row=1, column=col_idx).column_letter
+        max_len = len(str(ws.cell(row=1, column=col_idx).value or ''))
+        for row_idx in range(2, len(rows) + 2):
+            val = ws.cell(row=row_idx, column=col_idx).value
+            if val is not None:
+                max_len = max(max_len, len(str(val)))
+        ws.column_dimensions[col_letter].width = min(max_len + 4, 50)
 
     buf = io.BytesIO()
     wb.save(buf)
