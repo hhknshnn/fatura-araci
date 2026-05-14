@@ -74,8 +74,7 @@ def api_generate():
         return jsonify({'status': 'ok', 'service': 'generate'})
 
     try:
-        body = request.get_json(force=True)
-
+        body           = request.get_json(force=True)
         excel_bytes    = base64.b64decode(body.get('excel', ''))
         logo_b64       = body.get('logo', '')
         logo_bytes     = base64.b64decode(logo_b64) if logo_b64 else None
@@ -85,15 +84,15 @@ def api_generate():
         grup_kilolari  = body.get('grupKilolari', {})
         exception_skus = body.get('exceptionSkus', gen_mod.EXCEPTION_SKUS)
         ulke_kodu      = body.get('ulkeKodu', 'rs')
+        eur_kuru       = float(body.get('eurKuru', 1.0))
+        usd_kuru       = float(body.get('usdKuru', 1.0))
 
         pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
-        pdf_b64 = body.get('pdf', '')
+        pdf_b64    = body.get('pdf', '')
         if pdf_b64:
             pdf_fields = gen_mod.parse_pdf(base64.b64decode(pdf_b64))
 
-        price_list_out = None
-        mill_test_out = None
-
+        # ── Kıbrıs özel ──────────────────────────────────────────────────────
         if ulke_kodu == 'cy':
             faturalar = body.get('faturalar', [])
             excel_out = gen_mod.generate_excel_cy(faturalar, grup_kilolari, exception_skus)
@@ -106,68 +105,32 @@ def api_generate():
                 'pdfFields': {},
             })
 
-        df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
+        df          = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
         df_original = df.copy()
-        kw = dict(
-            hedef_net=hedef_net,
-            depo_tipi=depo_tipi,
-            df_original=df_original,
-        )
 
-        if ulke_kodu == 'ba':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ba(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'ge':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ge(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'xk':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ko(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'mk':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_mk(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'kz':
-            excel_out, fatura_no, master_out, price_list_out = gen_mod.generate_excel_kz(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'ru':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ru(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'uz':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_uz(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'be':
-            excel_out, fatura_no, master_out, mill_test_out = gen_mod.generate_excel_be(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'de':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_de(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'nl':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_nl(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'iq':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_iq(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'ly':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ly(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'lr':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_lr(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'lb':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_lb(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        else:
-            excel_out, fatura_no, master_out = gen_mod.generate_excel(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+        price_list_out = None
+        mill_test_out  = None
+
+        # ── Yeni dispatcher — hata alırsa eski koda düş ───────────────────
+        try:
+            excel_out, fatura_no, master_out, price_list_out, mill_test_out = \
+                gen_mod.dispatch(
+                    ulke_kodu, df, df_original, grup_kilolari, hedef_brut,
+                    hedef_net, depo_tipi, exception_skus, logo_bytes,
+                    pdf_fields, eur_kuru, usd_kuru
+                )
+        except NotImplementedError:
+            print(f'[WARN] dispatch: {ulke_kodu} için eski kod kullanılıyor')
+            kw = dict(hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
+            if ulke_kodu == 'ba':
+                excel_out, fatura_no, master_out = gen_mod.generate_excel_ba(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+            elif ulke_kodu == 'ge':
+                excel_out, fatura_no, master_out = gen_mod.generate_excel_ge(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+            else:
+                excel_out, fatura_no, master_out = gen_mod.generate_excel(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
 
         resp = {
             'success':   True,
@@ -183,8 +146,11 @@ def api_generate():
         return jsonify(resp)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
-
+        return jsonify({
+            'success': False,
+            'error':   str(e),
+            'trace':   traceback.format_exc()
+        }), 500
 
 # ── /api/taslak ───────────────────────────────────────────────────────────────
 

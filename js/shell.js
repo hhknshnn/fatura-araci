@@ -201,13 +201,11 @@ function filterCountryList() {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.country-row').forEach(row => {
     row.classList.add('country-btn');
   });
-
-  // authCheck().then(() => {
-    sidebarSelect('dashboard');
-    if (typeof checkGecmisCount === 'function') checkGecmisCount();
-  // });
+  await loadCountriesConfig();
+  sidebarSelect('dashboard');
+  if (typeof checkGecmisCount === 'function') checkGecmisCount();
 });
