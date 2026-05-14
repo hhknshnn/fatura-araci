@@ -62,8 +62,8 @@ def parse_pdf_fields(pdf_bytes):
                     break
             # Kur bilgisi
             result['kur'] = _extract_pdf_amount(text, [
-                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*([\d.,]+)',
-            ])    
+                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+            ])
             # BRÜT kilo
             result['brutKg'] = _extract_pdf_amount(text, [
                 r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
