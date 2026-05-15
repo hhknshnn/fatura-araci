@@ -231,6 +231,12 @@
               <option value="ÖZBEKİSTAN">Özbekistan</option>
               <option value="RUSYA">Rusya</option>
             </select>
+            <select id="filter-musteri-tipi" onchange="filterShipments()"
+              style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border2);font-size:13px;background:var(--surface);color:var(--text);">
+              <option value="">Tüm müşteri tipleri</option>
+              <option value="kurumsal">Kurumsal</option>
+              <option value="franchise">Franchise</option>
+            </select>
             <select id="filter-durum" onchange="filterShipments()"
               style="padding:8px 12px;border-radius:8px;border:0.5px solid var(--border2);font-size:13px;background:var(--surface);color:var(--text);">
               <option value="">Tüm durumlar</option>
@@ -642,7 +648,8 @@
           </div>
           <div class="nav-row">
             <div></div>
-            <button class="btn-secondary" id="step2Next" onclick="checkDosyaNoAndProceed()" style="display:none;">Devam →</button>
+            <button class="btn-secondary" id="step2Next" onclick="checkDosyaNoAndProceed()" style="display:none;">Devam
+              →</button>
           </div>
         </div>
 

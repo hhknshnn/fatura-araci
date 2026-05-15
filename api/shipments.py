@@ -7,9 +7,22 @@ from flask import request, jsonify, send_file
 from api.db import get_conn
 from api.auth import get_session_from_headers
 
+# Ülke adı → müşteri tipi eşlemesi
+ULKE_MUSTERI_TIPI = {
+    'SIRBİSTAN': 'kurumsal', 'BOSNA': 'kurumsal', 'GÜRCİSTAN': 'kurumsal',
+    'KOSOVA': 'kurumsal', 'MAKEDONYA': 'kurumsal', 'BELÇİKA': 'kurumsal',
+    'ALMANYA': 'kurumsal', 'HOLLANDA': 'kurumsal', 'KAZAKİSTAN': 'kurumsal',
+    'KIBRIS': 'franchise', 'IRAK': 'franchise', 'LİBYA': 'franchise',
+    'LİBERYA': 'franchise', 'LÜBNAN': 'franchise', 'ÖZBEKİSTAN': 'franchise',
+    'RUSYA': 'franchise',
+}
+
+def _musteri_tipi_from_ulke(ulke):
+    return ULKE_MUSTERI_TIPI.get(str(ulke).strip().upper(), 'kurumsal')
+
 
 # ── TÜM SEVKİYATLARI GETİR ───────────────────────────────────────────────────
-def get_all_shipments(ulke=None, durum=None):
+def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
     conn = get_conn()
     cur  = conn.cursor()
 
@@ -20,22 +33,23 @@ def get_all_shipments(ulke=None, durum=None):
                varis_tarihi, gumrukleme_bitis, created_at,
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
-               toplam_maliyet_eur
+               toplam_maliyet_eur, musteri_tipi
         FROM shipments
         WHERE 1=1
     '''
     params = []
 
     if ulke:
-        # Case-insensitive eşleşme — DB'de SIRBİSTAN var, kullanıcı Sırbistan gönderir
         query += ' AND unaccent(lower(ulke)) = unaccent(lower(%s))'
         params.append(ulke)
     if durum:
-        # Durum değerleri büyük harf olarak tutulur
         query += ' AND upper(durum) = upper(%s)'
         params.append(durum)
+    if musteri_tipi:
+        query += ' AND musteri_tipi = %s'
+        params.append(musteri_tipi)
 
-    query += ' ORDER BY ihracat_dosya_no DESC'
+    query += ' ORDER BY id DESC'
 
     cur.execute(query, params)
     rows = cur.fetchall()
@@ -50,7 +64,7 @@ def get_shipment(shipment_id):
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute('SELECT * FROM shipments WHERE id = %s', (shipment_id,))
-    row = cur.fetchone()
+    row  = cur.fetchone()
     cols = [d[0] for d in cur.description]
     cur.close()
     conn.close()
@@ -61,7 +75,6 @@ def get_shipment(shipment_id):
 
 # ── SEVKİYAT OLUŞTUR ─────────────────────────────────────────────────────────
 def create_shipment(data):
-    # Duplicate fatura_no kontrolü
     fatura_no = data.get('fatura_no', '')
     if fatura_no:
         conn = get_conn()
@@ -73,6 +86,10 @@ def create_shipment(data):
             raise ValueError(f'Bu fatura no zaten kayıtlı: {fatura_no}')
         cur.close()
         conn.close()
+
+    ulke         = data.get('ulke', '')
+    musteri_tipi = data.get('musteri_tipi') or _musteri_tipi_from_ulke(ulke)
+
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute('''
@@ -80,13 +97,13 @@ def create_shipment(data):
             ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
             fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
             eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
-            varis_tarihi, durum
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            varis_tarihi, durum, musteri_tipi
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         RETURNING id
     ''', (
         data.get('ihracat_dosya_no', ''),
-        data.get('fatura_no', ''),
-        data.get('ulke', ''),
+        fatura_no,
+        ulke,
         data.get('nakliye_firmasi', ''),
         data.get('plaka', ''),
         data.get('fatura_bedeli_tl', 0),
@@ -97,9 +114,9 @@ def create_shipment(data):
         data.get('fatura_bedeli_eur', 0),
         data.get('yukleme_tarihi') or None,
         data.get('gumruk_tarihi') or None,
-        data.get('varis_tarihi') or None, 
-        # Durum değerini normalize ederek kaydet — her zaman büyük harf
+        data.get('varis_tarihi') or None,
         _normalize_durum(data.get('durum', 'YOLDA')),
+        musteri_tipi,
     ))
     new_id = cur.fetchone()[0]
     conn.commit()
@@ -155,6 +172,7 @@ def update_shipment(shipment_id, data):
     cur.close()
     conn.close()
 
+
 # ── DASHBOARD İSTATİSTİKLERİ ─────────────────────────────────────────────────
 def get_dashboard_stats():
     conn = get_conn()
@@ -194,9 +212,8 @@ def get_dashboard_stats():
 
 
 # ── MALİYET RAPORU EXPORT ────────────────────────────────────────────────────
-def export_shipments(ulke=None, durum=None, depo=None):
-    """Sevkiyatları Excel olarak döndür."""
-    rows = get_all_shipments(ulke=ulke, durum=durum)
+def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
+    rows = get_all_shipments(ulke=ulke, durum=durum, musteri_tipi=musteri_tipi)
     if depo:
         rows = [r for r in rows if str(r.get('fatura_no', '')).startswith(depo)]
     try:
@@ -213,7 +230,8 @@ def export_shipments(ulke=None, durum=None, depo=None):
     ws.title = 'Maliyet Raporu'
 
     headers = [
-        'İhracat Dosya No', 'Fatura No', 'Depo', 'Ülke', 'Nakliye Firması', 'Plaka',
+        'İhracat Dosya No', 'Fatura No', 'Depo', 'Ülke', 'Müşteri Tipi',
+        'Nakliye Firması', 'Plaka',
         'Fatura Bedeli TL', 'Fatura Bedeli EUR', 'Mal Bedeli EUR',
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
@@ -222,7 +240,6 @@ def export_shipments(ulke=None, durum=None, depo=None):
         'Durum',
     ]
 
-    # Header satırı
     header_fill = PatternFill('solid', fgColor='1F3864')
     header_font = Font(name='Arial', bold=True, color='FFFFFF', size=10)
     for col_idx, header in enumerate(headers, start=1):
@@ -231,16 +248,14 @@ def export_shipments(ulke=None, durum=None, depo=None):
         cell.fill      = header_fill
         cell.alignment = Alignment(horizontal='center', vertical='center')
 
-    from openpyxl.styles import numbers
-    
     TL_FMT  = '#,##0.00 ₺'
     EUR_FMT = '#,##0.00 €'
     NUM_FMT = '#,##0.0000'
-    # Veri satırları
+
     for row_idx, s in enumerate(rows, start=2):
         fatura_no = s.get('fatura_no', '')
-        depo = 'ANT' if str(fatura_no).startswith('ANT') else 'IHR'
-        
+        depo_val  = 'ANT' if str(fatura_no).startswith('ANT') else 'IHR'
+
         def c(col, val, fmt=None):
             cell = ws.cell(row=row_idx, column=col, value=val)
             if fmt: cell.number_format = fmt
@@ -248,32 +263,32 @@ def export_shipments(ulke=None, durum=None, depo=None):
 
         c(1,  s.get('ihracat_dosya_no', ''))
         c(2,  fatura_no)
-        c(3,  depo)
+        c(3,  depo_val)
         c(4,  s.get('ulke', ''))
-        c(5,  s.get('nakliye_firmasi', ''))
-        c(6,  s.get('plaka', ''))
-        c(7,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
-        c(8,  float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
-        c(9,  float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
-        c(10, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
-        c(11, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
-        c(12, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
-        c(13, s.get('yukleme_tarihi', ''))
-        c(14, s.get('gumruk_tarihi', ''))
-        c(15, s.get('varis_tarihi', ''))
-        c(16, s.get('gumrukleme_bitis', ''))
-        c(17, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
-        c(18, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
-        c(19, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
-        c(20, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(21, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(22, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(23, s.get('durum', ''))
-    
-    # Veri satırları yazıldıktan sonra otomatik genişlik ayarla
+        c(5,  s.get('musteri_tipi', ''))
+        c(6,  s.get('nakliye_firmasi', ''))
+        c(7,  s.get('plaka', ''))
+        c(8,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
+        c(9,  float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
+        c(10, float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
+        c(11, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
+        c(12, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
+        c(13, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
+        c(14, s.get('yukleme_tarihi', ''))
+        c(15, s.get('gumruk_tarihi', ''))
+        c(16, s.get('varis_tarihi', ''))
+        c(17, s.get('gumrukleme_bitis', ''))
+        c(18, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
+        c(19, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
+        c(20, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(21, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(22, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(23, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(24, s.get('durum', ''))
+
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
-        max_len = len(str(ws.cell(row=1, column=col_idx).value or ''))
+        max_len    = len(str(ws.cell(row=1, column=col_idx).value or ''))
         for row_idx in range(2, len(rows) + 2):
             val = ws.cell(row=row_idx, column=col_idx).value
             if val is not None:
@@ -288,19 +303,15 @@ def export_shipments(ulke=None, durum=None, depo=None):
         buf,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=f'maliyet_raporu.xlsx',
+        download_name='maliyet_raporu.xlsx',
     )
 
 
 # ── YARDIMCI ─────────────────────────────────────────────────────────────────
 def _normalize_durum(raw):
-    """Durum değerini standart formata çevir."""
     if not raw:
         return 'YOLDA'
     s = raw.strip().upper()
-    # Türkçe karakter normalizasyonu
-    s = s.replace('İ', 'İ').replace('I', 'I')
-
     if s in ('YOLDA', 'IN TRANSIT', 'TRANSIT'):
         return 'YOLDA'
     if s in ('TESLIM EDILDI', 'TESLİM EDİLDİ', 'DELIVERED', 'TESLIM'):
@@ -309,7 +320,6 @@ def _normalize_durum(raw):
         return 'Varış Gümrük'
     if s in ('HAZIRLANIYOR', 'HAZIRLANYOR', 'PREPARING'):
         return 'HAZIRLANIYOR'
-
     return raw.strip()
 
 
@@ -341,16 +351,17 @@ def _row_to_dict(row):
         'gumruk_vergisi_eur':    float(row[23] or 0),
         'kdv_eur':               float(row[24] or 0),
         'toplam_maliyet_eur':    float(row[25] or 0),
+        'musteri_tipi':          row[26] if len(row) > 26 else 'kurumsal',
     }
 
 
 # ── FLASK ROUTE FONKSİYONLARI ─────────────────────────────────────────────────
 def shipments_get():
-    """GET /api/shipments — listele veya dashboard stats"""
-    mode  = request.args.get('mode')
-    ulke  = request.args.get('ulke')
-    durum = request.args.get('durum')
-    sid   = request.args.get('id')
+    mode         = request.args.get('mode')
+    ulke         = request.args.get('ulke')
+    durum        = request.args.get('durum')
+    musteri_tipi = request.args.get('musteri_tipi')
+    sid          = request.args.get('id')
 
     if mode == 'dashboard':
         return jsonify({'success': True, 'stats': get_dashboard_stats()})
@@ -361,7 +372,7 @@ def shipments_get():
             return jsonify({'success': False, 'error': 'Bulunamadı'}), 404
         return jsonify({'success': True, 'shipment': s})
 
-    shipments = get_all_shipments(ulke=ulke, durum=durum)
+    shipments = get_all_shipments(ulke=ulke, durum=durum, musteri_tipi=musteri_tipi)
     return jsonify({'success': True, 'shipments': shipments})
 
 
@@ -375,7 +386,6 @@ def shipments_post():
 
 
 def shipments_put():
-    """PUT /api/shipments — sevkiyat güncelle"""
     body = request.get_json() or {}
     sid  = body.get('id')
     if not sid:
@@ -383,8 +393,8 @@ def shipments_put():
     update_shipment(int(sid), body)
     return jsonify({'success': True})
 
+
 def shipments_delete():
-    """DELETE /api/shipments — sevkiyat sil"""
     body = request.get_json() or {}
     sid  = body.get('id')
     if not sid:
@@ -397,8 +407,10 @@ def shipments_delete():
     conn.close()
     return jsonify({'success': True})
 
+
 def shipments_export():
-    ulke  = request.args.get('ulke')
-    durum = request.args.get('durum')
-    depo  = request.args.get('depo')
-    return export_shipments(ulke=ulke, durum=durum, depo=depo)
+    ulke         = request.args.get('ulke')
+    durum        = request.args.get('durum')
+    depo         = request.args.get('depo')
+    musteri_tipi = request.args.get('musteri_tipi')
+    return export_shipments(ulke=ulke, durum=durum, depo=depo, musteri_tipi=musteri_tipi)
