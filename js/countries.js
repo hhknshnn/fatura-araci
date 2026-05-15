@@ -1,3 +1,48 @@
+// ── YENİ: MERKEZİ ÜLKE CONFIG ────────────────────────────────────────────────
+window.COUNTRIES_CACHE = null;
+
+async function loadCountriesConfig() {
+  if (window.COUNTRIES_CACHE) return window.COUNTRIES_CACHE;
+  try {
+    const res = await fetch('./config/countries.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('countries.json yüklenemedi');
+    window.COUNTRIES_CACHE = await res.json();
+    console.log('✓ Ülke config yüklendi:', Object.keys(window.COUNTRIES_CACHE).length, 'ülke');
+    return window.COUNTRIES_CACHE;
+  } catch(e) {
+    console.error('countries.json yükleme hatası:', e);
+    window.COUNTRIES_CACHE = {};
+    return {};
+  }
+}
+
+// ── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
+function ulkeInvKurGerekli(kod) {
+  const cfg = window.COUNTRIES_CACHE?.[kod];
+  if (!cfg) return false;
+  return cfg.invKurKaynagi === 'pdf_eur' || cfg.invKurFallback === 'input';
+}
+
+function ulkeCurrency(kod) {
+  return window.COUNTRIES_CACHE?.[kod]?.currency || 'TRY';
+}
+
+function ulkeEngine(kod) {
+  return window.COUNTRIES_CACHE?.[kod]?.engine || null;
+}
+
+function ulkeSevkiyatKurKaynagi(kod) {
+  return window.COUNTRIES_CACHE?.[kod]?.sevkiyatKurKaynagi || 'api_eur';
+}
+
+function ulkelerByGrup(grup) {
+  if (!window.COUNTRIES_CACHE) return [];
+  return Object.entries(window.COUNTRIES_CACHE)
+    .filter(([_, cfg]) => cfg.grup === grup)
+    .map(([kod, cfg]) => ({ kod, ...cfg }));
+}
+
+
 // ── ÜLKE TANIMLARI ──────────────────────────────────────────────────────────
 // Bu dosya tüm ülkelerin çıktı sütunlarını tanımlar.
 // Yeni ülke eklemek için sadece bu dosyayı düzenlemen yeterli.

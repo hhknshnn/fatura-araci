@@ -51,7 +51,7 @@ body {
 }
 
 /* ── SIDEBAR ──────────────────────────────────────────────────────────────── */
-.sidebar {
+.sidebar { position: relative;
   width: var(--sidebar-w);
   flex-shrink: 0;
   background: var(--surface);
@@ -176,7 +176,7 @@ body {
 /* ── TOP BAR ──────────────────────────────────────────────────────────────── */
 .topbar {
   height: var(--topbar-h);
-  padding: 0 24px;
+  padding: 0 25px 0 0;
   border-bottom: 0.5px solid var(--border2);
   display: flex;
   align-items: center;
@@ -881,7 +881,7 @@ body {
 
 /* ── RESPONSIVE (dar ekran fallback) ─────────────────────────────────────── */
 @media (max-width: 640px) {
-  .sidebar { display: none; }
+  .sidebar { position: relative; display: none; }
   .two-col { grid-template-columns: 1fr; }
 }
 
@@ -1015,3 +1015,298 @@ body {
 }
 
 .country-row.active .country-row-check { opacity: 1; }
+
+/* ── DASHBOARD ─────────────────────────────────────────────────────────────── */
+.stat-card {
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text);
+}
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.dash-card {
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.dash-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* ── DASHBOARD — tanımsız değişkenler düzeltildi ─────────────────────────── */
+/* Eski: var(--card-bg), var(--text-secondary) → tanımsız, şeffaf kalıyordu  */
+
+.stat-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.stat-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+.dash-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.dash-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* ── SEVKİYAT TABLO ──────────────────────────────────────────────────────── */
+.shipments-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.shipments-table thead tr {
+  background: var(--surface2);
+  border-bottom: 0.5px solid var(--border2);
+}
+
+.shipments-table thead th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+
+.shipments-table tbody tr:hover {
+  background: var(--surface2);
+}
+
+/* ── OVERLAY — pop-up arka plan karartması ───────────────────────────────── */
+#shipment-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+
+/* ── DETAIL PANEL — pop-up kutusu ────────────────────────────────────────── */
+#shipment-detail-panel {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 101;
+
+  /* Arka plan ve kenarlık — artık şeffaf değil */
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+
+  width: min(600px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 0;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 0.5px solid var(--border2);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.detail-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.detail-header-meta {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+.detail-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+
+.detail-close-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+
+.detail-body {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: -6px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detail-field label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text2);
+}
+
+.detail-field input,
+.detail-field select {
+  padding: 8px 11px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.detail-field input:focus,
+.detail-field select:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.detail-field input::placeholder {
+  color: var(--text3);
+}
+
+/* Durum select — renkli seçenek */
+.detail-field select option[value="YOLDA"]          { background: var(--gold-dim);    color: var(--gold); }
+.detail-field select option[value="TESLİM EDİLDİ"] { background: var(--success-dim); color: var(--success); }
+.detail-field select option[value="Varış Gümrük"]  { background: var(--accent-dim);  color: var(--accent-text); }
+
+.detail-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 22px 18px;
+  border-top: 0.5px solid var(--border2);
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  position: sticky;
+  bottom: 0;
+}
+
+/* ── FİLTRE BARI ─────────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12.5px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.12s;
+  min-width: 140px;
+}
+
+.filter-select:focus {
+  border-color: var(--accent);
+}
+
+
+/* Sidebar toggle */
+.sidebar { position: relative; transition: width 0.2s ease; }
+.sidebar.collapsed { width: 0 !important; overflow: hidden; }
+
+/* ── SEVKİYATLAR PANELİ ─────────────────────────────────────────────────── */
+#stepSevkiyatlar {
+  padding: 0;
+  gap: 0;
+}

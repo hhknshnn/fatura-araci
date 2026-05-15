@@ -7,6 +7,8 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export
+from api.kur import get_tcmb_kurlar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -15,6 +17,10 @@ import evrak as evrak_mod
 import generate as gen_mod
 import taslak as taslak_mod
 
+from api.db import init_db
+from api.auth import auth_get, auth_post
+from api.users import users_get, users_post, users_delete
+from api.storage import storage_get, storage_post, storage_delete
 
 def read_port():
     try:
@@ -25,6 +31,7 @@ def read_port():
 
 
 app = Flask(__name__, static_folder=None)
+init_db()
 
 STATIC_DIRS = {'css', 'js', 'templates', 'fonts', 'assets', 'config'}
 
@@ -42,6 +49,11 @@ app.after_request(_cors)
 @app.route('/')
 def index():
     return send_file(os.path.join(BASE_DIR, 'index.html'))
+
+
+@app.route('/config.json')
+def serve_config_json():
+    return send_file(os.path.join(BASE_DIR, 'config.json'), mimetype='application/json')
 
 
 @app.route('/<path:filename>')
@@ -62,8 +74,7 @@ def api_generate():
         return jsonify({'status': 'ok', 'service': 'generate'})
 
     try:
-        body = request.get_json(force=True)
-
+        body           = request.get_json(force=True)
         excel_bytes    = base64.b64decode(body.get('excel', ''))
         logo_b64       = body.get('logo', '')
         logo_bytes     = base64.b64decode(logo_b64) if logo_b64 else None
@@ -73,14 +84,15 @@ def api_generate():
         grup_kilolari  = body.get('grupKilolari', {})
         exception_skus = body.get('exceptionSkus', gen_mod.EXCEPTION_SKUS)
         ulke_kodu      = body.get('ulkeKodu', 'rs')
+        eur_kuru       = float(body.get('eurKuru', 1.0))
+        usd_kuru       = float(body.get('usdKuru', 1.0))
 
         pdf_fields = {'navlun': 0.0, 'sigorta': 0.0, 'kap': ''}
-        pdf_b64 = body.get('pdf', '')
+        pdf_b64    = body.get('pdf', '')
         if pdf_b64:
             pdf_fields = gen_mod.parse_pdf(base64.b64decode(pdf_b64))
 
-        price_list_out = None
-
+        # ── Kıbrıs özel ──────────────────────────────────────────────────────
         if ulke_kodu == 'cy':
             faturalar = body.get('faturalar', [])
             excel_out = gen_mod.generate_excel_cy(faturalar, grup_kilolari, exception_skus)
@@ -93,68 +105,32 @@ def api_generate():
                 'pdfFields': {},
             })
 
-        df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
+        df          = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
         df_original = df.copy()
-        kw = dict(
-            hedef_net=hedef_net,
-            depo_tipi=depo_tipi,
-            df_original=df_original,
-        )
 
-        if ulke_kodu == 'ba':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ba(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'ge':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ge(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'xk':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ko(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'mk':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_mk(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'kz':
-            excel_out, fatura_no, master_out, price_list_out = gen_mod.generate_excel_kz(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'ru':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ru(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'uz':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_uz(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-        elif ulke_kodu == 'be':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_be(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'de':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_de(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'nl':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_nl(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                eur_kuru=float(body.get('eurKuru', 1.0)), **kw)
-        elif ulke_kodu == 'iq':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_iq(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'ly':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_ly(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'lr':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_lr(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        elif ulke_kodu == 'lb':
-            excel_out, fatura_no, master_out = gen_mod.generate_excel_lb(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields,
-                usd_kuru=float(body.get('usdKuru', 1.0)), **kw)
-        else:
-            excel_out, fatura_no, master_out = gen_mod.generate_excel(
-                df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+        price_list_out = None
+        mill_test_out  = None
+
+        # ── Yeni dispatcher — hata alırsa eski koda düş ───────────────────
+        try:
+            excel_out, fatura_no, master_out, price_list_out, mill_test_out = \
+                gen_mod.dispatch(
+                    ulke_kodu, df, df_original, grup_kilolari, hedef_brut,
+                    hedef_net, depo_tipi, exception_skus, logo_bytes,
+                    pdf_fields, eur_kuru, usd_kuru
+                )
+        except NotImplementedError:
+            print(f'[WARN] dispatch: {ulke_kodu} için eski kod kullanılıyor')
+            kw = dict(hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
+            if ulke_kodu == 'ba':
+                excel_out, fatura_no, master_out = gen_mod.generate_excel_ba(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+            elif ulke_kodu == 'ge':
+                excel_out, fatura_no, master_out = gen_mod.generate_excel_ge(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+            else:
+                excel_out, fatura_no, master_out = gen_mod.generate_excel(
+                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
 
         resp = {
             'success':   True,
@@ -165,11 +141,16 @@ def api_generate():
         }
         if price_list_out:
             resp['priceList'] = base64.b64encode(price_list_out).decode()
+        if mill_test_out:
+            resp['millTest'] = base64.b64encode(mill_test_out).decode()
         return jsonify(resp)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
-
+        return jsonify({
+            'success': False,
+            'error':   str(e),
+            'trace':   traceback.format_exc()
+        }), 500
 
 # ── /api/taslak ───────────────────────────────────────────────────────────────
 
@@ -248,6 +229,61 @@ def api_evrak():
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
 
 
+@app.route('/api/auth', methods=['GET', 'POST', 'OPTIONS'])
+def api_auth():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return auth_get()
+    return auth_post()
+
+
+@app.route('/api/users', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
+def api_users():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return users_get()
+    if request.method == 'DELETE':
+        return users_delete()
+    return users_post()
+
+
+@app.route('/api/storage', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
+def api_storage():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return storage_get()
+    if request.method == 'DELETE':
+        return storage_delete()
+    return storage_post()
+
+
+@app.route('/api/shipments', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+def api_shipments():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return shipments_get()
+    if request.method == 'PUT':
+        return shipments_put()
+    if request.method == 'DELETE':
+        return shipments_delete()
+    return shipments_post()
+    
+@app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
+def api_shipments_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return shipments_export()
+
+@app.route('/api/kur', methods=['GET', 'OPTIONS'])
+def api_kur():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    kurlar = get_tcmb_kurlar()
+    return jsonify({'success': True, 'kurlar': kurlar})
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
