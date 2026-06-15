@@ -200,37 +200,42 @@ function renderShipments(list) {
     <table style="width:100%;border-collapse:collapse;">
       <thead>
         <tr style="background:var(--surface2);border-bottom:0.5px solid var(--border2);">
-          ${thCell('Dosya No',       'ihracat_dosya_no')}
-          ${thCell('Fatura No',      'fatura_no')}
-          ${thCell('Depo',           'fatura_no')}
-          ${thCell('Ülke',           'ulke')}
-          ${thCell('Nakliye Firması','nakliye_firmasi')}
-          ${thCell('Plaka',          'plaka')}
-          ${thCell('Fatura EUR',     'fatura_bedeli_eur')}
-          ${thCell('Yükleme',        'yukleme_tarihi')}
-          ${thCell('Durum',          'durum')}
+          ${thCell('Dosya No',        'ihracat_dosya_no')}
+          ${thCell('Fatura No',       'fatura_no')}
+          ${thCell('Depo',            '_depo')}
+          ${thCell('Ülke',            'ulke')}
+          ${thCell('Nakliye Firması', 'nakliye_firmasi')}
+          ${thCell('Plaka',           'plaka')}
+          ${thCell('Fatura EUR',      'fatura_bedeli_eur')}
+          ${thCell('Yükleme',         'yukleme_tarihi')}
+          ${thCell('Durum',           'durum')}
         </tr>
       </thead>
       <tbody id="shipments-tbody">
         ${list.length === 0
-          ? `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text3);">Sevkiyat bulunamadı</td></tr>`
-          : list.map(s => {
+          ? `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">Sevkiyat bulunamadı</td></tr>`
+          : list.map((s, idx) => {
               const durumNorm = normalizeDurum(s.durum);
-              const depoTag = s.fatura_no?.startsWith('ANT')
-                ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--gold-dim);color:var(--gold);">ANT</span>`
-                : `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent-text);">IHR</span>`;
+              const isAnt    = s.fatura_no?.startsWith('ANT');
+              const depoTag  = isAnt
+                ? `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#FAEEDA;color:#633806;">ANT</span>`
+                : `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#E6F1FB;color:#0C447C;">IHR</span>`;
+              const rowBg = idx % 2 === 1 ? 'var(--surface2)' : 'transparent';
               return `
-                <tr style="border-bottom:0.5px solid var(--border);cursor:pointer;" onclick="openShipmentDetail(${s.id})">
-                  <td style="padding:6px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${s.ihracat_dosya_no || '-'}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.fatura_no || '-'}</td>
-                  <td style="padding:6px 12px;font-size:12px;white-space:nowrap;">${depoTag}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:6px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
-                  <td style="padding:6px 12px;white-space:nowrap;">
-                    <span style="font-size:11px;font-weight:500;padding:3px 8px;border-radius:4px;${durumStyle(durumNorm)}">${durumNorm}</span>
+                <tr style="border-bottom:0.5px solid var(--border);cursor:pointer;background:${rowBg};transition:background 0.1s;"
+                    onmouseover="this.style.background='var(--accent-dim)'"
+                    onmouseout="this.style.background='${rowBg}'"
+                    onclick="openShipmentDetail(${s.id})">
+                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${s.ihracat_dosya_no || '-'}</td>
+                  <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap;font-family:var(--mono);">${s.fatura_no || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;">${depoTag}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${formatEUR(s.fatura_bedeli_eur)}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;">
+                    <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
                 </tr>`;
             }).join('')}
@@ -239,11 +244,11 @@ function renderShipments(list) {
 }
 
 function durumStyle(durum) {
-  if (durum === 'YOLDA')         return 'background:var(--gold-dim);color:var(--gold);';
-  if (durum === 'TESLİM EDİLDİ') return 'background:var(--success-dim);color:var(--success);';
-  if (durum === 'Varış Gümrük')  return 'background:var(--accent-dim);color:var(--accent-text);';
-  if (durum === 'HAZIRLANIYOR')  return 'background:var(--surface2);color:var(--text2);border:0.5px solid var(--border2);';
-  return 'background:var(--surface2);color:var(--text2);border:0.5px solid var(--border2);';
+  if (durum === 'YOLDA')         return 'background:#FAEEDA;color:#633806;';
+  if (durum === 'TESLİM EDİLDİ') return 'background:#EAF3DE;color:#27500A;';
+  if (durum === 'Varış Gümrük')  return 'background:#E6F1FB;color:#0C447C;';
+  if (durum === 'HAZIRLANIYOR')  return 'background:#F1EFE8;color:#5F5E5A;';
+  return 'background:#F1EFE8;color:#5F5E5A;';
 }
 
 function filterShipments() {
