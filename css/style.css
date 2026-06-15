@@ -272,8 +272,8 @@ body {
 .panel {
   display: none;
   flex-direction: column;
+  opacity: 1;
   gap: 14px;
-  animation: fadeUp 0.2s ease;
 }
 
 @keyframes fadeUp {
