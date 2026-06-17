@@ -443,6 +443,133 @@ def shipments_delete():
     return jsonify({'success': True})
 
 
+def bulk_import_shipments(rows):
+    """
+    Excel'den parse edilmiş satır listesini toplu olarak shipments tablosuna ekler.
+    rows: list of dict
+    Döner: (eklenen, atlanan, hatalar)
+    """
+    conn = get_conn()
+    cur  = conn.cursor()
+    eklenen, atlanan, hatalar = 0, 0, []
+
+    def to_float(v):
+        # € $ ₺ sembollerini, boşlukları ve binlik ayraçları temizle
+        try:
+            if v in (None, '', 'nan'): return 0.0
+            s = str(v).strip()
+            s = s.replace('€', '').replace('$', '').replace('₺', '')
+            s = s.replace('\xa0', '').replace(' ', '')
+            # 1,234.56 formatı (binlik virgül, ondalık nokta)
+            if ',' in s and '.' in s:
+                s = s.replace(',', '')
+            # 1.234,56 formatı (binlik nokta, ondalık virgül)
+            elif ',' in s and '.' not in s:
+                s = s.replace(',', '.')
+            s = s.strip()
+            if not s or s == '-': return 0.0
+            return float(s)
+        except: return 0.0
+
+    def to_date(v):
+        # Tarihi YYYY-MM-DD formatına çevir
+        if not v or str(v).strip() in ('', 'nan', 'None'): return None
+        s = str(v).strip()
+        # DD/MM/YYYY → YYYY-MM-DD
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) == 3 and len(parts[2]) == 4:
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        # DD.MM.YYYY → YYYY-MM-DD
+        if '.' in s:
+            parts = s.split('.')
+            if len(parts) == 3 and len(parts[2]) == 4:
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        # Zaten YYYY-MM-DD veya uzun string, ilk 10 karakter al
+        return s[:10] if len(s) >= 10 else None
+
+    def to_str(v):
+        if v is None or str(v).strip() in ('', 'nan', 'None'): return ''
+        return str(v).strip()
+
+    for i, row in enumerate(rows):
+        try:
+            fatura_no = to_str(row.get('fatura_no'))
+            if fatura_no:
+                cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+                if cur.fetchone():
+                    atlanan += 1
+                    hatalar.append(f'Satır {i+1}: {fatura_no} zaten kayıtlı, atlandı.')
+                    continue
+
+            ulke         = to_str(row.get('ulke'))
+            musteri_tipi = to_str(row.get('musteri_tipi')) or _musteri_tipi_from_ulke(ulke)
+
+            cur.execute('''
+                INSERT INTO shipments (
+                    arac_sira_no, ulke, ihracat_dosya_no, nakliye_firmasi, plaka,
+                    fatura_no, palet, aciklama,
+                    fatura_bedeli_tl, mal_bedeli_tl, mal_bedeli_eur,
+                    navlun_eur, sigorta_eur, eur_kuru, fatura_bedeli_eur,
+                    arac_bekleme, ihracat_beyanname_tl, ihracat_beyanname_eur,
+                    brokerage_yerel, brokerage_birim, brokerage_eur,
+                    gumruk_vergisi_yerel, gumruk_vergisi_birim, gumruk_vergisi_eur,
+                    kdv_yerel, kdv_birim, kdv_eur,
+                    toplam_maliyet_eur,
+                    yukleme_tarihi, gumruk_tarihi, varis_tarihi, gumrukleme_bitis,
+                    durum, musteri_tipi
+                ) VALUES (
+                    %s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s
+                )
+            ''', (
+                row.get('arac_sira_no') or None,
+                ulke,
+                to_str(row.get('ihracat_dosya_no')),
+                to_str(row.get('nakliye_firmasi')),
+                to_str(row.get('plaka')),
+                fatura_no,
+                to_str(row.get('palet')),
+                to_str(row.get('aciklama')),
+                to_float(row.get('fatura_bedeli_tl')),
+                to_float(row.get('mal_bedeli_tl')),
+                to_float(row.get('mal_bedeli_eur')),
+                to_float(row.get('navlun_eur')),
+                to_float(row.get('sigorta_eur')),
+                to_float(row.get('eur_kuru')),
+                to_float(row.get('fatura_bedeli_eur')),
+                to_float(row.get('arac_bekleme')),
+                to_float(row.get('ihracat_beyanname_tl')),
+                to_float(row.get('ihracat_beyanname_eur')),
+                to_float(row.get('brokerage_yerel')),
+                to_str(row.get('brokerage_birim')),
+                to_float(row.get('brokerage_eur')),
+                to_float(row.get('gumruk_vergisi_yerel')),
+                to_str(row.get('gumruk_vergisi_birim')),
+                to_float(row.get('gumruk_vergisi_eur')),
+                to_float(row.get('kdv_yerel')),
+                to_str(row.get('kdv_birim')),
+                to_float(row.get('kdv_eur')),
+                to_float(row.get('toplam_maliyet_eur')),
+                to_date(row.get('yukleme_tarihi')),
+                to_date(row.get('gumruk_tarihi')),
+                to_date(row.get('varis_tarihi')),
+                to_date(row.get('gumrukleme_bitis')),
+                _normalize_durum(to_str(row.get('durum', 'YOLDA'))),
+                musteri_tipi,
+            ))
+            eklenen += 1
+        except Exception as e:
+            hatalar.append(f'Satır {i+1}: {str(e)}')
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return eklenen, atlanan, hatalar
+
+
 def shipments_export():
     ulke         = request.args.get('ulke')
     durum        = request.args.get('durum')

@@ -127,6 +127,13 @@ function sidebarSelect(mod) {
   } else if (mod === 'sevkiyatlar') {
     document.getElementById('stepSevkiyatlar').style.display = 'block';
     document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('topbarRight').innerHTML = `
+      <button onclick="openImportModal()"
+        style="height:30px;padding:0 12px;border-radius:var(--radius-md);border:none;
+               background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;
+               font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
+        ⬆ İçe Aktar
+      </button>`;
     if (typeof loadShipments === 'function') loadShipments();
   }
 }

@@ -99,7 +99,7 @@ function renderDonut(container, teslim, yolda, diger) {
         </svg>
         <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
           <div style="font-size:24px;font-weight:700;color:#0F172A;line-height:1;" id="dash-donut-num">${total}</div>
-          <div style="font-size:9px;color:#94A3B8;margin-top:3px;">toplam</div>
+          <div style="font-size:9px;color:#94A3B8;margin-top:3px;">SEFER</div>
         </div>
         <div id="donut-tooltip" style="
           display:none;position:absolute;top:-32px;left:50%;transform:translateX(-50%);
@@ -356,7 +356,8 @@ async function loadDashboard() {
     // ── Donut ────────────────────────────────────────────────────────────────
     const teslim = s.teslim || 0;
     const yolda = s.yolda || 0;
-    const diger = (s.toplam || 0) - teslim - yolda;
+    const seferToplam = s.sefer_sayisi || s.toplam || 0;
+    const diger = seferToplam - teslim - yolda;
     const donutContainer = document.getElementById('dash-donut');
     if (donutContainer) renderDonut(donutContainer, teslim, yolda, Math.max(diger, 0));
 

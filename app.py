@@ -7,7 +7,7 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments
 from api.kur import get_tcmb_kurlar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -274,6 +274,26 @@ def api_shipments():
         return shipments_delete()
     return shipments_post()
     
+@app.route('/api/shipments/bulk-import', methods=['POST', 'OPTIONS'])
+def api_shipments_bulk_import():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True)
+        rows = body.get('rows', [])
+        if not rows:
+            return jsonify({'success': False, 'error': 'Satır listesi boş'}), 400
+        eklenen, atlanan, hatalar = bulk_import_shipments(rows)
+        return jsonify({
+            'success': True,
+            'eklenen': eklenen,
+            'atlanan': atlanan,
+            'hatalar': hatalar,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
 def api_shipments_export():
     if request.method == 'OPTIONS':
