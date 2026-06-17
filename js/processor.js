@@ -63,6 +63,8 @@ function handleFile(file) {
   badge.style.display = 'inline-flex';
   const dosyaSec = document.getElementById('dosyaNoSection');
   if (dosyaSec) dosyaSec.style.display = 'block';
+  const plakaSec = document.getElementById('plakaSection');
+  if (plakaSec) plakaSec.style.display = 'block';
   // Excel yüklenince drop zone'a loaded class ekle
   const dz = document.getElementById('dropZone');
   if (dz) dz.classList.add('loaded');

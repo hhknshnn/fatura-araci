@@ -565,7 +565,11 @@ async function downloadRS() {
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
     // INV+PL
-    _downloadBlob(data.excel, `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'}.xlsx`,
+    const plakaVal = document.getElementById('plakaInput')?.value?.trim() || '';
+    const dosyaAdi = plakaVal
+      ? `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'} - ${plakaVal}.xlsx`
+      : `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'}.xlsx`;
+    _downloadBlob(data.excel, dosyaAdi,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // Master
