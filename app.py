@@ -21,6 +21,7 @@ from api.db import init_db
 from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
+from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
 
 def read_port():
     try:
@@ -277,6 +278,30 @@ def api_shipments_export():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return shipments_export()
+
+@app.route('/api/taslak-store/kaydet', methods=['POST', 'OPTIONS'])
+def api_taslak_store_kaydet():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_store_kaydet()
+
+@app.route('/api/taslak-store/liste', methods=['GET', 'OPTIONS'])
+def api_taslak_store_liste():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_store_liste()
+
+@app.route('/api/taslak-store/indir/<int:taslak_id>', methods=['GET', 'OPTIONS'])
+def api_taslak_store_indir(taslak_id):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_store_indir(taslak_id)
+
+@app.route('/api/taslak-store/sil/<int:taslak_id>', methods=['DELETE', 'OPTIONS'])
+def api_taslak_store_sil(taslak_id):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_store_sil(taslak_id)
 
 @app.route('/api/kur', methods=['GET', 'OPTIONS'])
 def api_kur():

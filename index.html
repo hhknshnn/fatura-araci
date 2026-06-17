@@ -1051,13 +1051,15 @@
               </select><span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
               <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
             </div>
-            <div class="file-badge" id="menseTaslakYuklendi" style="display:none;margin-bottom:10px;"></div>
-            <div class="drop-zone" id="menseTaslakDropZone" style="padding:18px;margin-bottom:10px;">
-              <input type="file" accept=".xlsx,.xls" onchange="handleMenseTaslakFile(this.files[0])">
-              <div class="drop-icon" style="font-size:18px;">📂</div>
-              <h3 style="font-size:13px;">Doldurulmuş taslağı yükle</h3>
-              <p style="font-size:11px;">Taslak Doldur'dan indirdiğin dosyayı yükle</p>
-              <div class="file-badge" id="menseTaslakDosya" style="display:none;"></div>
+            <div id="menseTaslakListe" style="margin-bottom:10px;">
+              <div
+                style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+                Kayıtlı Taslaklar</div>
+              <div id="menseTaslakListeIcerik">
+                <div
+                  style="font-size:12px;color:var(--text3);padding:12px;background:var(--surface2);border-radius:var(--radius-md);">
+                  ⏳ Yükleniyor...</div>
+              </div>
             </div>
             <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">⬇
               Menşe Taslak İndir</button>

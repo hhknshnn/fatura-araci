@@ -548,6 +548,24 @@ async function indirTaslak() {
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
     indir(data.excel, data.dosyaAdi);
     showTaslakStatus('success', `<div class="stat">✓ İndirildi: <span>${data.dosyaAdi}</span></div>`);
+
+    // Taslağı DB'ye kaydet (arka planda, hata olsa indirme etkilenmez)
+    try {
+      await fetch('/api/taslak-store/kaydet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referansNo: formData.referansNo,
+          ulkeKodu:   taslakUlke,
+          ulkeAdi:    TASLAK_ULKELER[taslakUlke]?.label || taslakUlke,
+          depoTipi:   taslakDepoTipi,
+          excel:      data.excel,
+          kullanici:  window.currentUser?.displayName || window.currentUser?.username || '',
+        })
+      });
+    } catch(e) {
+      console.warn('Taslak DB kayıt hatası:', e);
+    }
   } catch (err) {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {
@@ -558,9 +576,17 @@ async function indirTaslak() {
 
 // ── MENŞE → TASLAK ────────────────────────────────────────────────────────────
 async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
-  const refNo = document.getElementById('menseRefNo')?.value?.trim();
+  // Referans no: seçili taslaktan al (window._menseTaslakRefNo), yoksa input'tan
+  const refNo = window._menseTaslakRefNo || (() => {
+    const refNoEl  = document.getElementById('menseRefNo');
+    const yilEl    = refNoEl?.closest('div')?.querySelector('select');
+    const yil      = yilEl ? yilEl.value : (localStorage.getItem('app_yil') || '2026');
+    const refNoVal = refNoEl?.value?.trim();
+    return refNoVal ? yil + '-' + refNoVal : null;
+  })();
+
+  if (!menseTaslakBytes) { showTaslakStatus('error', '⚠ Kayıtlı taslak seçin.'); return; }
   if (!refNo) { showTaslakStatus('error', '⚠ Referans No girin.'); return; }
-  if (!taslakBytes) { showTaslakStatus('error', '⚠ Taslak Excel yükleyin.'); return; }
   const btn = document.getElementById('menseTaslakIndir');
   btn.textContent = '⏳ Hazırlanıyor...';
   btn.disabled = true;
