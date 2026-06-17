@@ -202,6 +202,22 @@ def get_dashboard_stats():
     ''')
     sefer_sayisi = cur.fetchone()[0]
 
+    # Toplam fatura sayısı
+    cur.execute('SELECT COUNT(*) FROM shipments')
+    toplam_fatura = cur.fetchone()[0]
+
+    # Tek araç sefer sayısı (sefer_id NULL olanlar)
+    cur.execute('SELECT COUNT(*) FROM shipments WHERE sefer_id IS NULL')
+    tek_arac = cur.fetchone()[0]
+
+    # Gruplu sefer sayısı (unique sefer_id sayısı)
+    cur.execute('SELECT COUNT(DISTINCT sefer_id) FROM shipments WHERE sefer_id IS NOT NULL')
+    gruplu_sefer = cur.fetchone()[0]
+
+    # Gruplu fatura sayısı (sefer_id NOT NULL olanlar)
+    cur.execute('SELECT COUNT(*) FROM shipments WHERE sefer_id IS NOT NULL')
+    gruplu_fatura = cur.fetchone()[0]
+
     cur.execute('''
         SELECT ulke, COUNT(*) as sayi
         FROM shipments
@@ -215,12 +231,16 @@ def get_dashboard_stats():
     conn.close()
 
     return {
-        'toplam':       toplam,
-        'sefer_sayisi': sefer_sayisi,
-        'yolda':        yolda,
-        'teslim':       teslim,
-        'toplam_eur':   toplam_eur,
-        'ulkeler':      ulkeler,
+        'toplam':        toplam,
+        'sefer_sayisi':  sefer_sayisi,
+        'toplam_fatura': toplam_fatura,
+        'tek_arac':      tek_arac,
+        'gruplu_sefer':  gruplu_sefer,
+        'gruplu_fatura': gruplu_fatura,
+        'yolda':         yolda,
+        'teslim':        teslim,
+        'toplam_eur':    toplam_eur,
+        'ulkeler':       ulkeler,
     }
 
 
