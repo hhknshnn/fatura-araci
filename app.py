@@ -22,6 +22,7 @@ from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
+from api.shipments import group_shipments, ungroup_shipment
 
 def read_port():
     try:
@@ -315,3 +316,25 @@ if __name__ == '__main__':
     port = read_port()
     print(f'Sunucu başlıyor: http://localhost:{port}')
     app.run(host='0.0.0.0', port=port, debug=False)
+    
+@app.route('/api/shipments/group', methods=['POST', 'OPTIONS'])
+def api_shipments_group():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    body = request.get_json() or {}
+    ids  = body.get('ids', [])
+    if not ids:
+        return jsonify({'success': False, 'error': 'id listesi boş'}), 400
+    sefer_id = group_shipments(ids)
+    return jsonify({'success': True, 'sefer_id': sefer_id})
+
+@app.route('/api/shipments/ungroup', methods=['POST', 'OPTIONS'])
+def api_shipments_ungroup():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    body = request.get_json() or {}
+    sid  = body.get('id')
+    if not sid:
+        return jsonify({'success': False, 'error': 'id gerekli'}), 400
+    ungroup_shipment(int(sid))
+    return jsonify({'success': True})

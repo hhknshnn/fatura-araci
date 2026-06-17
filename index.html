@@ -536,6 +536,8 @@
             </div>
             <div class="detail-section-label">Genel Bilgiler</div>
             <div class="detail-grid">
+              <div class="detail-field"><label>İhracat Dosya No</label><input id="edit-dosya-no" type="text"
+                  placeholder="örn: 2026-210"></div>
               <div class="detail-field"><label>Nakliye Firması</label><input id="edit-nakliye" type="text"
                   placeholder="örn: RAPID"></div>
               <div class="detail-field"><label>Plaka</label><input id="edit-plaka" type="text"
@@ -578,6 +580,9 @@
             <button id="delete-shipment-btn" onclick="deleteShipment()"
               style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--error);background:transparent;color:var(--error);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;margin-right:auto;">🗑
               Sil</button>
+            <button id="grupla-btn" onclick="openGruplaModal()"
+              style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--accent);background:transparent;color:var(--accent);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;">🔗
+              Grupla</button>
             <button class="btn-ghost" onclick="closeShipmentDetail()">İptal</button>
             <button class="btn-secondary" onclick="saveShipmentDetail()">Kaydet</button>
           </div>
@@ -945,6 +950,28 @@
               Plaka</div>
             <input class="target-input" id="plakaInput" type="text" placeholder="örn: 34ABC123 - 34DEF456"
               style="width:100%;">
+          </div>
+          <div id="nakliyeSection"
+            style="display:none;background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-md);padding:12px 14px;margin-top:8px;">
+            <div
+              style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em;">
+              Nakliye Firması</div>
+            <input class="target-input" id="nakliyeInput" type="text" placeholder="örn: RAPID LOJİSTİK"
+              style="width:100%;">
+          </div>
+          <div id="yuklemeTarihiSection"
+            style="display:none;background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-md);padding:12px 14px;margin-top:8px;">
+            <div
+              style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em;">
+              Yükleme Tarihi</div>
+            <input class="target-input" id="yuklemeTarihiInput" type="date" style="width:100%;">
+          </div>
+          <div id="gumrukTarihiSection"
+            style="display:none;background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-md);padding:12px 14px;margin-top:8px;">
+            <div
+              style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em;">
+              Gümrük Tarihi</div>
+            <input class="target-input" id="gumrukTarihiInput" type="date" style="width:100%;">
           </div>
           <div id="pdfDropZone" style="display:none;"><input type="file" id="pdfInput" accept=".pdf"
               onchange="handlePdf(this.files[0])"></div>
@@ -1357,6 +1384,32 @@
   <script src="js/users.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/shipments.js"></script>
+
+  <!-- ── GRUPLAMA MODAL ─────────────────────────────────────────────────── -->
+  <div id="grupla-overlay" onclick="closeGruplaModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;"></div>
+  <div id="grupla-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xl);
+    padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.16);z-index:301;">
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">🔗 Sefer Grubu Oluştur</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">
+      Bu sevkiyatı aynı araca yüklenen diğer sevkiyatlarla grupla. Gruplanmış kayıtlar dashboard'da 1 sefer sayılır.
+    </div>
+    <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;">Eklenecek sevkiyatlar:</div>
+    <div id="grupla-liste"
+      style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:16px;"></div>
+    <div id="grupla-status" style="font-size:12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeGruplaModal()"
+        style="padding:9px 20px;border-radius:var(--radius-md);border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);font-size:13px;cursor:pointer;">
+        İptal
+      </button>
+      <button onclick="saveGruplama()"
+        style="padding:9px 20px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;">
+        Grupla
+      </button>
+    </div>
+  </div>
 
 </body>
 

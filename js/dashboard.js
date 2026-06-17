@@ -230,7 +230,7 @@ async function loadDashboard() {
     const kv3 = document.getElementById('dash-kv3');
     const kv4 = document.getElementById('dash-kv4');
 
-    animateCount(kv1, s.toplam, n => n.toLocaleString('tr-TR'));
+    animateCount(kv1, s.sefer_sayisi ?? s.toplam, n => n.toLocaleString('tr-TR'));
     animateCount(kv2, s.yolda,  n => n.toLocaleString('tr-TR'));
     animateCount(kv3, s.teslim, n => n.toLocaleString('tr-TR'));
 

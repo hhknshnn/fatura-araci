@@ -206,6 +206,7 @@ function renderShipments(list) {
           ${thCell('Ülke',            'ulke')}
           ${thCell('Nakliye Firması', 'nakliye_firmasi')}
           ${thCell('Plaka',           'plaka')}
+          ${thCell('Grup', 'sefer_id', 'width:70px;')}
           ${thCell('Fatura EUR',      'fatura_bedeli_eur')}
           ${thCell('Yükleme',         'yukleme_tarihi')}
           ${thCell('Durum',           'durum')}
@@ -232,6 +233,9 @@ function renderShipments(list) {
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;width:70px;">
+                    ${s.sefer_id ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:12px;">-</span>'}
+                  </td>
                   <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${formatEUR(s.fatura_bedeli_eur)}</td>
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
                   <td style="padding:8px 12px;white-space:nowrap;">
@@ -290,6 +294,7 @@ async function openShipmentDetail(id) {
   document.getElementById('detail-ulke').textContent      = s.ulke || '-';
   document.getElementById('detail-id').value              = s.id;
 
+  document.getElementById('edit-dosya-no').value      = s.ihracat_dosya_no || '';
   document.getElementById('edit-nakliye').value       = s.nakliye_firmasi || '';
   document.getElementById('edit-plaka').value         = s.plaka || '';
   document.getElementById('edit-durum').value         = normalizeDurum(s.durum);
@@ -314,6 +319,16 @@ async function openShipmentDetail(id) {
 
   const newFields = document.getElementById('new-shipment-fields');
   if (newFields) newFields.style.display = 'none';
+
+  // Gruptan çıkar butonu — gruplanmışsa göster
+  const gruplaBtn = document.getElementById('grupla-btn');
+  if (gruplaBtn) {
+    if (s.sefer_id) {
+      gruplaBtn.innerHTML = '🔗 Grubu Düzenle';
+    } else {
+      gruplaBtn.innerHTML = '🔗 Grupla';
+    }
+  }
 
   overlay.style.display = 'block';
   panel.style.display   = 'flex';
@@ -361,6 +376,7 @@ async function saveShipmentDetail() {
   } else {
     const body = {
       id:                    parseInt(id),
+      ihracat_dosya_no:      document.getElementById('edit-dosya-no').value.trim(),
       nakliye_firmasi:       document.getElementById('edit-nakliye').value,
       plaka:                 document.getElementById('edit-plaka').value,
       durum:                 document.getElementById('edit-durum').value,
@@ -465,4 +481,125 @@ function clearFilters() {
   sortColumn = null;
   sortDir    = 'asc';
   loadShipments();
+}
+
+// ── GRUPLAMA ──────────────────────────────────────────────────────────────────
+let gruplaHedefId = null;     // popup'ta açık olan sevkiyat id'si
+let gruplaSecilen = new Set(); // kullanıcının seçtiği id'ler
+
+function openGruplaModal() {
+  const id = document.getElementById('detail-id').value;
+  if (!id) return;
+  gruplaHedefId = parseInt(id);
+  gruplaSecilen = new Set([gruplaHedefId]);
+
+  const liste = document.getElementById('grupla-liste');
+  liste.innerHTML = '';
+
+  // Arama kutusu
+  const aramaWrapper = document.getElementById('grupla-arama-wrapper');
+  if (!aramaWrapper) {
+    const aw = document.createElement('div');
+    aw.id = 'grupla-arama-wrapper';
+    aw.style.cssText = 'margin-bottom:10px;';
+    aw.innerHTML = `<input id="grupla-arama" type="text" placeholder="Dosya no, fatura no veya ülke ara..."
+      style="width:100%;padding:8px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
+             background:var(--surface2);font-family:var(--font);font-size:12px;color:var(--text);outline:none;box-sizing:border-box;"
+      oninput="filterGruplaListe()">`;
+    liste.parentNode.insertBefore(aw, liste);
+  } else {
+    document.getElementById('grupla-arama').value = '';
+  }
+
+  // Mevcut sevkiyatları listele — kendisi hariç
+  allShipments.forEach(s => {
+    if (s.id === gruplaHedefId) return;
+
+    // Zaten aynı gruptaysa işaretle
+    const hedef    = allShipments.find(x => x.id === gruplaHedefId);
+    const ayniGrup = hedef?.sefer_id && s.sefer_id === hedef.sefer_id;
+    if (ayniGrup) gruplaSecilen.add(s.id);
+
+    const checked = ayniGrup;
+    const item = document.createElement('label');
+    item.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 12px;
+      border-radius:var(--radius-md);border:0.5px solid var(--border2);
+      background:var(--surface2);cursor:pointer;font-size:12px;`;
+    item.innerHTML = `
+      <input type="checkbox" data-id="${s.id}" ${checked ? 'checked' : ''}
+        style="width:14px;height:14px;accent-color:var(--accent);">
+      <div style="flex:1;">
+        <span style="font-weight:600;color:var(--text);">${s.ihracat_dosya_no || '-'}</span>
+        <span style="color:var(--text3);margin:0 6px;">·</span>
+        <span style="color:var(--text2);font-family:var(--mono);font-size:11px;">${s.fatura_no || '-'}</span>
+        <span style="color:var(--text3);margin:0 6px;">·</span>
+        <span style="color:var(--text3);">${s.ulke || '-'}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text3);">${s.plaka || '-'}</span>`;
+
+    item.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) gruplaSecilen.add(s.id);
+      else gruplaSecilen.delete(s.id);
+    });
+
+    liste.appendChild(item);
+  });
+
+  document.getElementById('grupla-status').innerHTML = '';
+  document.getElementById('grupla-overlay').style.display = 'block';
+  document.getElementById('grupla-modal').style.display  = 'block';
+}
+
+function closeGruplaModal() {
+  document.getElementById('grupla-overlay').style.display = 'none';
+  document.getElementById('grupla-modal').style.display   = 'none';
+}
+
+async function saveGruplama() {
+  if (gruplaSecilen.size < 2) {
+    document.getElementById('grupla-status').innerHTML =
+      '<span style="color:var(--error);">⚠ En az 2 sevkiyat seçin.</span>';
+    return;
+  }
+
+  const token = sessionStorage.getItem('fa_auth_token');
+  const ids   = [...gruplaSecilen];
+
+  const res  = await fetch('/api/shipments/group', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ ids }),
+  });
+  const data = await res.json();
+
+  if (data.success) {
+    closeGruplaModal();
+    closeShipmentDetail();
+    loadShipments();
+  } else {
+    document.getElementById('grupla-status').innerHTML =
+      `<span style="color:var(--error);">⚠ ${data.error}</span>`;
+  }
+}
+
+async function ungroupShipment() {
+  const id    = document.getElementById('detail-id').value;
+  if (!id) return;
+  if (!confirm('Bu sevkiyatı gruptan çıkarmak istiyor musunuz?')) return;
+  const token = sessionStorage.getItem('fa_auth_token');
+  await fetch('/api/shipments/ungroup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ id: parseInt(id) }),
+  });
+  closeShipmentDetail();
+  loadShipments();
+}
+
+function filterGruplaListe() {
+  const q = (document.getElementById('grupla-arama')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('#grupla-liste label').forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = !q || text.includes(q) ? '' : 'none';
+  });
 }

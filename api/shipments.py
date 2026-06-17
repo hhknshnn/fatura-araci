@@ -33,7 +33,7 @@ def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
                varis_tarihi, gumrukleme_bitis, created_at,
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
-               toplam_maliyet_eur, musteri_tipi
+               toplam_maliyet_eur, musteri_tipi, sefer_id
         FROM shipments
         WHERE 1=1
     '''
@@ -140,6 +140,7 @@ def update_shipment(shipment_id, data):
 
     cur.execute('''
         UPDATE shipments SET
+            ihracat_dosya_no     = %s,
             nakliye_firmasi      = %s,
             plaka                = %s,
             ihracat_beyanname_tl  = %s,
@@ -154,6 +155,7 @@ def update_shipment(shipment_id, data):
             durum                = %s
         WHERE id = %s
     ''', (
+        data.get('ihracat_dosya_no', ''),
         data.get('nakliye_firmasi', ''),
         data.get('plaka', ''),
         data.get('ihracat_beyanname_tl', 0),
@@ -190,6 +192,16 @@ def get_dashboard_stats():
     cur.execute('SELECT COALESCE(SUM(fatura_bedeli_eur), 0) FROM shipments')
     toplam_eur = float(cur.fetchone()[0])
 
+    # Sefer sayısı: gruplanmamışlar tek tek + her grup 1 sefer
+    cur.execute('''
+        SELECT COUNT(*) FROM (
+            SELECT id FROM shipments WHERE sefer_id IS NULL
+            UNION ALL
+            SELECT MIN(id) FROM shipments WHERE sefer_id IS NOT NULL GROUP BY sefer_id
+        ) t
+    ''')
+    sefer_sayisi = cur.fetchone()[0]
+
     cur.execute('''
         SELECT ulke, COUNT(*) as sayi
         FROM shipments
@@ -203,11 +215,12 @@ def get_dashboard_stats():
     conn.close()
 
     return {
-        'toplam':     toplam,
-        'yolda':      yolda,
-        'teslim':     teslim,
-        'toplam_eur': toplam_eur,
-        'ulkeler':    ulkeler,
+        'toplam':       toplam,
+        'sefer_sayisi': sefer_sayisi,
+        'yolda':        yolda,
+        'teslim':       teslim,
+        'toplam_eur':   toplam_eur,
+        'ulkeler':      ulkeler,
     }
 
 
@@ -231,7 +244,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
 
     headers = [
         'İhracat Dosya No', 'Fatura No', 'Depo', 'Ülke', 'Müşteri Tipi',
-        'Nakliye Firması', 'Plaka',
+        'Nakliye Firması', 'Plaka', 'Grup',
         'Fatura Bedeli TL', 'Fatura Bedeli EUR', 'Mal Bedeli EUR',
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
@@ -268,23 +281,24 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
         c(5,  s.get('musteri_tipi', ''))
         c(6,  s.get('nakliye_firmasi', ''))
         c(7,  s.get('plaka', ''))
-        c(8,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
-        c(9,  float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
-        c(10, float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
-        c(11, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
-        c(12, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
-        c(13, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
-        c(14, s.get('yukleme_tarihi', ''))
-        c(15, s.get('gumruk_tarihi', ''))
-        c(16, s.get('varis_tarihi', ''))
-        c(17, s.get('gumrukleme_bitis', ''))
-        c(18, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
-        c(19, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
-        c(20, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
-        c(21, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(22, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(23, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(24, s.get('durum', ''))
+        c(8,  f"Grup {s['sefer_id']}" if s.get('sefer_id') else '')
+        c(9,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
+        c(10, float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
+        c(11, float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
+        c(12, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
+        c(13, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
+        c(14, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
+        c(15, s.get('yukleme_tarihi', ''))
+        c(16, s.get('gumruk_tarihi', ''))
+        c(17, s.get('varis_tarihi', ''))
+        c(18, s.get('gumrukleme_bitis', ''))
+        c(19, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
+        c(20, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
+        c(21, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(22, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(23, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(24, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(25, s.get('durum', ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -352,6 +366,7 @@ def _row_to_dict(row):
         'kdv_eur':               float(row[24] or 0),
         'toplam_maliyet_eur':    float(row[25] or 0),
         'musteri_tipi':          row[26] if len(row) > 26 else 'kurumsal',
+        'sefer_id':              row[27] if len(row) > 27 else None,
     }
 
 
@@ -414,3 +429,35 @@ def shipments_export():
     depo         = request.args.get('depo')
     musteri_tipi = request.args.get('musteri_tipi')
     return export_shipments(ulke=ulke, durum=durum, depo=depo, musteri_tipi=musteri_tipi)
+
+# ── GRUPLAMA ──────────────────────────────────────────────────────────────────
+def group_shipments(shipment_ids):
+    """Verilen id'lere yeni bir sefer_id ata."""
+    if not shipment_ids:
+        return
+
+    conn = get_conn()
+    cur  = conn.cursor()
+
+    # Mevcut en yüksek sefer_id'yi bul, 1 artır
+    cur.execute('SELECT COALESCE(MAX(sefer_id), 0) + 1 FROM shipments')
+    new_sefer_id = cur.fetchone()[0]
+
+    cur.execute(
+        'UPDATE shipments SET sefer_id = %s WHERE id = ANY(%s)',
+        (new_sefer_id, shipment_ids)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_sefer_id
+
+
+def ungroup_shipment(shipment_id):
+    """Tek bir kaydı gruptan çıkar."""
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute('UPDATE shipments SET sefer_id = NULL WHERE id = %s', (shipment_id,))
+    conn.commit()
+    cur.close()
+    conn.close()

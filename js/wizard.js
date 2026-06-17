@@ -160,6 +160,17 @@ function selectCountry(c) {
   document.getElementById('koFreightSection').style.display = 'none';
   document.getElementById('kzModeSection').style.display = 'none';
 
+  // ── DEFAULT NAKLİYE FİRMASI ───────────────────────────────────────────────
+  const DEFAULT_NAKLIYE = {
+    rs: 'RAPİD', ba: 'RAPİD', xk: 'RAPİD', mk: 'RAPİD', kz: 'RAPİD',
+    ge: 'Logitrans',
+    be: 'Trukker', nl: 'Trukker', de: 'Trukker',
+    iq: 'Fikret Lojistik',
+    cy: 'Harun Lojistik',
+  };
+  const nakliyeEl = document.getElementById('nakliyeInput');
+  if (nakliyeEl) nakliyeEl.value = DEFAULT_NAKLIYE[c] || '';
+
   // ── DROPZONE: Ülke seçilince göster ──────────────────────────────────────
   const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb'];
   const dropZone = document.getElementById('dropZone');
@@ -561,7 +572,6 @@ async function downloadRS() {
     });
 
     const data = await resp.json();
-    console.log('RS pdfFields:', data.pdfFields, 'kur:', data.pdfFields?.kur);
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
     // INV+PL
@@ -688,9 +698,15 @@ async function downloadRS() {
           ulke: ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
           durum: 'YOLDA',
           fatura_bedeli_eur: Math.round(fatura_bedeli_eur * 100) / 100,
+          fatura_bedeli_tl:  Math.round(fatura_bedeli_eur * eur_kuru * 100) / 100,
+          mal_bedeli_eur:    Math.round((fatura_bedeli_eur - navlun_eur - sigorta_eur) * 100) / 100,
           navlun_eur: Math.round(navlun_eur * 100) / 100,
           sigorta_eur: Math.round(sigorta_eur * 100) / 100,
           eur_kuru: Math.round(eur_kuru * 10000) / 10000,
+          plaka: document.getElementById('plakaInput')?.value?.trim() || '',
+          nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
+          yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
+          gumruk_tarihi:  document.getElementById('gumrukTarihiInput')?.value || '',
         })
       });
       const sevkData = await sevkRes.json();
