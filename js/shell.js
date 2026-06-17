@@ -1,23 +1,32 @@
 // ── SHELL.JS ──────────────────────────────────────────────────────────────────
 // Sidebar navigasyon, wizard adım yönetimi ve topbar güncellemeleri.
 
-// ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
-// Sidebar toggle
+// ── SIDEBAR TOGGLE — mini mod ─────────────────────────────────────────────────
 function toggleSidebar() {
-  const sb = document.querySelector(".sidebar");
-  sb.classList.toggle("collapsed");
-  const collapsed = sb.classList.contains("collapsed");
-  const fs = document.getElementById("fake-scrollbar");
-  if (fs) fs.style.left = collapsed ? "0" : "220px";
-  // Tablo alanını genişlet
-  const main = document.querySelector(".main-area");
-  if (main) main.style.marginLeft = collapsed ? "0" : "";
+  // Sidebar elementini al
+  const sb = document.getElementById('mainSidebar') || document.querySelector('.sidebar');
+  if (!sb) return;
+
+  // mini class'ı toggle et (CSS transition ile 220px ↔ 60px geçişi)
+  sb.classList.toggle('mini');
+
+  // Fake scrollbar varsa konumunu güncelle
+  const fakeScroll = document.getElementById('fake-scrollbar');
+  if (fakeScroll) {
+    const isMini = sb.classList.contains('mini');
+    const sidebarW = isMini
+      ? getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w-mini').trim()
+      : getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
+    fakeScroll.style.left = sidebarW;
+  }
 }
 
+// ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
 function hideAllPanels() {
   document.getElementById('contentArea').style.padding = '';
 
-  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak','stepGecmis','stepUsers','stepDashboard','stepSevkiyatlar'].forEach(id => {
+  ['step2','step3','stepMense','stepTaslak','stepGtip','stepEvrak',
+   'stepGecmis','stepUsers','stepDashboard','stepSevkiyatlar'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -26,7 +35,10 @@ function hideAllPanels() {
 
 // ── SIDEBAR NAVİGASYON ────────────────────────────────────────────────────────
 function sidebarSelect(mod) {
+  // Tüm nav-item'lardan active'i kaldır
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+  // Seçilen nav-item'ı active yap
   const navEl = document.getElementById('nav-' + mod);
   if (navEl) navEl.classList.add('active');
   const navGecmis = document.getElementById('nav-gecmis-item');
@@ -162,49 +174,37 @@ function updateTopbarBadges() {
   }
 }
 
-// ── ÜLKE LİSTESİ — toggle, arama ─────────────────────────────────────────────
-function toggleCountryGroup(id) {
-  const body    = document.getElementById('cbody-' + id);
-  const chevron = document.getElementById('cchevron-' + id);
-  if (!body) return;
-  const isOpen = body.classList.contains('open');
-  body.classList.toggle('open', !isOpen);
-  if (chevron) chevron.classList.toggle('open', !isOpen);
-}
-
+// ── ÜLKE LİSTESİ ARAMA — yeni kart yapısı (.cc) ──────────────────────────────
 function filterCountryList() {
+  // INV+PL wizard step2 arama kutusu
   const q = document.getElementById('countrySearchInput').value.toLowerCase().trim();
   let total = 0;
 
-  ['kurumsal', 'franchise'].forEach(gId => {
-    const rows = document.querySelectorAll('#cbody-' + gId + ' .country-row');
-    let visible = 0;
-    rows.forEach(row => {
-      const name = row.querySelector('.country-row-name').textContent.toLowerCase();
-      const show = !q || name.includes(q);
-      row.style.display = show ? '' : 'none';
-      if (show) visible++;
-    });
-    const countEl = document.getElementById('ccount-' + gId);
-    const body    = document.getElementById('cbody-' + gId);
-    const chevron = document.getElementById('cchevron-' + gId);
-    if (countEl) countEl.textContent = visible;
-    if (q && visible > 0 && body) {
-      body.classList.add('open');
-      if (chevron) chevron.classList.add('open');
-    }
-    total += visible;
+  // Tüm .cc kartlarını gez, data-name ile filtrele
+  document.querySelectorAll('#cc-grid-kurumsal .cc, #cc-grid-franchise .cc').forEach(card => {
+    const name = card.dataset.name || '';
+    const show = !q || name.includes(q);
+    card.style.display = show ? '' : 'none';
+    if (show) total++;
   });
 
+  // Grup grid + etiketini gizle/göster
+  ['kurumsal', 'franchise'].forEach(grup => {
+    const grid = document.getElementById('cc-grid-' + grup);
+    const lbl  = document.getElementById('cc-lbl-'  + grup);
+    if (!grid) return;
+    const visible = [...grid.querySelectorAll('.cc')].some(c => c.style.display !== 'none');
+    grid.style.display = visible ? '' : 'none';
+    if (lbl) lbl.style.display = visible ? '' : 'none';
+  });
+
+  // Sonuç bulunamadı mesajı
   const nr = document.getElementById('countryNoResults');
   if (nr) nr.style.display = total === 0 ? 'block' : 'none';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  document.querySelectorAll('.country-row').forEach(row => {
-    row.classList.add('country-btn');
-  });
   await loadCountriesConfig();
   sidebarSelect('dashboard');
   if (typeof checkGecmisCount === 'function') checkGecmisCount();

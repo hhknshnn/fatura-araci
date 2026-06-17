@@ -22,6 +22,10 @@ function initMensePanel() {
   const sb = document.getElementById('menseStatus');
   if (sb) { sb.className = 'status-box'; sb.innerHTML = ''; }
 
+  // Panel sıfırlanınca loaded class'ı temizle
+  const dzReset = document.getElementById('menseDropZone');
+  if (dzReset) dzReset.classList.remove('loaded');
+
   // Drag-drop
   const dz = document.getElementById('menseDropZone');
   if (dz && !dz._menseInit) {
@@ -62,6 +66,9 @@ function handleMenseExcel(file) {
       if (!rows.length) throw new Error('Dosya boş');
       menseRows = rows;
       badge.textContent = '✓ ' + rows.length.toLocaleString('tr') + ' satır yüklendi';
+      // Excel yüklenince drop zone'a loaded class ekle
+      const dz = document.getElementById('menseDropZone');
+      if (dz) dz.classList.add('loaded');
       buildMenseKgTable(rows);
       document.getElementById('menseKgPanel').style.display  = 'block';
       document.getElementById('menseApplyBtn').style.display = 'block';
@@ -105,6 +112,9 @@ async function handleMensePdf(file) {
     badge.textContent = '✓ PDF yüklendi';
     console.warn('Menşe PDF parse hatası:', e);
   }
+  // PDF yüklenince drop zone'a loaded class ekle
+  const dz = document.getElementById('menseDropZone');
+  if (dz) dz.classList.add('loaded');
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────

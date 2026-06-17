@@ -133,9 +133,10 @@ function selectDepo(depo) {
 function selectCountry(c) {
   currentCountry = c;
 
-  document.querySelectorAll('.country-btn, .country-row').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.country-btn, .country-row, .cc').forEach(btn => btn.classList.remove('active'));
   const el = document.getElementById('country-' + c);
   if (el) el.classList.add('active');
+  if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 
   // USD kur satırlarını gizle
   const usdRateRow = document.getElementById('usdRateRow');

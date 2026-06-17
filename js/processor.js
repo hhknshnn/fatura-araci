@@ -39,6 +39,9 @@ function handleMultiFile(files) {
     badge.style.display = 'inline-flex';
     const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
     if (nextBtn && cyExcelFiles.length > 0) nextBtn.style.display = 'block';
+    // Kıbrıs: en az 1 dosya seçilince loaded ekle
+    const dz = document.getElementById('dropZone');
+    if (dz) dz.classList.add('loaded');
     return;
   }
   // Diğer ülkeler — mevcut kod aynen
@@ -60,6 +63,9 @@ function handleFile(file) {
   badge.style.display = 'inline-flex';
   const dosyaSec = document.getElementById('dosyaNoSection');
   if (dosyaSec) dosyaSec.style.display = 'block';
+  // Excel yüklenince drop zone'a loaded class ekle
+  const dz = document.getElementById('dropZone');
+  if (dz) dz.classList.add('loaded');
   const r = new FileReader();
   r.onload = e => {
     lastFileData = e.target.result;
@@ -111,6 +117,9 @@ function handlePdf(file) {
     } finally {
       clearInterval(timer);
       badge.textContent = `✓ PDF okundu (${elapsed}s)`;
+      // PDF yüklenince drop zone'a loaded class ekle
+      const dz = document.getElementById('dropZone');
+      if (dz) dz.classList.add('loaded');
     }
   };
   r.readAsArrayBuffer(file);

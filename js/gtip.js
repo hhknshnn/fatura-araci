@@ -69,6 +69,9 @@ function initGtipPanel() {
 
     const fileBadge = document.getElementById('gtipFileName');
     if (fileBadge) { fileBadge.style.display = 'none'; fileBadge.textContent = ''; }
+    // Panel sıfırlanınca loaded class'ı temizle
+    const dzReset = document.getElementById('gtipDropZone');
+    if (dzReset) dzReset.classList.remove('loaded');
 
     const resultBox = document.getElementById('gtipResultBox');
     if (resultBox) { resultBox.className = 'status-box'; resultBox.innerHTML = ''; }
@@ -127,6 +130,9 @@ function handleGtipFile(file) {
     gtipFileName = file.name;
     const badge = document.getElementById('gtipFileName');
     if (badge) { badge.textContent = '✓ ' + file.name; badge.style.display = 'inline-flex'; }
+    // Dosya yüklenince drop zone'a loaded class ekle
+    const dz = document.getElementById('gtipDropZone');
+    if (dz) dz.classList.add('loaded');
 
     const r = new FileReader();
     r.onload = e => {
