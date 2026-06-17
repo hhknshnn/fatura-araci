@@ -219,14 +219,14 @@ function buildTaslakUlkeGrid() {
     // Para birimini belirle — config'de yoksa ülke kodundan çıkar
     const cur = cfg.currency ||
       (kod === 'be' || kod === 'de' || kod === 'nl' || kod === 'xk' || kod === 'mk' ? 'EUR' :
-       kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' ? 'USD' : 'TRY');
+        kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' ? 'USD' : 'TRY');
 
     const curClass = cur === 'EUR' ? 'cur-eur' : cur === 'USD' ? 'cur-usd' : 'cur-try';
-    const tip      = kod === 'cy' ? 'PL only' : 'INV + PL';
+    const tip = kod === 'cy' ? 'PL only' : 'INV + PL';
 
     const card = document.createElement('div');
-    card.className   = 'cc';
-    card.id          = 'taslak-ulke-' + kod;
+    card.className = 'cc';
+    card.id = 'taslak-ulke-' + kod;
     card.dataset.name = cfg.label.toLowerCase();
     card.innerHTML = `
       <div class="cc-check"><i class="ti ti-check" aria-hidden="true"></i></div>
@@ -252,7 +252,7 @@ function buildTaslakUlkeGrid() {
 
 // ── TASLAK ÜLKE GRİD TOGGLE ───────────────────────────────────────────────────
 function toggleTaslakCountryGroup(id) {
-  const body    = document.getElementById('tcbody-' + id);
+  const body = document.getElementById('tcbody-' + id);
   const chevron = document.getElementById('tcchevron-' + id);
   if (!body) return;
   const isOpen = body.classList.contains('open');
@@ -275,7 +275,7 @@ function filterTaslakCountryList() {
 
   // Her grup için kart sayısını güncelle, arama varsa grubu aç
   ['kurumsal', 'franchise'].forEach(grup => {
-    const body    = document.getElementById('tcbody-' + grup);
+    const body = document.getElementById('tcbody-' + grup);
     const countEl = document.getElementById('tccount-' + grup);
     const chevron = document.getElementById('tcchevron-' + grup);
     if (!body) return;
@@ -334,7 +334,7 @@ function selectTaslakDepo(tip) {
 // ── FORM OLUŞTUR ──────────────────────────────────────────────────────────────
 function buildTaslakForm() {
   if (!taslakUlke) return;
-  const formCfg   = TASLAK_ULKELER[taslakUlke];
+  const formCfg = TASLAK_ULKELER[taslakUlke];
   const container = document.getElementById('taslakFormAlanlari');
   container.innerHTML = '';
 
@@ -347,7 +347,7 @@ function buildTaslakForm() {
 
   // Standart form alanları
   formCfg.alanlar.forEach(alan => {
-    const div    = document.createElement('div');
+    const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
     const isNetKg = alan.id === 'netKg';
     const note = isNetKg
@@ -358,7 +358,7 @@ function buildTaslakForm() {
     div.innerHTML = `
       <div style="font-size:13px;font-weight:500;margin-bottom:6px;">${alan.label}</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        ${alan.prefix ? `<span style="font-family:var(--mono);font-size:13px;color:var(--text3);white-space:nowrap;">${alan.prefix}</span>` : ''}
+        ${alan.prefix ? `<select class="yil-select" onchange="localStorage.setItem('app_yil',this.value);window.APP_YIL=this.value;" style="font-family:var(--mono);font-size:13px;color:var(--text3);border:none;background:transparent;cursor:pointer;outline:none;padding:0;"><option ${(window.APP_YIL || '2026') === '2026' ? 'selected' : ''}>2026</option><option ${(window.APP_YIL || '2026') === '2027' ? 'selected' : ''}>2027</option><option ${(window.APP_YIL || '2026') === '2028' ? 'selected' : ''}>2028</option></select><span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>` : ''}
         <input
           class="target-input"
           id="taslak_${alan.id}"
@@ -382,7 +382,7 @@ function buildTaslakForm() {
 function hesaplaNet() {
   if (taslakDepoTipi !== 'serbest') return;
   const brutEl = document.getElementById('taslak_brutKg');
-  const netEl  = document.getElementById('taslak_netKg');
+  const netEl = document.getElementById('taslak_netKg');
   if (!brutEl || !netEl) return;
   const brut = parseFloat(brutEl.value.replace(',', '.'));
   if (!isNaN(brut) && brut > 0) {
@@ -395,9 +395,9 @@ function hesaplaNet() {
 // ── KIBRIS ÖZEL FORM ──────────────────────────────────────────────────────────
 function buildKibrisForm(container) {
   const gruplar = [
-    { id: 'tekstil',     label: 'Tekstil' },
+    { id: 'tekstil', label: 'Tekstil' },
     { id: 'tekstilDisi', label: 'Tekstil Dışı' },
-    { id: 'kozmetik',    label: 'Kozmetik' },
+    { id: 'kozmetik', label: 'Kozmetik' },
   ];
   const grid = document.createElement('div');
   grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;';
@@ -431,14 +431,14 @@ function buildKibrisForm(container) {
   refDiv.innerHTML = `
     <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Referans No</div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">2026-</span>
+      <select class="yil-select" onchange="localStorage.setItem('app_yil',this.value)" style="font-family:var(--mono);font-size:13px;color:var(--text3);border:none;background:transparent;cursor:pointer;outline:none;padding:0;"><option selected>2026</option><option>2027</option><option>2028</option></select><span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
       <input class="target-input" id="kibris_referansNo" placeholder="örn: 100" style="flex:1;">
     </div>`;
   container.appendChild(refDiv);
 }
 
 function kibrisHesaplaNet(grupId) {
-  const brut  = parseFloat(
+  const brut = parseFloat(
     (document.getElementById(`kibris_${grupId}_brutKg`)?.value || '').replace(',', '.')
   );
   const netEl = document.getElementById(`kibris_${grupId}_netKg`);
@@ -449,15 +449,15 @@ function kibrisHesaplaNet(grupId) {
 
 function getKibrisFormData() {
   const gruplar = ['tekstil', 'tekstilDisi', 'kozmetik'];
-  const data    = {};
+  const data = {};
   gruplar.forEach(g => {
-    const kap  = document.getElementById(`kibris_${g}_kap`)?.value?.trim()   || '';
+    const kap = document.getElementById(`kibris_${g}_kap`)?.value?.trim() || '';
     const brut = document.getElementById(`kibris_${g}_brutKg`)?.value?.trim() || '';
-    const net  = document.getElementById(`kibris_${g}_netKg`)?.value?.trim()  || '';
+    const net = document.getElementById(`kibris_${g}_netKg`)?.value?.trim() || '';
     if (kap || brut) {
-      data[g + '_kap']   = kap;
+      data[g + '_kap'] = kap;
       data[g + '_brutKg'] = parseFloat(brut.replace(',', '.')) || 0;
-      data[g + '_netKg']  = parseFloat(net.replace(',', '.'))  || 0;
+      data[g + '_netKg'] = parseFloat(net.replace(',', '.')) || 0;
     }
   });
   const refEl = document.getElementById('kibris_referansNo');
@@ -478,7 +478,7 @@ function handleMenseTaslakFile(file) {
 function handleTaslakFile(file) {
   if (!file) return;
   const badge = document.getElementById('taslakFileName');
-  badge.textContent   = '✓ ' + file.name;
+  badge.textContent = '✓ ' + file.name;
   badge.style.display = 'inline-flex';
   const r = new FileReader();
   r.onload = e => {
@@ -495,7 +495,7 @@ function getTaslakFormData() {
   const formDataCfg = TASLAK_ULKELER[taslakUlke];
   const data = {};
   for (const alan of formDataCfg.alanlar) {
-    const el  = document.getElementById('taslak_' + alan.id);
+    const el = document.getElementById('taslak_' + alan.id);
     if (!el) continue;
     const val = el.value.trim();
     if (!val) continue;
@@ -508,7 +508,14 @@ function getTaslakFormData() {
       }
       data[alan.id] = parseFloat(numStr) || 0;
     } else {
-      data[alan.id] = val;
+      // Referans No ise dropdown'dan seçilen yılı prefix olarak ekle
+      if (alan.id === 'referansNo' && alan.prefix) {
+        const yilEl = document.querySelector(`#taslak_${alan.id}`)?.closest('div')?.querySelector('select');
+        const yil = yilEl ? yilEl.value : (localStorage.getItem('app_yil') || '2026');
+        data[alan.id] = yil + '-' + val;
+      } else {
+        data[alan.id] = val;
+      }
     }
   }
   return data;
@@ -528,14 +535,14 @@ async function indirTaslak() {
   }
   const btn = document.getElementById('taslakIndir');
   btn.textContent = '⏳ Hazırlanıyor...';
-  btn.disabled    = true;
+  btn.disabled = true;
   try {
     const taslakB64 = arrayBufferToBase64(taslakBytes);
     if (!taslakB64) throw new Error('Base64 dönüşümü başarısız');
     const resp = await fetch('/api/taslak', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ulkeKodu: taslakUlke, taslak: taslakB64, formData })
+      body: JSON.stringify({ ulkeKodu: taslakUlke, taslak: taslakB64, formData })
     });
     const data = JSON.parse(await resp.text());
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
@@ -545,26 +552,26 @@ async function indirTaslak() {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {
     btn.textContent = '⬇ Taslak İndir';
-    btn.disabled    = false;
+    btn.disabled = false;
   }
 }
 
 // ── MENŞE → TASLAK ────────────────────────────────────────────────────────────
 async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
   const refNo = document.getElementById('menseRefNo')?.value?.trim();
-  if (!refNo)       { showTaslakStatus('error', '⚠ Referans No girin.'); return; }
+  if (!refNo) { showTaslakStatus('error', '⚠ Referans No girin.'); return; }
   if (!taslakBytes) { showTaslakStatus('error', '⚠ Taslak Excel yükleyin.'); return; }
   const btn = document.getElementById('menseTaslakIndir');
   btn.textContent = '⏳ Hazırlanıyor...';
-  btn.disabled    = true;
+  btn.disabled = true;
   try {
     const taslakB64 = arrayBufferToBase64(menseTaslakBytes);
     const resp = await fetch('/api/taslak', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
+      body: JSON.stringify({
         ulkeKodu: taslakUlke || 'rs',
-        taslak:   taslakB64,
+        taslak: taslakB64,
         formData: { referansNo: refNo, brutKg, netKg },
         menseData: { trKg, yabanciKg },
       })
@@ -577,7 +584,7 @@ async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {
     btn.textContent = '⬇ Menşe Taslak İndir';
-    btn.disabled    = false;
+    btn.disabled = false;
   }
 }
 
@@ -589,7 +596,7 @@ function buildMenseUlkeGrid() {
   Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
     const btn = document.createElement('div');
     btn.className = 'country-btn';
-    btn.id        = 'mense-ulke-' + kod;
+    btn.id = 'mense-ulke-' + kod;
     btn.addEventListener('click', () => selectMenseUlke(kod));
     btn.innerHTML = `
       <div class="country-flag"><img src="https://flagcdn.com/40x30/${cfg.flag}.png"></div>
@@ -617,12 +624,12 @@ async function selectMenseUlke(kod) {
 
 // ── YARDIMCI ──────────────────────────────────────────────────────────────────
 function indir(b64, dosyaAdi) {
-  const bin   = atob(b64);
+  const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url; a.download = dosyaAdi; a.click();
   URL.revokeObjectURL(url);
 }
@@ -652,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function arrayBufferToBase64(buf) {
-  const b         = new Uint8Array(buf);
+  const b = new Uint8Array(buf);
   const chunkSize = 8192;
   let s = '';
   for (let i = 0; i < b.byteLength; i += chunkSize) {

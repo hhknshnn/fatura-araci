@@ -8,5 +8,7 @@
     "1SPOCA0030169.": 0.01,
     "1SPOCA0028197.": 0.01
   },
-  "defaultGroupWeights": {}
+  "defaultGroupWeights": {},
+  "yilSecenekleri": ["2025", "2026", "2027", "2028"],
+  "defaultYil": "2026"
 }

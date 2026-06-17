@@ -119,6 +119,9 @@ def doldur_kibris(taslak_bytes, config, form_data):
     # Dosya no — her 3 sütuna da yaz (A8, D8, G8)
     ref_no = str(form_data.get('referansNo', ''))
     prefix = dosya_cfg.get('prefix', '')
+    # Frontend zaten yıl+no gönderiyor (örn: 2027-100), prefix'i atla
+    if ref_no and '-' in ref_no:
+        prefix = ''
     for hucre in ['B8', 'E8', 'H8']:
         ws[hucre] = prefix + ref_no
 
@@ -194,6 +197,9 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
     # ── DOSYA ADI ─────────────────────────────────────────────────────────────
     ref_no  = form_data.get('referansNo', '')
     prefix  = config['alanlar']['referansNo'].get('prefix', '')
+    # Frontend zaten yıl+no gönderiyor (örn: 2027-100), prefix'i atla
+    if ref_no and '-' in ref_no:
+            prefix = ''
     ulke    = config.get('dosyaAdi', 'Taslak')
     dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
     # ── BYTES OLARAK DÖNDÜR ───────────────────────────────────────────────────
