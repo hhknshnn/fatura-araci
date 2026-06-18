@@ -7,7 +7,7 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments
 from api.kur import get_tcmb_kurlar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -293,7 +293,40 @@ def api_shipments_bulk_import():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/shipments/bulk-update', methods=['POST', 'OPTIONS'])
+def api_shipments_bulk_update():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True)
+        rows = body.get('rows', [])
+        if not rows:
+            return jsonify({'success': False, 'error': 'Satır listesi boş'}), 400
+        guncellenen, atlanan, hatalar = bulk_update_shipments(rows)
+        return jsonify({
+            'success': True,
+            'guncellenen': guncellenen,
+            'atlanan': atlanan,
+            'hatalar': hatalar,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@app.route('/api/shipments/bulk-delete', methods=['POST', 'OPTIONS'])
+def api_shipments_bulk_delete():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True)
+        ids  = body.get('ids', [])
+        if not ids:
+            return jsonify({'success': False, 'error': 'id listesi boş'}), 400
+        deleted = bulk_delete_shipments(ids)
+        return jsonify({'success': True, 'silinen': deleted})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
 def api_shipments_export():
     if request.method == 'OPTIONS':

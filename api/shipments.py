@@ -470,7 +470,120 @@ def shipments_delete():
     cur.close()
     conn.close()
     return jsonify({'success': True})
+def bulk_update_shipments(rows):
+    """
+    Excel'den parse edilmiş satır listesini fatura_no eşleşimine göre günceller.
+    rows: list of dict
+    Döner: (guncellenen, atlanan, hatalar)
+    """
+    conn = get_conn()
+    cur  = conn.cursor()
+    guncellenen, atlanan, hatalar = 0, 0, []
 
+    def to_float(v):
+        try:
+            if v in (None, '', 'nan'): return None
+            s = str(v).strip()
+            # Para birimi kelimelerini temizle
+            s = s.replace('EUR', '').replace('USD', '').replace('BAM', '').replace('TRY', '')
+            # Para birimi sembollerini temizle
+            s = s.replace('€', '').replace('$', '').replace('₺', '').replace('£', '')
+            # Boşluk ve non-breaking space temizle
+            s = s.replace('\xa0', '').replace('\u202f', '').replace(' ', '')
+            # Binlik ayraç ve ondalık düzelt
+            # 1.234,56 formatı (Türkçe) → 1234.56
+            if ',' in s and '.' in s:
+                if s.rfind(',') > s.rfind('.'):
+                    # Türkçe format: 1.234,56
+                    s = s.replace('.', '').replace(',', '.')
+                else:
+                    # İngilizce format: 1,234.56
+                    s = s.replace(',', '')
+            elif ',' in s:
+                s = s.replace(',', '.')
+            s = s.strip()
+            if not s or s == '-': return None
+            return float(s)
+        except: return None
+
+    def to_date(v):
+        if not v or str(v).strip() in ('', 'nan', 'None'): return None
+        s = str(v).strip()
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) == 3 and len(parts[2]) == 4:
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        if '.' in s:
+            parts = s.split('.')
+            if len(parts) == 3 and len(parts[2]) == 4:
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        return s[:10] if len(s) >= 10 else None
+
+    def to_str(v):
+        if v is None or str(v).strip() in ('', 'nan', 'None'): return None
+        return str(v).strip()
+
+    for i, row in enumerate(rows):
+        try:
+            fatura_no = to_str(row.get('fatura_no'))
+            if not fatura_no:
+                atlanan += 1
+                hatalar.append(f'Satır {i+1}: fatura_no boş, atlandı.')
+                continue
+
+            # Kayıt var mı kontrol et
+            cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+            existing = cur.fetchone()
+            if not existing:
+                atlanan += 1
+                hatalar.append(f'Satır {i+1}: {fatura_no} bulunamadı, atlandı.')
+                continue
+
+            # Sadece gönderilen alanları güncelle (None olanları atla)
+            fields = {}
+            mapping = {
+                'ulke': to_str, 'ihracat_dosya_no': to_str,
+                'nakliye_firmasi': to_str, 'plaka': to_str,
+                'fatura_bedeli_tl': to_float, 'mal_bedeli_tl': to_float,
+                'mal_bedeli_eur': to_float, 'navlun_eur': to_float,
+                'sigorta_eur': to_float, 'eur_kuru': to_float,
+                'fatura_bedeli_eur': to_float, 'arac_bekleme': to_float,
+                'ihracat_beyanname_tl': to_float, 'ihracat_beyanname_eur': to_float,
+                'brokerage_eur': to_float, 'gumruk_vergisi_eur': to_float,
+                'kdv_eur': to_float, 'toplam_maliyet_eur': to_float,
+                'durum': to_str,
+            }
+            date_fields = ['yukleme_tarihi', 'gumruk_tarihi', 'varis_tarihi', 'gumrukleme_bitis']
+
+            for col, fn in mapping.items():
+                if col in row:
+                    val = fn(row[col])
+                    if val is not None:
+                        fields[col] = val
+
+            for col in date_fields:
+                if col in row:
+                    val = to_date(row[col])
+                    if val is not None:
+                        fields[col] = val
+
+            if not fields:
+                atlanan += 1
+                hatalar.append(f'Satır {i+1}: {fatura_no} — güncellenecek alan yok.')
+                continue
+
+            set_clause = ', '.join(f'{k} = %s' for k in fields)
+            values = list(fields.values()) + [fatura_no]
+            cur.execute(f'UPDATE shipments SET {set_clause} WHERE fatura_no = %s', values)
+            guncellenen += 1
+
+        except Exception as e:
+            hatalar.append(f'Satır {i+1}: {str(e)}')
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return guncellenen, atlanan, hatalar
 
 def bulk_import_shipments(rows):
     """
@@ -487,6 +600,9 @@ def bulk_import_shipments(rows):
         try:
             if v in (None, '', 'nan'): return 0.0
             s = str(v).strip()
+            # Para birimi kelimelerini temizle
+            s = s.replace('EUR', '').replace('USD', '').replace('BAM', '').replace('TRY', '')
+            # Para birimi sembollerini temizle
             s = s.replace('€', '').replace('$', '').replace('₺', '')
             s = s.replace('\xa0', '').replace(' ', '')
             # 1,234.56 formatı (binlik virgül, ondalık nokta)
@@ -637,3 +753,17 @@ def ungroup_shipment(shipment_id):
     conn.commit()
     cur.close()
     conn.close()
+    
+    
+def bulk_delete_shipments(ids):
+    """Birden fazla sevkiyatı id listesine göre siler."""
+    if not ids:
+        return 0
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute('DELETE FROM shipments WHERE id = ANY(%s)', (ids,))
+    deleted = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+    return deleted

@@ -22,7 +22,7 @@ const KOLON_MAP = {
   fatura_bedeli_eur:     ['fatura bedeli döviz', 'fatura bedeli eur', 'fatura bedeli usd', 'fatura bedeli̇ döviz'],
   arac_bekleme:          ['araç bekleme masrafı', 'arac bekleme', 'araç bekleme masrafı usd'],
   ihracat_beyanname_tl:  ['ihracat beyanname tl', 'i̇hracatbeyanname tl', 'ihracatbeyanname tl'],
-  ihracat_beyanname_eur: ['ihracat beyanname eur', 'ihracat beyanname usd', 'i̇hracatbeyanname eur'],
+  ihracat_beyanname_eur: ['ihracat beyanname eur', 'ihracat beyanname usd', 'i̇hracatbeyanname eur', 'ihracat beyanname  eur'],
   brokerage_eur:         ['brokerage fee', 'brokerage eur', 'brokerage fee eur', 'brokerage fee\\n(ülke gümrükleme masrafı)'],
   gumruk_vergisi_eur:    ['gümrük vergisi döviz', 'gümrük vergisi eur', 'gümrükvergisi \\nusd', 'import duties döviz', 'customs clearance fee döviz'],
   kdv_eur:               ['kdv döviz', 'kdv eur', 'kdv\\neur'],
@@ -72,6 +72,7 @@ let importExcelHeaders = [];   // Excel'deki sütun başlıkları
 let importRawRows      = [];   // Excel'den okunan ham satırlar
 let importMapping      = {};   // { db_kolonu: excel_baslik }
 let importPreviewRows  = [];   // eşleştirme sonrası önizleme satırları
+let importMode         = 'ekle'; // 'ekle' | 'guncelle'
 
 // ── PANELİ BAŞLAT ─────────────────────────────────────────────────────────────
 function initImportPanel() {
@@ -119,6 +120,23 @@ function initImportPanel() {
     <div id="importStep3" style="display:none;">
       <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">Önizleme</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:14px;" id="importPreviewDesc"></div>
+
+      <!-- Mod seçimi -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <div id="import-mode-ekle" onclick="setImportMode('ekle')"
+          style="flex:1;padding:12px 16px;border-radius:var(--radius-md);border:1.5px solid var(--accent);
+                 background:var(--accent-dim);cursor:pointer;transition:all 0.12s;">
+          <div style="font-size:13px;font-weight:600;color:var(--accent-text);">➕ Yeni Ekle</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Fatura No yoksa ekler, varsa atlar</div>
+        </div>
+        <div id="import-mode-guncelle" onclick="setImportMode('guncelle')"
+          style="flex:1;padding:12px 16px;border-radius:var(--radius-md);border:1.5px solid var(--border2);
+                 background:var(--surface2);cursor:pointer;transition:all 0.12s;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);">✏️ Güncelle</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Fatura No eşleşirse üzerine yazar, yoksa atlar</div>
+        </div>
+      </div>
+
       <div style="overflow-x:auto;margin-bottom:14px;">
         <table id="importPreviewTable" style="width:100%;border-collapse:collapse;font-size:11px;"></table>
       </div>
@@ -181,12 +199,12 @@ function handleImportFile(file) {
 // ── OTOMATİK EŞLEŞTİRME ─────────────────────────────────────────────────────
 function autoMap() {
   importMapping = {};
-  const normalize = s => String(s).toLowerCase()
-    .replace(/i̇/g, 'i').replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+  const normalize = s => String(s)
+    .replace(/İ/g, 'I').replace(/ı/g, 'i')
+    .toLowerCase()
+    .replace(/i̇/g, 'i').replace(/I/g, 'i')
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/i̇/g, 'i')
-    .replace(/ı/g, 'i')
     .replace(/ğ/g, 'g')
     .replace(/ü/g, 'u')
     .replace(/ş/g, 's')
@@ -341,41 +359,73 @@ function buildPreviewTable() {
   table.innerHTML = thead + tbody;
 }
 
+// ── MOD SEÇ ───────────────────────────────────────────────────────────────────
+function setImportMode(mode) {
+  importMode = mode;
+  const ekleEl     = document.getElementById('import-mode-ekle');
+  const guncelleEl = document.getElementById('import-mode-guncelle');
+  if (!ekleEl || !guncelleEl) return;
+
+  if (mode === 'ekle') {
+    ekleEl.style.border     = '1.5px solid var(--accent)';
+    ekleEl.style.background = 'var(--accent-dim)';
+    ekleEl.querySelector('div').style.color = 'var(--accent-text)';
+    guncelleEl.style.border     = '1.5px solid var(--border2)';
+    guncelleEl.style.background = 'var(--surface2)';
+    guncelleEl.querySelector('div').style.color = 'var(--text)';
+    document.getElementById('importBtn').textContent = '⬆ Ekle';
+  } else {
+    guncelleEl.style.border     = '1.5px solid var(--accent)';
+    guncelleEl.style.background = 'var(--accent-dim)';
+    guncelleEl.querySelector('div').style.color = 'var(--accent-text)';
+    ekleEl.style.border     = '1.5px solid var(--border2)';
+    ekleEl.style.background = 'var(--surface2)';
+    ekleEl.querySelector('div').style.color = 'var(--text)';
+    document.getElementById('importBtn').textContent = '✏️ Güncelle';
+  }
+}
+
 // ── AKTAR ─────────────────────────────────────────────────────────────────────
 async function doImport() {
   if (!importPreviewRows.length) return;
 
   const btn = document.getElementById('importBtn');
-  btn.textContent = '⏳ Aktarılıyor...';
+  btn.textContent = '⏳ İşleniyor...';
   btn.disabled = true;
 
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
-    const resp  = await fetch('/api/shipments/bulk-import', {
+    const token   = sessionStorage.getItem('fa_auth_token');
+    const url     = importMode === 'guncelle'
+      ? '/api/shipments/bulk-update'
+      : '/api/shipments/bulk-import';
+
+    const resp = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body:    JSON.stringify({ rows: importPreviewRows }),
     });
     const data = await resp.json();
-
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
-    let msg = `✓ ${data.eklenen} kayıt eklendi.`;
-    if (data.atlanan) msg += ` ${data.atlanan} satır atlandı (duplicate).`;
+    let msg;
+    if (importMode === 'guncelle') {
+      msg = `✓ ${data.guncellenen} kayıt güncellendi.`;
+      if (data.atlanan) msg += ` ${data.atlanan} satır atlandı (eşleşme yok).`;
+    } else {
+      msg = `✓ ${data.eklenen} kayıt eklendi.`;
+      if (data.atlanan) msg += ` ${data.atlanan} satır atlandı (duplicate).`;
+    }
 
     showImportStatus('success', msg);
-
     if (data.hatalar && data.hatalar.length) {
       console.warn('Import uyarıları:', data.hatalar);
     }
-
-    // 1.5 saniye sonra sevkiyatlar sayfasına yönlendir
     setTimeout(() => sidebarSelect('sevkiyatlar'), 1500);
 
   } catch (err) {
     showImportStatus('error', '⚠ ' + err.message);
   } finally {
-    btn.textContent = '⬆ Aktar';
+    btn.textContent = importMode === 'guncelle' ? '✏️ Güncelle' : '⬆ Ekle';
     btn.disabled = false;
   }
 }
@@ -386,6 +436,7 @@ function resetImport() {
   importRawRows      = [];
   importMapping      = {};
   importPreviewRows  = [];
+  importMode         = 'ekle';
   showImportStep(1);
   showImportStatus('', '');
   const input = document.getElementById('importFileInput');

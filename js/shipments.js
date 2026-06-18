@@ -1,7 +1,8 @@
 // js/shipments.js
 // Sevkiyatlar sayfası — listeleme, filtreleme, güncelleme
 
-let allShipments = [];
+let allShipments    = [];
+let seciliSatirlar  = new Set(); // çoklu silme için seçili id'ler
 
 // ── SIRALAMA STATE ────────────────────────────────────────────────────────────
 let sortColumn = null;   // hangi sütun: 'ihracat_dosya_no', 'fatura_no', vb.
@@ -209,6 +210,10 @@ function renderShipments(list) {
     <table style="width:100%;border-collapse:collapse;">
       <thead>
         <tr style="background:var(--surface2);border-bottom:0.5px solid var(--border2);">
+          <th style="padding:8px 12px;width:36px;">
+            <input type="checkbox" id="chk-all" onclick="toggleTumSatirlar(this)"
+              style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
+          </th>
           ${thCell('Dosya No',        'ihracat_dosya_no')}
           ${thCell('Fatura No',       'fatura_no')}
           ${thCell('Depo',            '_depo')}
@@ -234,20 +239,25 @@ function renderShipments(list) {
               return `
                 <tr style="border-bottom:0.5px solid var(--border);cursor:pointer;background:${rowBg};transition:background 0.1s;"
                     onmouseover="this.style.background='var(--accent-dim)'"
-                    onmouseout="this.style.background='${rowBg}'"
-                    onclick="openShipmentDetail(${s.id})">
-                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${s.ihracat_dosya_no || '-'}</td>
-                  <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap;font-family:var(--mono);">${s.fatura_no || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;">${depoTag}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.ulke || '-'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.nakliye_firmasi || '-'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.plaka || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;width:70px;">
+                    onmouseout="this.style.background='${rowBg}'">
+                  <td style="padding:8px 12px;width:36px;" onclick="event.stopPropagation()">
+                    <input type="checkbox" data-id="${s.id}"
+                      ${seciliSatirlar.has(s.id) ? 'checked' : ''}
+                      onclick="toggleSatirSec(event, ${s.id})"
+                      style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
+                  </td>
+                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ihracat_dosya_no || '-'}</td>
+                  <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap;font-family:var(--mono);" onclick="openShipmentDetail(${s.id})">${s.fatura_no || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${depoTag}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ulke || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.nakliye_firmasi || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.plaka || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;width:70px;" onclick="openShipmentDetail(${s.id})">
                     ${s.sefer_id ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:12px;">-</span>'}
                   </td>
-                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;">${s.yukleme_tarihi || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;">
+                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${formatEUR(s.fatura_bedeli_eur)}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.yukleme_tarihi || '-'}</td>
+                  <td style="padding:8px 12px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">
                     <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
                 </tr>`;
@@ -611,4 +621,103 @@ function filterGruplaListe() {
     const text = item.textContent.toLowerCase();
     item.style.display = !q || text.includes(q) ? '' : 'none';
   });
+}
+
+// ── ÇOKLU SEÇİM & SİLME ──────────────────────────────────────────────────────
+function toggleSatirSec(event, id) {
+  event.stopPropagation();
+  if (seciliSatirlar.has(id)) {
+    seciliSatirlar.delete(id);
+  } else {
+    seciliSatirlar.add(id);
+  }
+  updateSecimToolbar();
+}
+
+function toggleTumSatirlar(chk) {
+  const checkboxes = document.querySelectorAll('#shipments-tbody input[type=checkbox]');
+  checkboxes.forEach(cb => {
+    const id = parseInt(cb.dataset.id);
+    if (chk.checked) {
+      seciliSatirlar.add(id);
+      cb.checked = true;
+    } else {
+      seciliSatirlar.delete(id);
+      cb.checked = false;
+    }
+  });
+  updateSecimToolbar();
+}
+
+function updateSecimToolbar() {
+  const count = seciliSatirlar.size;
+  let toolbar = document.getElementById('secim-toolbar');
+
+  if (count === 0) {
+    if (toolbar) toolbar.style.display = 'none';
+    return;
+  }
+
+  if (!toolbar) {
+    toolbar = document.createElement('div');
+    toolbar.id = 'secim-toolbar';
+    toolbar.style.cssText = `
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      background:#1E293B;color:#F1F5F9;
+      padding:12px 20px;border-radius:12px;
+      display:flex;align-items:center;gap:14px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3);
+      z-index:200;font-size:13px;font-weight:500;
+    `;
+    toolbar.innerHTML = `
+      <span id="secim-count"></span>
+      <button onclick="topluSil()"
+        style="padding:7px 16px;border-radius:8px;border:none;
+               background:#EF4444;color:#fff;font-family:var(--font);
+               font-size:12px;font-weight:600;cursor:pointer;">
+        🗑 Seçilenleri Sil
+      </button>
+      <button onclick="secimIptal()"
+        style="padding:7px 14px;border-radius:8px;
+               border:0.5px solid rgba(255,255,255,0.2);
+               background:transparent;color:#CBD5E1;
+               font-family:var(--font);font-size:12px;cursor:pointer;">
+        İptal
+      </button>
+    `;
+    document.body.appendChild(toolbar);
+  }
+
+  toolbar.style.display = 'flex';
+  document.getElementById('secim-count').textContent = `${count} satır seçildi`;
+}
+
+function secimIptal() {
+  seciliSatirlar.clear();
+  document.querySelectorAll('#shipments-tbody input[type=checkbox]').forEach(cb => cb.checked = false);
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = false;
+  updateSecimToolbar();
+}
+
+async function topluSil() {
+  const count = seciliSatirlar.size;
+  if (!count) return;
+  if (!confirm(`${count} sevkiyat kalıcı olarak silinecek. Emin misiniz?`)) return;
+
+  const token = sessionStorage.getItem('fa_auth_token');
+  try {
+    const resp = await fetch('/api/shipments/bulk-delete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ ids: [...seciliSatirlar] }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+    seciliSatirlar.clear();
+    updateSecimToolbar();
+    loadShipments();
+  } catch (e) {
+    alert('Silme hatası: ' + e.message);
+  }
 }
