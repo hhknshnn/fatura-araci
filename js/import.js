@@ -86,13 +86,32 @@ function initImportPanel() {
 
   panel.innerHTML = `
     <div class="panel-label">Toplu İçe Aktar</div>
-    <div class="panel-title">Excel'den Sevkiyat Aktar</div>
-    <div class="panel-desc">Excel dosyanı yükle, sütunları eşleştir, önizle ve aktar.</div>
 
-    <div class="status-box" id="importStatus"></div>
+    <!-- Sekme Başlıkları -->
+    <div style="display:flex;gap:0;border-bottom:1.5px solid var(--border2);margin-bottom:18px;">
+      <button id="import-tab-excel" onclick="switchImportTab('excel')"
+        style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
+               font-size:13px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);
+               margin-bottom:-1.5px;cursor:pointer;">
+        📊 Excel Aktar
+      </button>
+      <button id="import-tab-aksu" onclick="switchImportTab('aksu')"
+        style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
+               font-size:13px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;
+               margin-bottom:-1.5px;cursor:pointer;">
+        📄 Aksu Beyanname PDF
+      </button>
+    </div>
 
-    <!-- ADIM 1: Dosya yükle -->
-    <div id="importStep1">
+    <!-- Excel Sekmesi -->
+    <div id="import-tab-content-excel">
+      <div class="panel-title">Excel'den Sevkiyat Aktar</div>
+      <div class="panel-desc">Excel dosyanı yükle, sütunları eşleştir, önizle ve aktar.</div>
+
+      <div class="status-box" id="importStatus"></div>
+
+      <!-- ADIM 1: Dosya yükle -->
+      <div id="importStep1">
       <div class="drop-zone" id="importDropZone" onclick="document.getElementById('importFileInput').click()">
         <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display:none"
           onchange="handleImportFile(this.files[0])">
@@ -145,6 +164,34 @@ function initImportPanel() {
         <button class="btn-ghost" onclick="showImportStep(2)">← Geri</button>
       </div>
     </div>
+    </div><!-- /import-tab-content-excel -->
+
+    <!-- Aksu PDF Sekmesi -->
+    <div id="import-tab-content-aksu" style="display:none;">
+      <div class="panel-title">Aksu Beyanname PDF</div>
+      <div class="panel-desc">Aksu Gümrük faturasını yükle — İhracat Beyanname TL/EUR otomatik dolar.</div>
+
+      <div class="status-box" id="aksuStatus"></div>
+
+      <div id="aksu-drop-zone"
+        ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+        ondragleave="this.classList.remove('vergi-drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleAksuPdf(event.dataTransfer.files[0])"
+        onclick="document.getElementById('aksu-pdf-input').click()"
+        style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+               gap:10px;padding:32px 20px;background:var(--surface2);
+               border:1.5px dashed var(--border2);border-radius:var(--radius-md);
+               cursor:pointer;transition:border-color 0.15s,background 0.15s;text-align:center;">
+        <input type="file" id="aksu-pdf-input" accept=".pdf" style="display:none;"
+          onchange="handleAksuPdf(this.files[0])">
+        <span style="font-size:32px;">📄</span>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">PDF'i buraya sürükleyin veya tıklayın</div>
+        <div style="font-size:12px;color:var(--text3);">Çok sayfalı PDF desteklenir — tüm faturalar taranır</div>
+      </div>
+
+      <div id="aksu-result" style="display:none;margin-top:16px;"></div>
+    </div>
+
   `;
 
   // Drag-drop
@@ -462,4 +509,67 @@ function showImportStatus(type, html) {
   if (!sb) return;
   sb.className = type ? `status-box visible ${type}` : 'status-box';
   sb.innerHTML = html;
+}
+
+// ── SEKME GEÇİŞİ ─────────────────────────────────────────────────────────────
+function switchImportTab(tab) {
+  const tabs = ['excel', 'aksu'];
+  tabs.forEach(t => {
+    const btn     = document.getElementById('import-tab-' + t);
+    const content = document.getElementById('import-tab-content-' + t);
+    if (!btn || !content) return;
+    const active = t === tab;
+    btn.style.color       = active ? 'var(--accent)' : 'var(--text3)';
+    btn.style.borderBottom = active ? '2px solid var(--accent)' : '2px solid transparent';
+    content.style.display  = active ? 'block' : 'none';
+  });
+}
+
+// ── AKSU PDF YÜKLE ────────────────────────────────────────────────────────────
+async function handleAksuPdf(file) {
+  if (!file) return;
+
+  const statusEl = document.getElementById('aksuStatus');
+  const resultEl = document.getElementById('aksu-result');
+  statusEl.className = 'status-box visible info';
+  statusEl.innerHTML = '⏳ PDF okunuyor ve eşleştiriliyor...';
+  resultEl.style.display = 'none';
+
+  try {
+    const b     = await file.arrayBuffer();
+    const bytes = new Uint8Array(b);
+    let s = '';
+    for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
+    const pdf_b64 = btoa(s);
+
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/shipments/parse-aksu-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: pdf_b64 }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    statusEl.className = 'status-box visible success';
+    statusEl.innerHTML = `✓ ${data.eslesen} kayıt güncellendi, ${data.atlanan} atlandı.`;
+
+    if (data.hatalar && data.hatalar.length) {
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+        <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;">Detaylar:</div>
+        ${data.hatalar.map(h =>
+          `<div style="font-size:12px;color:${h.startsWith('✓') ? 'var(--success)' : 'var(--text3)'};padding:4px 0;border-bottom:0.5px solid var(--border);">${h.startsWith('✓') ? '' : '⚠ '}${h}</div>`
+        ).join('')}
+      `;
+    }
+
+    if (data.eslesen > 0) {
+      loadShipments();
+    }
+
+  } catch (err) {
+    statusEl.className = 'status-box visible error';
+    statusEl.innerHTML = '⚠ ' + err.message;
+  }
 }

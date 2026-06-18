@@ -835,3 +835,83 @@ def parse_rs_brokerage_pdf(pdf_bytes):
         print(f'RS brokerage PDF parse hatası: {e}')
 
     return result
+
+def parse_aksu_beyanname_pdf(pdf_bytes):
+    """
+    Aksu Gümrük e-faturasından tüm faturaları parse eder.
+    Fatura sayfası (Vergiler Hariç Toplam Tutar) + özet sayfası (MÜŞTERİ REF.NO) çifti.
+    """
+    faturalar = []
+
+    def parse_tl_sayi(s):
+        s = str(s).strip().replace('.', '').replace(',', '.').replace('TL', '').strip()
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    def extract_ref_no(text):
+        # "POZİSYON NO H-26-01461 2026-281 EŞYANIN CİNSİ" → 2026-281
+        m = re.search(r'POZ[İI]SYON NO\s+\S+\s+(\d{4}-\d+)', text)
+        if m:
+            return m.group(1).strip()
+        return None
+
+    def extract_fatura_no(text):
+        # "MÜŞTERİ FATURA NO IHR2026..." veya "MÜŞTERİ 26TR... NOT" formatı
+        m = re.search(r'MÜŞTER[İI]\s+(?:FATURA\s+NO\s+)?((?:IHR|ANT)\d+)', text, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        return None
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            pages_text = []
+            for page in pdf.pages:
+                raw = page.extract_text() or ''
+                pages_text.append(re.sub(r'\s+', ' ', raw))
+
+        i = 0
+        while i < len(pages_text):
+            text = pages_text[i]
+
+            if 'Vergiler Hariç Toplam Tutar' in text:
+                # Fatura sayfası
+                tutar     = 0.0
+                ref_no    = None
+                fatura_no = None
+
+                m = re.search(r'Vergiler Hariç Toplam Tutar\s+([\d.,]+)', text)
+                if m:
+                    tutar = parse_tl_sayi(m.group(1))
+
+                # Ref ve fatura no aynı sayfada olabilir
+                ref_no    = extract_ref_no(text)
+                fatura_no = extract_fatura_no(text)
+
+                # Bir sonraki sayfa özet sayfasıysa oradan da al
+                if i + 1 < len(pages_text):
+                    next_text = pages_text[i + 1]
+                    if 'POZİSYON NO' in next_text or 'MÜŞTERİ REF' in next_text:
+                        if not ref_no:
+                            ref_no = extract_ref_no(next_text)
+                        if not fatura_no:
+                            fatura_no = extract_fatura_no(next_text)
+                        i += 2
+                    else:
+                        i += 1
+                else:
+                    i += 1
+
+                faturalar.append({
+                    'ref_no':    ref_no,
+                    'fatura_no': fatura_no,
+                    'tutar_tl':  tutar,
+                })
+            else:
+                i += 1
+
+    except Exception as e:
+        print(f'Aksu beyanname PDF parse hatası: {e}')
+
+    return faturalar

@@ -7,7 +7,6 @@ async function loadCountriesConfig() {
     const res = await fetch('./config/countries.json', { cache: 'no-store' });
     if (!res.ok) throw new Error('countries.json yüklenemedi');
     window.COUNTRIES_CACHE = await res.json();
-    console.log('✓ Ülke config yüklendi:', Object.keys(window.COUNTRIES_CACHE).length, 'ülke');
     return window.COUNTRIES_CACHE;
   } catch(e) {
     console.error('countries.json yükleme hatası:', e);

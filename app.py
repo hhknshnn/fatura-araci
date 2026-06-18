@@ -17,12 +17,12 @@ import evrak as evrak_mod
 import generate as gen_mod
 import taslak as taslak_mod
 
-from api.db import init_db
+from api.db import init_db, get_conn
 from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
-from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_aksu_beyanname_pdf
 
 def read_port():
     try:
@@ -414,6 +414,93 @@ def api_parse_vergi_pdf():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
 
+@app.route('/api/shipments/parse-aksu-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_aksu_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+
+        # 1. PDF parse — tüm faturaları çek
+        faturalar = parse_aksu_beyanname_pdf(pdf_bytes)
+        if not faturalar:
+            return jsonify({'success': False, 'error': 'PDF\'den fatura bilgisi çıkarılamadı'}), 400
+
+        # 2. Veritabanında eşleştir ve güncelle
+        conn = get_conn()
+        cur  = conn.cursor()
+
+        eslesen, atlanan, hatalar = 0, 0, []
+
+        for f in faturalar:
+            ref_no    = f.get('ref_no')
+            fatura_no = f.get('fatura_no')
+            tutar_tl  = f.get('tutar_tl', 0)
+
+            if not tutar_tl:
+                atlanan += 1
+                hatalar.append(f'{ref_no or fatura_no}: tutar çıkarılamadı')
+                continue
+
+            # Önce fatura_no ile eşleştir, yoksa ihracat_dosya_no ile dene
+            shipment_id = None
+            eur_kuru    = 0.0
+
+            if fatura_no:
+                cur.execute(
+                    'SELECT id, eur_kuru FROM shipments WHERE fatura_no = %s',
+                    (fatura_no,)
+                )
+                row = cur.fetchone()
+                if row:
+                    shipment_id = row[0]
+                    eur_kuru    = float(row[1] or 0)
+
+            if not shipment_id and ref_no:
+                cur.execute(
+                    'SELECT id, eur_kuru FROM shipments WHERE ihracat_dosya_no = %s',
+                    (ref_no,)
+                )
+                row = cur.fetchone()
+                if row:
+                    shipment_id = row[0]
+                    eur_kuru    = float(row[1] or 0)
+
+            if not shipment_id:
+                atlanan += 1
+                hatalar.append(f'{ref_no or fatura_no}: eşleşen kayıt bulunamadı')
+                continue
+
+            tutar_eur = round(tutar_tl / eur_kuru, 2) if eur_kuru else 0.0
+
+            cur.execute('''
+                UPDATE shipments
+                SET ihracat_beyanname_tl  = %s,
+                    ihracat_beyanname_eur = %s
+                WHERE id = %s
+            ''', (tutar_tl, tutar_eur, shipment_id))
+            eslesen += 1
+            hatalar.append(f'✓ REF:{ref_no} / FATURA:{fatura_no} → {tutar_tl:,.2f} TL / {tutar_eur:,.2f} EUR güncellendi')
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            'success':  True,
+            'eslesen':  eslesen,
+            'atlanan':  atlanan,
+            'hatalar':  hatalar,
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+    
 @app.route('/api/kur', methods=['GET', 'OPTIONS'])
 def api_kur():
     if request.method == 'OPTIONS':
