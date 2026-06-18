@@ -344,11 +344,43 @@ async function openShipmentDetail(id) {
   if (gruplaBtn) {
     if (s.sefer_id) {
       gruplaBtn.innerHTML = '🔗 Grubu Düzenle';
+      gruplaBtn.onclick = () => openGruplaModal();
     } else {
       gruplaBtn.innerHTML = '🔗 Grupla';
+      gruplaBtn.onclick = () => openGruplaModal();
     }
   }
 
+  // Gruptan çıkar butonunu göster/gizle
+  let ungroupBtn = document.getElementById('ungroup-btn');
+  if (!ungroupBtn) {
+    ungroupBtn = document.createElement('button');
+    ungroupBtn.id = 'ungroup-btn';
+    ungroupBtn.style.cssText = 'padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--text3);background:transparent;color:var(--text3);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;';
+    ungroupBtn.onclick = () => ungroupShipment();
+    const footer = document.querySelector('.detail-footer');
+    const gruplaB = document.getElementById('grupla-btn');
+    footer.insertBefore(ungroupBtn, gruplaB);
+  }
+  if (s.sefer_id) {
+    ungroupBtn.style.display = 'inline-block';
+    ungroupBtn.innerHTML = '🔓 Gruptan Çıkar';
+  } else {
+    ungroupBtn.style.display = 'none';
+  }
+  // Sırbistan ise vergi PDF alanını göster, değilse gizle
+  const vergiPdfSection = document.getElementById('vergi-pdf-section');
+  if (vergiPdfSection) {
+    vergiPdfSection.style.display = s.ulke?.toUpperCase() === 'SIRBİSTAN' ? 'block' : 'none';
+  }
+  // Her popup açılışında vergi PDF status ve input'u sıfırla
+  const vergiStatus = document.getElementById('vergi-pdf-status');
+  if (vergiStatus) {
+    vergiStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage otomatik dolar';
+    vergiStatus.style.color = 'var(--text3)';
+  }
+  const vergiInput = document.getElementById('vergi-pdf-input');
+  if (vergiInput) vergiInput.value = '';
   overlay.style.display = 'block';
   panel.style.display   = 'flex';
 }
@@ -512,6 +544,14 @@ function openGruplaModal() {
   gruplaHedefId = parseInt(id);
   gruplaSecilen = new Set([gruplaHedefId]);
 
+  // Mevcut gruptaki tüm üyeleri baştan ekle
+  const hedef = allShipments.find(x => x.id === gruplaHedefId);
+  if (hedef?.sefer_id) {
+    allShipments.forEach(s => {
+      if (s.sefer_id === hedef.sefer_id) gruplaSecilen.add(s.id);
+    });
+  }
+
   const liste = document.getElementById('grupla-liste');
   liste.innerHTML = '';
 
@@ -535,8 +575,8 @@ function openGruplaModal() {
     if (s.id === gruplaHedefId) return;
 
     // Zaten aynı gruptaysa işaretle
-    const hedef    = allShipments.find(x => x.id === gruplaHedefId);
-    const ayniGrup = hedef?.sefer_id && s.sefer_id === hedef.sefer_id;
+    const hedefItem = allShipments.find(x => x.id === gruplaHedefId);
+    const ayniGrup = hedefItem?.sefer_id && s.sefer_id === hedefItem.sefer_id;
     if (ayniGrup) gruplaSecilen.add(s.id);
 
     const checked = ayniGrup;
@@ -719,5 +759,74 @@ async function topluSil() {
     loadShipments();
   } catch (e) {
     alert('Silme hatası: ' + e.message);
+  }
+}
+
+// ── SIRBİSTAN VERGİ PDF PARSE ─────────────────────────────────────────────────
+async function parseVergiPdf(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const b = new Uint8Array(e.target.result);
+        let s = '';
+        for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+        const pdf_b64 = btoa(s);
+
+        const token = sessionStorage.getItem('fa_auth_token');
+        const resp  = await fetch('/api/shipments/parse-vergi-pdf', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body:    JSON.stringify({ pdf: pdf_b64 }),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+        resolve(data);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('Dosya okunamadı'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function handleVergiPdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('vergi-pdf-status');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+
+  try {
+    const data = await parseVergiPdf(file);
+
+    const fmt = n => new Intl.NumberFormat('tr-TR', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    }).format(n);
+
+    if (data.tip === 'vergi') {
+      // Gümrük vergisi faturası
+      document.getElementById('edit-gumruk-v').value = data.eur.gumruk_vergisi;
+      document.getElementById('edit-kdv').value       = data.eur.kdv;
+
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent =
+        `✓ Gümrük: ${fmt(data.rsd.carina)} RSD → ${fmt(data.eur.gumruk_vergisi)} € | ` +
+        `KDV: ${fmt(data.rsd.pdv)} RSD → ${fmt(data.eur.kdv)} € | ` +
+        `Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD`;
+
+    } else if (data.tip === 'brokerage') {
+      // Spediter faturası
+      document.getElementById('edit-brokerage').value = data.eur.brokerage;
+
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent =
+        `✓ Brokerage: ${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} € | ` +
+        `Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD`;
+    }
+
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
   }
 }

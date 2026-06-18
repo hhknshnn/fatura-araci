@@ -2,7 +2,9 @@
 # Sevkiyat kayıtları — PostgreSQL tabanlı
 
 import io
+import re
 import time
+import pdfplumber
 from flask import request, jsonify, send_file
 from api.db import get_conn
 from api.auth import get_session_from_headers
@@ -767,3 +769,69 @@ def bulk_delete_shipments(ids):
     cur.close()
     conn.close()
     return deleted
+
+# ── SIRBİSTAN VERGİ PDF PARSE ────────────────────────────────────────────────
+def parse_rs_vergi_pdf(pdf_bytes):
+    """
+    Sırbistan gümrük faturasından CARINA ve POREZ NA DODATU VREDNOST çeker.
+    Format: 4.071,40 (binlik nokta, ondalık virgül)
+    """
+    result = {'carina': 0.0, 'pdv': 0.0, 'svega': 0.0}
+
+    def parse_rs_sayi(s):
+        s = s.strip().replace('.', '').replace(',', '.')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text)
+
+        m = re.search(r'CARINA\s+([\d.,]+)', text)
+        if m:
+            result['carina'] = parse_rs_sayi(m.group(1))
+
+        m = re.search(r'POREZ NA DODATU VREDNOST\s+([\d.,]+)', text)
+        if m:
+            result['pdv'] = parse_rs_sayi(m.group(1))
+
+        m = re.search(r'SVEGA\s+([\d.,]+)', text)
+        if m:
+            result['svega'] = parse_rs_sayi(m.group(1))
+
+    except Exception as e:
+        print(f'RS vergi PDF parse hatası: {e}')
+
+    return result
+
+
+def parse_rs_brokerage_pdf(pdf_bytes):
+    """
+    M&M gibi Sırbistan spediter faturasından 'Naši troškovi bez PDV-a' tutarını çeker.
+    Format: 13.616,06 (binlik nokta, ondalık virgül)
+    """
+    result = {'nasi_troskovi': 0.0}
+
+    def parse_rs_sayi(s):
+        s = s.strip().replace('.', '').replace(',', '.')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text)
+
+        m = re.search(r'Na[šs]i tro[šs]kovi bez PDV-a[:\s]*([\d.,]+)', text, re.IGNORECASE)
+        if m:
+            result['nasi_troskovi'] = parse_rs_sayi(m.group(1))
+
+    except Exception as e:
+        print(f'RS brokerage PDF parse hatası: {e}')
+
+    return result

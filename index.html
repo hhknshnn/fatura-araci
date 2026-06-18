@@ -575,6 +575,37 @@
               <div class="detail-field"><label>Gümrükleme Bitiş</label><input id="edit-gumruk-bitis" type="date">
               </div>
             </div>
+            <!-- Sırbistan vergi PDF yükleme — sadece SIRBİSTAN için gösterilir -->
+            <div id="vergi-pdf-section" style="display:none;">
+              <div class="detail-section-label">Sırbistan Maliyet PDF'leri</div>
+              <div id="vergi-drop-zone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleVergiPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('vergi-pdf-input').click()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                       background:var(--surface2);border:1.5px dashed var(--border2);
+                       border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;
+                       margin-top:8px;">
+                <input type="file" id="vergi-pdf-input" accept=".pdf" style="display:none;"
+                  onchange="handleVergiPdf(this.files[0])">
+                <span style="font-size:20px;flex-shrink:0;">📄</span>
+                <div style="flex:1;min-width:0;">
+                  <div id="vergi-pdf-status" style="font-size:12px;color:var(--text3);">
+                    PDF'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage otomatik dolar
+                  </div>
+                </div>
+              </div>
+              <style>
+                #vergi-drop-zone:hover,
+                #vergi-drop-zone.vergi-drag-over {
+                  border-color: var(--accent);
+                  background: var(--accent-dim);
+                }
+
+                #vergi-drop-zone.vergi-drag-over {
+                  border-style: solid;
+                }
+              </style>
+            </div>
             <div class="detail-section-label">Maliyet Bilgileri</div>
             <div class="detail-grid">
               <div class="detail-field"><label>İhracat Beyanname TL</label><input id="edit-beyanname-tl" type="number"

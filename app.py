@@ -22,7 +22,7 @@ from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
-from api.shipments import group_shipments, ungroup_shipment
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf
 
 def read_port():
     try:
@@ -41,7 +41,7 @@ STATIC_DIRS = {'css', 'js', 'templates', 'fonts', 'assets', 'config'}
 def _cors(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     return response
 
 
@@ -357,6 +357,63 @@ def api_taslak_store_sil(taslak_id):
         return app.make_default_options_response()
     return taslak_store_sil(taslak_id)
 
+@app.route('/api/shipments/parse-vergi-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_vergi_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+
+        # Anlık RSD/EUR kuru çek
+        import urllib.request as _urllib
+        url = 'https://api.exchangerate-api.com/v4/latest/EUR'
+        req = _urllib.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with _urllib.urlopen(req, timeout=5) as resp:
+            rates = json.loads(resp.read()).get('rates', {})
+        rsd_per_eur = float(rates.get('RSD', 0))
+
+        def to_eur(rsd):
+            if not rsd_per_eur:
+                return 0.0
+            return round(rsd / rsd_per_eur, 2)
+
+        # PDF tipini otomatik tanı
+        with __import__('pdfplumber').open(__import__('io').BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+
+        if 'CARINA' in text or 'POREZ NA DODATU VREDNOST' in text:
+            # Gümrük/vergi faturası
+            vergi = parse_rs_vergi_pdf(pdf_bytes)
+            return jsonify({
+                'success': True,
+                'tip': 'vergi',
+                'rsd': {'carina': vergi['carina'], 'pdv': vergi['pdv'], 'svega': vergi['svega']},
+                'eur': {'gumruk_vergisi': to_eur(vergi['carina']), 'kdv': to_eur(vergi['pdv'])},
+                'kur': {'rsd_per_eur': rsd_per_eur},
+            })
+
+        elif 'troškovi' in text or 'troskovi' in text.lower():
+            # Brokerage/spediter faturası
+            brokerage = parse_rs_brokerage_pdf(pdf_bytes)
+            return jsonify({
+                'success': True,
+                'tip': 'brokerage',
+                'rsd': {'nasi_troskovi': brokerage['nasi_troskovi']},
+                'eur': {'brokerage': to_eur(brokerage['nasi_troskovi'])},
+                'kur': {'rsd_per_eur': rsd_per_eur},
+            })
+
+        else:
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. Gümrük veya spediter faturası yükleyin.'}), 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
 @app.route('/api/kur', methods=['GET', 'OPTIONS'])
 def api_kur():
     if request.method == 'OPTIONS':
@@ -365,11 +422,6 @@ def api_kur():
     return jsonify({'success': True, 'kurlar': kurlar})
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    port = read_port()
-    print(f'Sunucu başlıyor: http://localhost:{port}')
-    app.run(host='0.0.0.0', port=port, debug=False)
-    
 @app.route('/api/shipments/group', methods=['POST', 'OPTIONS'])
 def api_shipments_group():
     if request.method == 'OPTIONS':
@@ -391,3 +443,9 @@ def api_shipments_ungroup():
         return jsonify({'success': False, 'error': 'id gerekli'}), 400
     ungroup_shipment(int(sid))
     return jsonify({'success': True})
+
+if __name__ == '__main__':
+    port = read_port()
+    print(f'Sunucu başlıyor: http://localhost:{port}')
+    app.run(host='0.0.0.0', port=port, debug=False)
+    
