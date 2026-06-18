@@ -284,7 +284,7 @@
           </style>
 
           <!-- KPI Kartları -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;">
 
             <div class="dash-kpi" style="animation-delay:0.05s;">
               <div class="dash-kpi-accent" style="background:#2563EB;"></div>
@@ -309,6 +309,17 @@
             </div>
 
             <div class="dash-kpi" style="animation-delay:0.15s;">
+              <div class="dash-kpi-accent" style="background:#06B6D4;"></div>
+              <div class="dash-kpi-icon" style="background:#ECFEFF;color:#06B6D4;">
+                <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Varış Gümrük</div>
+              <div class="dash-kpi-value" id="dash-kv4" style="color:#06B6D4;">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag" style="background:#ECFEFF;color:#0E7490;">Gümrükte</span>
+              </div>
+            </div>
+
+            <div class="dash-kpi" style="animation-delay:0.20s;">
               <div class="dash-kpi-accent" style="background:#22C55E;"></div>
               <div class="dash-kpi-icon" style="background:#F0FDF4;color:#22C55E;">
                 <i class="ti ti-circle-check" aria-hidden="true"></i>
@@ -319,13 +330,13 @@
                   style="background:#F0FDF4;color:#16A34A;">Tamamlanan</span></div>
             </div>
 
-            <div class="dash-kpi" style="animation-delay:0.20s;">
+            <div class="dash-kpi" style="animation-delay:0.25s;">
               <div class="dash-kpi-accent" style="background:#8B5CF6;"></div>
               <div class="dash-kpi-icon" style="background:#F5F3FF;color:#8B5CF6;">
                 <i class="ti ti-currency-euro" aria-hidden="true"></i>
               </div>
               <div class="dash-kpi-label">Toplam EUR</div>
-              <div class="dash-kpi-value" id="dash-kv4" style="font-size:20px;color:#8B5CF6;">—</div>
+              <div class="dash-kpi-value" id="dash-kv5" style="font-size:20px;color:#8B5CF6;">—</div>
               <div class="dash-kpi-sub"><span class="dash-tag" style="background:#F5F3FF;color:#6D28D9;">Fatura
                   bedeli</span></div>
             </div>
@@ -410,22 +421,26 @@
                   <select id="filter-ulke" onchange="filterShipments()"
                     style="font-size:12px;padding:0 8px;height:32px;border:none;background:transparent;color:var(--text);outline:none;min-width:90px;">
                     <option value="">Tüm ülkeler</option>
-                    <option value="SIRBİSTAN">Sırbistan</option>
-                    <option value="BOSNA">Bosna</option>
-                    <option value="GÜRCİSTAN">Gürcistan</option>
-                    <option value="KOSOVA">Kosova</option>
-                    <option value="MAKEDONYA">Makedonya</option>
-                    <option value="BELÇİKA">Belçika</option>
-                    <option value="ALMANYA">Almanya</option>
-                    <option value="HOLLANDA">Hollanda</option>
-                    <option value="KAZAKİSTAN">Kazakistan</option>
-                    <option value="KIBRIS">Kıbrıs</option>
-                    <option value="IRAK">Irak</option>
-                    <option value="LİBYA">Libya</option>
-                    <option value="LİBERYA">Liberya</option>
-                    <option value="LÜBNAN">Lübnan</option>
-                    <option value="ÖZBEKİSTAN">Özbekistan</option>
-                    <option value="RUSYA">Rusya</option>
+                    <optgroup label="Kurumsal">
+                      <option value="ALMANYA">Almanya</option>
+                      <option value="BELÇİKA">Belçika</option>
+                      <option value="BOSNA">Bosna</option>
+                      <option value="GÜRCİSTAN">Gürcistan</option>
+                      <option value="HOLLANDA">Hollanda</option>
+                      <option value="KAZAKİSTAN">Kazakistan</option>
+                      <option value="KOSOVA">Kosova</option>
+                      <option value="MAKEDONYA">Makedonya</option>
+                      <option value="SIRBİSTAN">Sırbistan</option>
+                    </optgroup>
+                    <optgroup label="Franchise">
+                      <option value="IRAK">Irak</option>
+                      <option value="KIBRIS">Kıbrıs</option>
+                      <option value="LİBERYA">Liberya</option>
+                      <option value="LİBYA">Libya</option>
+                      <option value="LÜBNAN">Lübnan</option>
+                      <option value="ÖZBEKİSTAN">Özbekistan</option>
+                      <option value="RUSYA">Rusya</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -1398,8 +1413,7 @@
                 position:sticky;top:0;background:var(--surface);z-index:1;
                 border-radius:var(--radius-xl) var(--radius-xl) 0 0;">
       <div style="font-size:15px;font-weight:600;color:var(--text);">⬆ Toplu İçe Aktar</div>
-      <button onclick="closeImportModal()"
-        style="width:28px;height:28px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
+      <button onclick="closeImportModal()" style="width:28px;height:28px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
                background:var(--surface2);color:var(--text2);font-size:16px;cursor:pointer;
                display:flex;align-items:center;justify-content:center;">✕</button>
     </div>

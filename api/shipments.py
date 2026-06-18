@@ -183,11 +183,35 @@ def get_dashboard_stats():
     cur.execute('SELECT COUNT(*) FROM shipments')
     toplam = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM shipments WHERE upper(durum) = 'YOLDA'")
+    # Yolda — sefer bazlı (grupluları 1 say)
+    cur.execute('''
+        SELECT COUNT(*) FROM (
+            SELECT id FROM shipments WHERE sefer_id IS NULL AND upper(durum) = 'YOLDA'
+            UNION ALL
+            SELECT MIN(id) FROM shipments WHERE sefer_id IS NOT NULL AND upper(durum) = 'YOLDA' GROUP BY sefer_id
+        ) t
+    ''')
     yolda = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM shipments WHERE upper(durum) = 'TESLİM EDİLDİ'")
+    # Teslim edildi — sefer bazlı
+    cur.execute('''
+        SELECT COUNT(*) FROM (
+            SELECT id FROM shipments WHERE sefer_id IS NULL AND upper(durum) IN ('TESLİM EDİLDİ', 'TESLIM EDILDI')
+            UNION ALL
+            SELECT MIN(id) FROM shipments WHERE sefer_id IS NOT NULL AND upper(durum) IN ('TESLİM EDİLDİ', 'TESLIM EDILDI') GROUP BY sefer_id
+        ) t
+    ''')
     teslim = cur.fetchone()[0]
+
+    # Varış Gümrük — sefer bazlı
+    cur.execute('''
+        SELECT COUNT(*) FROM (
+            SELECT id FROM shipments WHERE sefer_id IS NULL AND upper(durum) LIKE '%GÜMRÜK%'
+            UNION ALL
+            SELECT MIN(id) FROM shipments WHERE sefer_id IS NOT NULL AND upper(durum) LIKE '%GÜMRÜK%' GROUP BY sefer_id
+        ) t
+    ''')
+    varis_gumruk = cur.fetchone()[0]
 
     cur.execute('SELECT COALESCE(SUM(fatura_bedeli_eur), 0) FROM shipments')
     toplam_eur = float(cur.fetchone()[0])
@@ -218,9 +242,13 @@ def get_dashboard_stats():
     cur.execute('SELECT COUNT(*) FROM shipments WHERE sefer_id IS NOT NULL')
     gruplu_fatura = cur.fetchone()[0]
 
+    # Ülke dağılımı — sefer bazlı
     cur.execute('''
-        SELECT ulke, COUNT(*) as sayi
-        FROM shipments
+        SELECT ulke, COUNT(*) as sayi FROM (
+            SELECT ulke, id FROM shipments WHERE sefer_id IS NULL
+            UNION ALL
+            SELECT ulke, MIN(id) FROM shipments WHERE sefer_id IS NOT NULL GROUP BY sefer_id, ulke
+        ) t
         GROUP BY ulke
         ORDER BY sayi DESC
         LIMIT 8
@@ -239,6 +267,7 @@ def get_dashboard_stats():
         'gruplu_fatura': gruplu_fatura,
         'yolda':         yolda,
         'teslim':        teslim,
+        'varis_gumruk':  varis_gumruk,
         'toplam_eur':    toplam_eur,
         'ulkeler':       ulkeler,
     }

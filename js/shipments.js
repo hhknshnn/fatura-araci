@@ -175,8 +175,17 @@ function renderShipments(list) {
   const wrapper = document.getElementById('shipments-table-wrapper');
   if (!wrapper) return;
 
-  // Özet şerit
-  const toplam    = list.length;
+  // Özet şerit — sefer bazlı say (grupluları 1 say)
+  const grupTemsilciOzet = new Set();
+  let toplam = 0;
+  list.forEach(item => {
+    if (!item.sefer_id) {
+      toplam++;
+    } else if (!grupTemsilciOzet.has(item.sefer_id)) {
+      grupTemsilciOzet.add(item.sefer_id);
+      toplam++;
+    }
+  });
   const faturaEur = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
   const navlunEur = list.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
   const sigortaEur = list.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);

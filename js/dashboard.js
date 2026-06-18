@@ -248,20 +248,22 @@ async function loadDashboard() {
     const kv2 = document.getElementById('dash-kv2');
     const kv3 = document.getElementById('dash-kv3');
     const kv4 = document.getElementById('dash-kv4');
+    const kv5 = document.getElementById('dash-kv5');
 
     animateCount(kv1, s.sefer_sayisi ?? s.toplam, n => n.toLocaleString('tr-TR'));
     animateCount(kv2, s.yolda, n => n.toLocaleString('tr-TR'));
     animateCount(kv3, s.teslim, n => n.toLocaleString('tr-TR'));
+    animateCount(kv4, s.varis_gumruk ?? 0, n => n.toLocaleString('tr-TR'));
 
     // EUR sayacı
-    if (kv4) {
+    if (kv5) {
       const target = s.toplam_eur;
       const duration = 1200;
       const startTime = performance.now();
       function stepEur(now) {
         const progress = Math.min((now - startTime) / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
-        kv4.textContent = formatEur(eased * target);
+        kv5.textContent = formatEur(eased * target);
         if (progress < 1) requestAnimationFrame(stepEur);
       }
       requestAnimationFrame(stepEur);
@@ -342,9 +344,24 @@ async function loadDashboard() {
       });
     }, 200);
 
-    // ── Aylık Trend ──────────────────────────────────────────────────────────
+    // ── Aylık Trend — sefer bazlı (grupluları MIN id ile 1 say) ──────────────
     const monthCounts = Array(12).fill(0);
+    const grupTemsilci = {};
+    const tekSeferler  = [];
+
     all.forEach(item => {
+      if (!item.sefer_id) {
+        tekSeferler.push(item);
+      } else {
+        const mevcut = grupTemsilci[item.sefer_id];
+        if (!mevcut || item.id < mevcut.id) {
+          grupTemsilci[item.sefer_id] = item;
+        }
+      }
+    });
+
+    const sayilacaklar = [...tekSeferler, ...Object.values(grupTemsilci)];
+    sayilacaklar.forEach(item => {
       if (!item.yukleme_tarihi) return;
       const m = new Date(item.yukleme_tarihi).getMonth();
       if (m >= 0 && m <= 11) monthCounts[m]++;
