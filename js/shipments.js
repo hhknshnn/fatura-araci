@@ -188,9 +188,11 @@ function renderShipments(list) {
     }
   });
   const faturaEur = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
+  const faturaTl  = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
   const navlunEur = list.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
   const sigortaEur = list.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
-  const fmt = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
+  const fmt   = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
+  const fmtTl = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
 
   const ozet = document.getElementById('shipments-ozet');
   if (ozet) {
@@ -198,6 +200,8 @@ function renderShipments(list) {
       <span>📦 <b>${toplam}</b> sevkiyat</span>
       <span style="color:var(--border2);">|</span>
       <span>Fatura: <b>${fmt(faturaEur)}</b></span>
+      <span style="color:var(--border2);">·</span>
+      <span><b>${fmtTl(faturaTl)}</b></span>
       <span style="color:var(--border2);">|</span>
       <span>Navlun: <b>${fmt(navlunEur)}</b></span>
       <span style="color:var(--border2);">|</span>
@@ -711,6 +715,12 @@ function updateSecimToolbar() {
     `;
     toolbar.innerHTML = `
       <span id="secim-count"></span>
+      <button onclick="topluGrupla()"
+        style="padding:7px 16px;border-radius:8px;border:none;
+               background:#7C3AED;color:#fff;font-family:var(--font);
+               font-size:12px;font-weight:600;cursor:pointer;">
+        🔗 Grupla
+      </button>
       <button onclick="topluSil()"
         style="padding:7px 16px;border-radius:8px;border:none;
                background:#EF4444;color:#fff;font-family:var(--font);
@@ -743,23 +753,161 @@ function secimIptal() {
 async function topluSil() {
   const count = seciliSatirlar.size;
   if (!count) return;
-  if (!confirm(`${count} sevkiyat kalıcı olarak silinecek. Emin misiniz?`)) return;
 
-  const token = sessionStorage.getItem('fa_auth_token');
-  try {
-    const resp = await fetch('/api/shipments/bulk-delete', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body:    JSON.stringify({ ids: [...seciliSatirlar] }),
-    });
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error);
-    seciliSatirlar.clear();
-    updateSecimToolbar();
-    loadShipments();
-  } catch (e) {
-    alert('Silme hatası: ' + e.message);
+  const seciliListesi = [...seciliSatirlar].map(id => {
+    const s = allShipments.find(x => x.id === id);
+    return s ? `<span style="font-family:var(--mono);font-size:12px;color:#EF4444;">${s.ihracat_dosya_no || s.fatura_no}</span>` : '';
+  }).filter(Boolean).join(', ');
+
+  showMiniModal('🗑 Kalıcı Silme', `
+    <div style="padding:12px 14px;background:#FFF5F5;border:0.5px solid #FECACA;
+                border-radius:var(--radius-md);margin-bottom:12px;
+                display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:20px;flex-shrink:0;">⚠️</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#B91C1C;margin-bottom:4px;">
+          Bu işlem geri alınamaz!
+        </div>
+        <div style="font-size:12px;color:#DC2626;">
+          <b>${count} sevkiyat</b> kalıcı olarak silinecek. Veriler kurtarılamaz.
+        </div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">Silinecek kayıtlar:</div>
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-md);
+                border:0.5px solid var(--border2);line-height:1.8;">
+      ${seciliListesi}
+    </div>`,
+    [
+      { label: 'Vazgeç', style: 'ghost', action: null },
+      { label: '🗑 Evet, Kalıcı Sil', style: 'danger', action: async () => {
+        const token = sessionStorage.getItem('fa_auth_token');
+        try {
+          const resp = await fetch('/api/shipments/bulk-delete', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body:    JSON.stringify({ ids: [...seciliSatirlar] }),
+          });
+          const data = await resp.json();
+          if (!data.success) throw new Error(data.error);
+          seciliSatirlar.clear();
+          updateSecimToolbar();
+          loadShipments();
+        } catch (e) {
+          showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
+        }
+      }}
+    ]
+  );
+}
+
+// ── TOPLU GRUPLA ─────────────────────────────────────────────────────────────
+function topluGrupla() {
+  const count = seciliSatirlar.size;
+  if (count < 2) {
+    showMiniModal('⚠️ Uyarı', 'Gruplamak için en az 2 satır seçin.', [
+      { label: 'Tamam', style: 'primary', action: null }
+    ]);
+    return;
   }
+
+  // Seçili satırların dosya no listesi
+  const seciliListesi = [...seciliSatirlar].map(id => {
+    const s = allShipments.find(x => x.id === id);
+    return s ? `<span style="font-family:var(--mono);font-size:12px;color:var(--accent);">${s.ihracat_dosya_no || s.fatura_no}</span>` : '';
+  }).filter(Boolean).join(', ');
+
+  showMiniModal('🔗 Grupla', `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text2);">
+      <b>${count} sevkiyat</b> bir sefer grubu olarak işaretlenecek:
+    </div>
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-md);
+                border:0.5px solid var(--border2);line-height:1.8;">
+      ${seciliListesi}
+    </div>`,
+    [
+      { label: 'İptal', style: 'ghost', action: null },
+      { label: '🔗 Grupla', style: 'primary', action: async () => {
+        const token = sessionStorage.getItem('fa_auth_token');
+        try {
+          const resp = await fetch('/api/shipments/group', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body:    JSON.stringify({ ids: [...seciliSatirlar] }),
+          });
+          const data = await resp.json();
+          if (!data.success) throw new Error(data.error);
+          seciliSatirlar.clear();
+          updateSecimToolbar();
+          loadShipments();
+        } catch (e) {
+          showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
+        }
+      }}
+    ]
+  );
+}
+
+function showMiniModal(title, bodyHtml, buttons) {
+  // Varsa eskiyi kaldır
+  document.getElementById('mini-modal-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mini-modal-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;
+    display:flex;align-items:center;justify-content:center;
+    animation:fadeIn 0.15s ease;
+  `;
+
+  const btnHtml = buttons.map(b => {
+    const styles = {
+      primary: 'background:var(--accent);color:#fff;border:none;',
+      ghost:   'background:transparent;color:var(--text2);border:0.5px solid var(--border2);',
+      danger:  'background:#EF4444;color:#fff;border:none;',
+    };
+    return `<button data-action="${b.label}"
+      style="padding:9px 20px;border-radius:var(--radius-md);font-family:var(--font);
+             font-size:13px;font-weight:600;cursor:pointer;transition:opacity 0.1s;
+             ${styles[b.style] || styles.ghost}"
+      onmouseover="this.style.opacity='0.85'"
+      onmouseout="this.style.opacity='1'">
+      ${b.label}
+    </button>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:0.5px solid var(--border2);
+                border-radius:var(--radius-xl);padding:28px 32px;
+                max-width:440px;width:90%;
+                box-shadow:0 8px 40px rgba(0,0,0,0.18);
+                animation:slideUp 0.2s ease;">
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px;">${title}</div>
+      <div style="margin-bottom:22px;">${bodyHtml}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">${btnHtml}</div>
+    </div>
+    <style>
+      @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+      @keyframes slideUp { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+    </style>
+  `;
+
+  // Buton aksiyonları
+  overlay.querySelectorAll('button').forEach(btn => {
+    const label = btn.dataset.action;
+    const found = buttons.find(b => b.label === label);
+    btn.addEventListener('click', () => {
+      overlay.remove();
+      if (found?.action) found.action();
+    });
+  });
+
+  // Overlay tıklayınca kapat
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
 }
 
 // ── SIRBİSTAN VERGİ PDF PARSE ─────────────────────────────────────────────────

@@ -376,10 +376,12 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
 def _normalize_durum(raw):
     if not raw:
         return 'YOLDA'
-    s = raw.strip().upper()
+    # Nokta, boşluk gibi karakterleri temizle
+    s = raw.strip().rstrip('.').strip().upper()
     if s in ('YOLDA', 'IN TRANSIT', 'TRANSIT'):
         return 'YOLDA'
-    if s in ('TESLIM EDILDI', 'TESLİM EDİLDİ', 'DELIVERED', 'TESLIM'):
+    if s in ('TESLIM EDILDI', 'TESLİM EDİLDİ', 'DELIVERED', 'TESLIM',
+             'TESLIM EDILDI.', 'TESLİM EDİLDİ.'):
         return 'TESLİM EDİLDİ'
     if s in ('VARIŞ GÜMRÜK', 'VARIS GUMRUK', 'CUSTOMS', 'GÜMRÜKTE'):
         return 'Varış Gümrük'
@@ -553,7 +555,7 @@ def bulk_update_shipments(rows):
                 'ihracat_beyanname_tl': to_float, 'ihracat_beyanname_eur': to_float,
                 'brokerage_eur': to_float, 'gumruk_vergisi_eur': to_float,
                 'kdv_eur': to_float, 'toplam_maliyet_eur': to_float,
-                'durum': to_str,
+                'durum': to_str,  # aşağıda varis_tarihi kontrolü yapılıyor
             }
             date_fields = ['yukleme_tarihi', 'gumruk_tarihi', 'varis_tarihi', 'gumrukleme_bitis']
 
@@ -568,6 +570,14 @@ def bulk_update_shipments(rows):
                     val = to_date(row[col])
                     if val is not None:
                         fields[col] = val
+
+            # Durum boşsa varış tarihine göre otomatik belirle
+            if 'durum' not in fields or not fields.get('durum'):
+                varis = fields.get('varis_tarihi') or to_date(row.get('varis_tarihi'))
+                if varis:
+                    fields['durum'] = 'TESLİM EDİLDİ'
+                elif 'durum' not in fields:
+                    fields['durum'] = 'YOLDA'
 
             if not fields:
                 atlanan += 1
@@ -586,6 +596,14 @@ def bulk_update_shipments(rows):
     cur.close()
     conn.close()
     return guncellenen, atlanan, hatalar
+
+def _otomatik_durum(durum, varis_tarihi):
+    """Durum boşsa varış tarihine göre otomatik belirle."""
+    if durum and durum.strip():
+        return durum
+    if varis_tarihi:
+        return 'TESLİM EDİLDİ'
+    return 'YOLDA'
 
 def bulk_import_shipments(rows):
     """
@@ -704,7 +722,7 @@ def bulk_import_shipments(rows):
                 to_date(row.get('gumruk_tarihi')),
                 to_date(row.get('varis_tarihi')),
                 to_date(row.get('gumrukleme_bitis')),
-                _normalize_durum(to_str(row.get('durum', 'YOLDA'))),
+                _normalize_durum(_otomatik_durum(to_str(row.get('durum', '')), to_date(row.get('varis_tarihi')))),
                 musteri_tipi,
             ))
             eklenen += 1

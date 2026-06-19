@@ -23,7 +23,7 @@ const KOLON_MAP = {
   arac_bekleme:          ['araç bekleme masrafı', 'arac bekleme', 'araç bekleme masrafı usd'],
   ihracat_beyanname_tl:  ['ihracat beyanname tl', 'i̇hracatbeyanname tl', 'ihracatbeyanname tl'],
   ihracat_beyanname_eur: ['ihracat beyanname eur', 'ihracat beyanname usd', 'i̇hracatbeyanname eur', 'ihracat beyanname  eur'],
-  brokerage_eur:         ['brokerage fee', 'brokerage eur', 'brokerage fee eur', 'brokerage fee\\n(ülke gümrükleme masrafı)'],
+  brokerage_eur:         ['brokerage fee', 'brokerage eur', 'brokerage fee eur', 'brokerage fee (ulke gumrukleme masrafi)', 'brokerage fee (ulke gumrukleme masrafi) eur'],
   gumruk_vergisi_eur:    ['gümrük vergisi döviz', 'gümrük vergisi eur', 'gümrükvergisi \\nusd', 'import duties döviz', 'customs clearance fee döviz'],
   kdv_eur:               ['kdv döviz', 'kdv eur', 'kdv\\neur'],
   toplam_maliyet_eur:    ['toplam \\nmaliyet', 'toplam maliyet', 'toplam \\nmaliyet usd'],
@@ -247,6 +247,7 @@ function handleImportFile(file) {
 function autoMap() {
   importMapping = {};
   const normalize = s => String(s)
+    .replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ')
     .replace(/İ/g, 'I').replace(/ı/g, 'i')
     .toLowerCase()
     .replace(/i̇/g, 'i').replace(/I/g, 'i')
@@ -256,8 +257,7 @@ function autoMap() {
     .replace(/ü/g, 'u')
     .replace(/ş/g, 's')
     .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c')
-    .replace(/\n/g, ' ');
+    .replace(/ç/g, 'c');
 
   const normHeaders = importExcelHeaders.map(h => ({ orig: h, norm: normalize(h) }));
 
@@ -333,11 +333,23 @@ function applyMapping() {
     return;
   }
 
-  importPreviewRows = importRawRows.map(row => {
+  // \r\n içeren key'leri normalize et — XLSX.js \r\n, importMapping \n kullanıyor
+  const normalizeKey = s => String(s).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalizedRowCache = importRawRows.map(row => {
+    const normalized = {};
+    for (const [k, v] of Object.entries(row)) {
+      normalized[normalizeKey(k)] = v;
+    }
+    return normalized;
+  });
+
+  importPreviewRows = normalizedRowCache.map(row => {
     const mapped = {};
     for (const [dbCol, excelHeader] of Object.entries(importMapping)) {
       if (excelHeader && excelHeader !== '(Eşleştirme)') {
-        mapped[dbCol] = row[excelHeader] ?? '';
+        const normHeader = normalizeKey(excelHeader);
+        const raw = row[normHeader] ?? '';
+        mapped[dbCol] = String(raw).replace(/€\s*/g, '').replace(/^\s+|\s+$/g, '') || '';
       }
     }
     // Ülke boşsa bir önceki satırdan al (Excel'de birleşik hücreler)
@@ -381,22 +393,45 @@ function buildPreviewTable() {
   const table = document.getElementById('importPreviewTable');
   if (!table) return;
 
-  // Sadece dolu sütunları göster
-  const gosterilecek = ['ulke', 'ihracat_dosya_no', 'fatura_no', 'nakliye_firmasi',
-                        'plaka', 'fatura_bedeli_eur', 'mal_bedeli_eur', 'navlun_eur',
-                        'eur_kuru', 'yukleme_tarihi', 'durum']
-    .filter(k => importPreviewRows.some(r => r[k] && String(r[k]).trim()));
+  // Sabit sütunlar — her zaman göster (boş olsa bile)
+  const zorunlu = ['ulke', 'ihracat_dosya_no', 'fatura_no', 'nakliye_firmasi', 'plaka', 'yukleme_tarihi', 'durum'];
+  // EUR sütunları — her zaman göster, boşsa uyarı ver
+  const eurSutunlar = ['fatura_bedeli_eur', 'mal_bedeli_eur', 'navlun_eur',
+                       'sigorta_eur', 'ihracat_beyanname_eur', 'brokerage_eur',
+                       'gumruk_vergisi_eur', 'kdv_eur', 'toplam_maliyet_eur', 'eur_kuru'];
+  const gosterilecek = [...zorunlu, ...eurSutunlar];
+
+  // Hangi EUR sütunları tamamen boş?
+  const tamBosSutunlar = new Set(
+    eurSutunlar.filter(k => !importPreviewRows.some(r => r[k] && String(r[k]).trim()))
+  );
 
   const thStyle = 'padding:6px 10px;background:var(--surface2);border:0.5px solid var(--border2);' +
                   'font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;white-space:nowrap;';
+  const thBosStyle = 'padding:6px 10px;background:#FFF3F3;border:0.5px solid #FECACA;' +
+                     'font-size:10px;font-weight:600;color:#EF4444;text-transform:uppercase;white-space:nowrap;';
   const tdStyle = 'padding:5px 10px;border:0.5px solid var(--border);font-size:11px;white-space:nowrap;';
+  const tdBosStyle = 'padding:5px 10px;border:0.5px solid #FECACA;font-size:11px;white-space:nowrap;' +
+                     'background:#FFF8F8;color:#FCA5A5;text-align:center;';
 
-  const thead = `<thead><tr>${gosterilecek.map(k =>
-    `<th style="${thStyle}">${KOLON_ETIKETLER[k] || k}</th>`).join('')}</tr></thead>`;
+  const thead = `<thead>
+    <tr>${gosterilecek.map(k =>
+      `<th style="${tamBosSutunlar.has(k) ? thBosStyle : thStyle}">
+        ${KOLON_ETIKETLER[k] || k}${tamBosSutunlar.has(k) ? ' ⚠' : ''}
+      </th>`).join('')}
+    </tr>
+  </thead>`;
 
   const tbody = `<tbody>${importPreviewRows.slice(0, 20).map((row, i) =>
     `<tr style="background:${i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)'};">
-      ${gosterilecek.map(k => `<td style="${tdStyle}">${row[k] ?? ''}</td>`).join('')}
+      ${gosterilecek.map(k => {
+        const val = row[k];
+        const bos = !val || !String(val).trim();
+        if (eurSutunlar.includes(k) && bos) {
+          return `<td style="${tdBosStyle}">—</td>`;
+        }
+        return `<td style="${tdStyle}">${val ?? ''}</td>`;
+      }).join('')}
     </tr>`
   ).join('')}${importPreviewRows.length > 20 ?
     `<tr><td colspan="${gosterilecek.length}" style="${tdStyle}color:var(--text3);text-align:center;">
