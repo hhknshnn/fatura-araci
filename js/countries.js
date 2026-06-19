@@ -63,6 +63,7 @@ const COUNTRIES = {
   ly: { label: 'Libya',    suffix: '_libya'   },
   lr: { label: 'Liberya',  suffix: '_liberya' },
   lb: { label: 'Lübnan',   suffix: '_lubnan'  },
+  abh: { label: 'Abhazya', suffix: '_abhazya' },
 };
 
 const KZ_COLS = [

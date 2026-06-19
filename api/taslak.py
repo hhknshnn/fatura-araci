@@ -161,7 +161,12 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
             try:    ws[hucre] = int(deger)
             except: ws[hucre] = deger
         elif tip == 'metin':
-            ws[hucre] = prefix + str(deger)
+            # Frontend zaten yıl+no gönderiyor (örn: 2026-284), prefix'i tekrar ekleme
+            deger_str = str(deger)
+            if prefix and deger_str.startswith(prefix):
+                ws[hucre] = deger_str
+            else:
+                ws[hucre] = prefix + deger_str
 
     # ── MENŞE ALANLARI (opsiyonel) ────────────────────────────────────────────
     if mense_data:

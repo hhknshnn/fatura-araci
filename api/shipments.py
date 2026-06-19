@@ -17,6 +17,7 @@ ULKE_MUSTERI_TIPI = {
     'KIBRIS': 'franchise', 'IRAK': 'franchise', 'LİBYA': 'franchise',
     'LİBERYA': 'franchise', 'LÜBNAN': 'franchise', 'ÖZBEKİSTAN': 'franchise',
     'RUSYA': 'franchise',
+    'ABHAZYA': 'toptan',
 }
 
 def _musteri_tipi_from_ulke(ulke):
@@ -92,6 +93,17 @@ def create_shipment(data):
     ulke         = data.get('ulke', '')
     musteri_tipi = data.get('musteri_tipi') or _musteri_tipi_from_ulke(ulke)
 
+    # Franchise veya toptan ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
+    gumruk_tarihi = data.get('gumruk_tarihi') or None
+    if musteri_tipi in ('franchise', 'toptan') and gumruk_tarihi:
+        varis_tarihi      = gumruk_tarihi
+        gumrukleme_bitis  = gumruk_tarihi
+        durum_default     = 'TESLİM EDİLDİ'
+    else:
+        varis_tarihi      = data.get('varis_tarihi') or None
+        gumrukleme_bitis  = data.get('gumrukleme_bitis') or None
+        durum_default     = data.get('durum', 'YOLDA')
+
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute('''
@@ -99,8 +111,8 @@ def create_shipment(data):
             ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
             fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
             eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
-            varis_tarihi, durum, musteri_tipi
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         RETURNING id
     ''', (
         data.get('ihracat_dosya_no', ''),
@@ -115,9 +127,10 @@ def create_shipment(data):
         data.get('eur_kuru', 0),
         data.get('fatura_bedeli_eur', 0),
         data.get('yukleme_tarihi') or None,
-        data.get('gumruk_tarihi') or None,
-        data.get('varis_tarihi') or None,
-        _normalize_durum(data.get('durum', 'YOLDA')),
+        gumruk_tarihi,
+        varis_tarihi,
+        gumrukleme_bitis,
+        _normalize_durum(durum_default),
         musteri_tipi,
     ))
     new_id = cur.fetchone()[0]

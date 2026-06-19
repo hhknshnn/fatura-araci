@@ -185,7 +185,8 @@ function updateTopbarBadges() {
   const names = {
     rs: 'Sırbistan', ba: 'Bosna', ge: 'Gürcistan', xk: 'Kosova', mk: 'Makedonya',
     be: 'Belçika', de: 'Almanya', nl: 'Hollanda', kz: 'Kazakistan', cy: 'Kıbrıs',
-    iq: 'Irak', ly: 'Libya', lr: 'Liberya', lb: 'Lübnan', uz: 'Özbekistan', ru: 'Rusya'
+    iq: 'Irak', ly: 'Libya', lr: 'Liberya', lb: 'Lübnan', uz: 'Özbekistan', ru: 'Rusya',
+    abh: 'Abhazya'
   };
 
   if (typeof currentCountry !== 'undefined' && currentCountry) {

@@ -175,6 +175,16 @@ const TASLAK_ULKELER = {
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
+  abh: {
+    label: 'Abhazya', flag: 'un', grup: 'toptan',
+    template: 'templates/taslak_abh.xlsx',
+    alanlar: [
+      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -209,17 +219,19 @@ function initTaslakPanel() {
 function buildTaslakUlkeGrid() {
   const kurBody = document.getElementById('tcbody-kurumsal');
   const fraBody = document.getElementById('tcbody-franchise');
+  const toptanBody = document.getElementById('tcbody-toptan');
   if (!kurBody || !fraBody) return;
 
   // Mevcut içeriği temizle, JS ile yeniden oluştur
   kurBody.innerHTML = '';
   fraBody.innerHTML = '';
+  if (toptanBody) toptanBody.innerHTML = '';
 
   Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
     // Para birimini belirle — config'de yoksa ülke kodundan çıkar
     const cur = cfg.currency ||
       (kod === 'be' || kod === 'de' || kod === 'nl' || kod === 'xk' || kod === 'mk' ? 'EUR' :
-        kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' ? 'USD' : 'TRY');
+        kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' || kod === 'abh' ? 'USD' : 'TRY');
 
     const curClass = cur === 'EUR' ? 'cur-eur' : cur === 'USD' ? 'cur-usd' : 'cur-try';
     const tip = kod === 'cy' ? 'PL only' : 'INV + PL';
@@ -246,6 +258,10 @@ function buildTaslakUlkeGrid() {
 
     // Gruba göre doğru container'a ekle
     if (cfg.grup === 'franchise') fraBody.appendChild(card);
+    else if (cfg.grup === 'toptan') {
+      const toptanBody = document.getElementById('tcbody-toptan');
+      if (toptanBody) toptanBody.appendChild(card);
+    }
     else kurBody.appendChild(card);
   });
 }
@@ -266,7 +282,7 @@ function filterTaslakCountryList() {
   let total = 0;
 
   // Tüm taslak kartlarını gez
-  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc').forEach(card => {
+  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc').forEach(card => {
     const name = card.dataset.name || '';
     const show = !q || name.includes(q);
     card.style.display = show ? '' : 'none';
@@ -274,7 +290,7 @@ function filterTaslakCountryList() {
   });
 
   // Her grup için kart sayısını güncelle, arama varsa grubu aç
-  ['kurumsal', 'franchise'].forEach(grup => {
+  ['kurumsal', 'franchise', 'toptan'].forEach(grup => {
     const body = document.getElementById('tcbody-' + grup);
     const countEl = document.getElementById('tccount-' + grup);
     const chevron = document.getElementById('tcchevron-' + grup);
@@ -297,7 +313,7 @@ async function selectTaslakUlke(kod) {
   taslakUlke = kod;
 
   // Önceki seçimi temizle, yeni kartı aktif yap
-  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('taslak-ulke-' + kod);
   if (btn) btn.classList.add('active');
 
@@ -512,7 +528,8 @@ function getTaslakFormData() {
       if (alan.id === 'referansNo' && alan.prefix) {
         const yilEl = document.querySelector(`#taslak_${alan.id}`)?.closest('div')?.querySelector('select');
         const yil = yilEl ? yilEl.value : (localStorage.getItem('app_yil') || '2026');
-        data[alan.id] = yil + '-' + val;
+        // val içinde zaten yıl varsa tekrar ekleme
+        data[alan.id] = val.startsWith(yil + '-') ? val : yil + '-' + val;
       } else {
         data[alan.id] = val;
       }

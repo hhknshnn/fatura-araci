@@ -413,6 +413,7 @@
                     <option value="">Tüm tipler</option>
                     <option value="kurumsal">Kurumsal</option>
                     <option value="franchise">Franchise</option>
+                    <option value="toptan">Toptan</option>
                   </select>
                 </div>
 
@@ -442,6 +443,8 @@
                       <option value="LÜBNAN">Lübnan</option>
                       <option value="ÖZBEKİSTAN">Özbekistan</option>
                       <option value="RUSYA">Rusya</option>
+                      <option value="ABHAZYA">Abhazya</option>
+
                     </optgroup>
                   </select>
                 </div>
@@ -937,7 +940,24 @@
               </div>
 
             </div>
-
+            <!-- Toptan -->
+            <div class="cc-group-label" id="cc-lbl-toptan">Toptan</div>
+            <div class="cc-grid" id="cc-grid-toptan">
+              <div class="cc" id="country-abh" data-grup="toptan" data-name="abhazya" onclick="selectCountry('abh')">
+                <div class="cc-check"><i class="ti ti-check" aria-hidden="true"></i></div>
+                <div class="cc-top">
+                  <img class="cc-flag" src="https://flagcdn.com/40x30/un.png" alt="Abhazya">
+                  <div>
+                    <div class="cc-name">Abhazya</div>
+                    <div class="cc-code">ABH</div>
+                  </div>
+                </div>
+                <div class="cc-footer">
+                  <span class="cc-currency cur-usd">USD</span>
+                  <span class="cc-type">INV + PL</span>
+                </div>
+              </div>
+            </div>
             <div class="cc-no-result" id="countryNoResults">Sonuç bulunamadı</div>
             <div id="countryNoResults"
               style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
@@ -1204,6 +1224,14 @@
                       class="country-group-chevron open" id="tcchevron-franchise">▼</span></div>
                 </div>
                 <div class="country-group-body open" id="tcbody-franchise"></div>
+              </div>
+              <div class="country-group" id="tcgroup-toptan">
+                <div class="country-group-header" onclick="toggleTaslakCountryGroup('toptan')">
+                  <span class="country-group-label">Toptan</span>
+                  <div class="country-group-meta"><span class="country-group-count" id="tccount-toptan">1</span><span
+                      class="country-group-chevron open" id="tcchevron-toptan">▼</span></div>
+                </div>
+                <div class="country-group-body open" id="tcbody-toptan"></div>
               </div>
             </div>
             <div id="taslakCountryNoResults"

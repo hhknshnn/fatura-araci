@@ -44,6 +44,7 @@ def find_iq_template_path(): return _find_template('ref_iq.xlsx')
 def find_ly_template_path(): return _find_template('ref_ly.xlsx')
 def find_lr_template_path(): return _find_template('ref_lr.xlsx')
 def find_lb_template_path(): return _find_template('ref_lb.xlsx')
+def find_abh_template_path(): return _find_template('ref_abh.xlsx')
 
 
 # ── Template path map — ülke kodu → fonksiyon ────────────────────────────────
@@ -64,6 +65,7 @@ TEMPLATE_FINDER = {
     'ly': find_ly_template_path,
     'lr': find_lr_template_path,
     'lb': find_lb_template_path,
+    'abh': find_abh_template_path,
 }
 
 
@@ -178,6 +180,7 @@ HEADER_APPLIER = {
     'ly': apply_genel_header,
     'lr': apply_genel_header,
     'lb': apply_genel_header,
+    'abh': apply_genel_header,
 }
 
 

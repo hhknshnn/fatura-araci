@@ -167,12 +167,13 @@ function selectCountry(c) {
     be: 'Trukker', nl: 'Trukker', de: 'Trukker',
     iq: 'Fikret Lojistik',
     cy: 'Harun Lojistik',
+    abh: 'DRC Lojistik',
   };
   const nakliyeEl = document.getElementById('nakliyeInput');
   if (nakliyeEl) nakliyeEl.value = DEFAULT_NAKLIYE[c] || '';
 
   // ── DROPZONE: Ülke seçilince göster ──────────────────────────────────────
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh'];
   const dropZone = document.getElementById('dropZone');
   if (dropZone) dropZone.style.display = 'block';
 
@@ -491,7 +492,7 @@ function showMenseAyrim() {
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
 function buildAndDownloadReady() {
   if (!workingRows) return;
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh'];
   if (backendUlkeler.includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
@@ -522,7 +523,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'cy'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'cy', 'abh'];
   if (backendUlkeler.includes(currentCountry)) { await downloadRS(); return; }
   if (!processedWB) return;
   const suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
@@ -629,10 +630,18 @@ async function downloadRS() {
       const kurData = await kurResp.json();
       const kurlar = kurData.kurlar || {};
 
-      // Ülkeye göre EUR dönüşümü
-      const EUR_ULKELER = ['be', 'de', 'nl', 'xk', 'mk'];
-      const USD_ULKELER = ['iq', 'ly', 'lr', 'lb', 'uz'];
-      const TRY_ULKELER = ['rs', 'ba', 'ge', 'kz', 'ru', 'cy'];
+      // ── KUR HESAPLAMA — tamamen countries.json config'e göre ──────────────
+      const countryCfg = window.COUNTRIES_CACHE?.[currentCountry] || {};
+      const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi || 'api_eur';
+      const countryCurrency = countryCfg.currency || 'TRY';
+
+      // PDF'ten gelen kur: EUR faturada TRY/EUR, USD faturada TRY/USD
+      const pdfKur = data.pdfFields?.kur || 0;
+
+      // API kurları
+      const apiEurKuru = kurlar.TRY || 0;          // TRY/EUR
+      const apiUsdPerEur = kurlar.USD || 1;         // 1 EUR = X USD
+      const apiTryUsd = apiEurKuru / apiUsdPerEur;  // TRY/USD
 
       let fatura_bedeli_eur = 0;
       let mal_bedeli_eur = 0;
@@ -640,39 +649,33 @@ async function downloadRS() {
       let sigorta_eur = 0;
       let eur_kuru = 0;
 
-      // Fatura tutarını hesapla
-      const pdfKur = data.pdfFields?.kur || 0; // PDF'ten gelen TRY/EUR kur
-      // Config'e göre kur kaynağını belirle
-      const countryCfg = window.COUNTRIES_CACHE?.[currentCountry] || {};
-      const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi || 'api_eur';
+      const mal_toplam_ham = workingRows.reduce(
+        (s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0), 0);
 
-      if (EUR_ULKELER.includes(currentCountry)) {
-        // EUR kuru — önce PDF'ten, sonra API'den al
-        eur_kuru = pdfKur > 0 ? pdfKur : (kurlar.TRY || 0);
-        const mal_toplam_eur = workingRows.reduce((s, r) => s + (parseNum(r['Fiyat'] || 0) / eur_kuru * parseNum(r['Miktar'] || 0)), 0);
-        navlun_eur = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
-        sigorta_eur = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
-        fatura_bedeli_eur = mal_toplam_eur + navlun_eur + sigorta_eur;
-        mal_bedeli_eur = mal_toplam_eur;
-      } else if (USD_ULKELER.includes(currentCountry)) {
-        // USD → EUR
-        eur_kuru = kurlar.TRY || 0;
-        const usdRate = kurlar.USD || 1;
-        fatura_bedeli_eur = workingRows.reduce((s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0), 0) / usdRate;
+      if (sevkiyatKurKaynagi === 'api_usd_to_eur' || countryCurrency === 'USD') {
+        // USD fatura: PDF'te TRY/USD kuru varsa onu kullan, yoksa API
+        const tryUsdKuru = pdfKur > 0 ? pdfKur : apiTryUsd;
+        eur_kuru = apiEurKuru;
+        const mal_toplam_tl = mal_toplam_ham * tryUsdKuru;
+        mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_tl / eur_kuru : 0;
         navlun_eur = 0;
         sigorta_eur = 0;
-      } else {
-        // TRY bazlı ülkeler
-        if (sevkiyatKurKaynagi === 'pdf_eur' && pdfKur > 0) {
-          eur_kuru = pdfKur;
-        } else {
-          eur_kuru = kurlar.TRY || 0;
-        }
+        fatura_bedeli_eur = mal_bedeli_eur;
 
+      } else if (sevkiyatKurKaynagi === 'pdf_eur' || countryCurrency === 'EUR') {
+        // EUR fatura: PDF'te TRY/EUR kuru varsa onu kullan, yoksa API
+        eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
+        // Excel Fiyat TRY cinsinden, EUR'ya çevir
+        mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_ham / eur_kuru : 0;
+        navlun_eur = parseFloat(data.pdfFields?.navlun || 0) / (eur_kuru || 1);
+        sigorta_eur = parseFloat(data.pdfFields?.sigorta || 0) / (eur_kuru || 1);
+        fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
+
+      } else {
+        // TRY bazlı (api_eur veya pdf_eur + currency TRY)
+        eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
         if (eur_kuru > 0) {
-          const mal_toplam = workingRows.reduce((s, r) =>
-            s + (parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0)), 0);
-          mal_bedeli_eur = mal_toplam / eur_kuru;
+          mal_bedeli_eur = mal_toplam_ham / eur_kuru;
           navlun_eur = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
           sigorta_eur = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
           fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
@@ -685,6 +688,7 @@ async function downloadRS() {
         mk: 'MAKEDONYA', be: 'BELÇİKA', de: 'ALMANYA', nl: 'HOLLANDA',
         kz: 'KAZAKİSTAN', ru: 'RUSYA', uz: 'ÖZBEKİSTAN', cy: 'KIBRIS',
         iq: 'IRAK', ly: 'LİBYA', lr: 'LİBERYA', lb: 'LÜBNAN',
+        abh: 'ABHAZYA',
       };
 
       const dosyaNoEl = document.getElementById('ihracatDosyaNo');
@@ -698,7 +702,7 @@ async function downloadRS() {
           ulke: ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
           durum: 'YOLDA',
           fatura_bedeli_eur: Math.round(fatura_bedeli_eur * 100) / 100,
-          fatura_bedeli_tl:  Math.round(fatura_bedeli_eur * eur_kuru * 100) / 100,
+          fatura_bedeli_tl:  Math.round(fatura_bedeli_eur * (eur_kuru > 0 ? eur_kuru : apiEurKuru) * 100) / 100,
           mal_bedeli_eur:    Math.round((fatura_bedeli_eur - navlun_eur - sigorta_eur) * 100) / 100,
           navlun_eur: Math.round(navlun_eur * 100) / 100,
           sigorta_eur: Math.round(sigorta_eur * 100) / 100,

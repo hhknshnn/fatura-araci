@@ -23,7 +23,7 @@ from invoice.eur_engine import (
 )
 from invoice.usd_engine import (
     generate_iq, generate_ly, generate_lr,
-    generate_lb, generate_uz,
+    generate_lb, generate_uz, generate_abh,
 )
 from invoice.cy_engine import generate_cy
 
@@ -111,6 +111,10 @@ def dispatch(ulke_kodu, df, df_original, grup_kilolari, hedef_brut, hedef_net,
 
     if ulke_kodu == 'uz':
         excel_out, fatura_no, master_out = generate_uz(df, **kw)
+        return excel_out, fatura_no, master_out, None, None
+
+    if ulke_kodu == 'abh':
+        excel_out, fatura_no, master_out = generate_abh(df, usd_kuru=usd_kuru, **kw)
         return excel_out, fatura_no, master_out, None, None
 
     raise ValueError(f'Bilinmeyen ülke kodu: {ulke_kodu}')

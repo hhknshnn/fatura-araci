@@ -355,3 +355,10 @@ def generate_uz(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     """Özbekistan — USD (KZ yapısı), Freight/Insurance YOK."""
     return _generate_uz(df, grup_kilolari, hedef_brut, exception_skus,
                         pdf_fields, hedef_net, depo_tipi, df_original)
+
+def generate_abh(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                 pdf_fields=None, hedef_net=0, depo_tipi='serbest',
+                 usd_kuru=1.0, df_original=None):
+    """Abhazya — USD, Freight/Insurance YOK."""
+    return _generate_usd_genel('abh', df, grup_kilolari, hedef_brut, exception_skus,
+                                pdf_fields, hedef_net, depo_tipi, df_original)
