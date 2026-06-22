@@ -101,6 +101,12 @@ function initImportPanel() {
                margin-bottom:-1.5px;cursor:pointer;">
         📄 Aksu Beyanname PDF
       </button>
+      <button id="import-tab-fr" onclick="switchImportTab('fr')"
+        style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
+               font-size:13px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;
+               margin-bottom:-1.5px;cursor:pointer;">
+        🇮🇶 FR PDF Import
+      </button>
     </div>
 
     <!-- Excel Sekmesi -->
@@ -190,6 +196,59 @@ function initImportPanel() {
       </div>
 
       <div id="aksu-result" style="display:none;margin-top:16px;"></div>
+    </div>
+
+  <!-- FR PDF Sekmesi -->
+    <div id="import-tab-content-fr" style="display:none;">
+      <div class="panel-title">FR Fatura PDF Import</div>
+      <div class="panel-desc">ANT veya IHR formatındaki franchise faturalarını yükle — çoklu PDF desteklenir.</div>
+
+      <div class="status-box" id="frStatus"></div>
+
+      <!-- Adım 1: Yükle -->
+      <div id="fr-step1">
+        <div id="fr-drop-zone"
+          ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+          ondragleave="this.classList.remove('vergi-drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleFrPdfDrop(event.dataTransfer.files)"
+          onclick="document.getElementById('fr-pdf-input').click()"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                 gap:10px;padding:32px 20px;background:var(--surface2);
+                 border:1.5px dashed var(--border2);border-radius:var(--radius-md);
+                 cursor:pointer;transition:border-color 0.15s,background 0.15s;text-align:center;">
+          <input type="file" id="fr-pdf-input" accept=".pdf" multiple style="display:none;"
+            onchange="handleFrPdfDrop(this.files)">
+          <span style="font-size:32px;">📄</span>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">PDF'leri buraya sürükleyin veya tıklayın</div>
+          <div style="font-size:12px;color:var(--text3);">Çoklu seçim desteklenir — ANT ve IHR formatları</div>
+        </div>
+      </div>
+
+      <!-- Adım 2: Önizleme -->
+      <div id="fr-step2" style="display:none;margin-top:16px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">Önizleme</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;" id="fr-preview-desc"></div>
+
+        
+
+        <!-- EUR kuru — otomatik çekilir -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;
+                    padding:12px 16px;background:var(--surface2);border-radius:var(--radius-md);
+                    border:0.5px solid var(--border2);">
+          <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;">Güncel EUR Kuru (TL):</div>
+          <div id="fr-eur-kuru-display" style="font-size:13px;font-weight:600;color:var(--accent);">⏳ Yükleniyor...</div>
+          <input type="hidden" id="fr-eur-kuru">
+        </div>
+
+        <div style="overflow-x:auto;margin-bottom:14px;">
+          <table id="fr-preview-table"
+            style="width:100%;border-collapse:collapse;font-size:11px;"></table>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-secondary" id="fr-import-btn" onclick="doFrImport()">⬆ Aktar</button>
+          <button class="btn-ghost" onclick="resetFrImport()">← Yeni Dosyalar</button>
+        </div>
+      </div>
     </div>
 
   `;
@@ -548,7 +607,7 @@ function showImportStatus(type, html) {
 
 // ── SEKME GEÇİŞİ ─────────────────────────────────────────────────────────────
 function switchImportTab(tab) {
-  const tabs = ['excel', 'aksu'];
+  const tabs = ['excel', 'aksu', 'fr'];
   tabs.forEach(t => {
     const btn     = document.getElementById('import-tab-' + t);
     const content = document.getElementById('import-tab-content-' + t);
@@ -561,6 +620,198 @@ function switchImportTab(tab) {
 }
 
 // ── AKSU PDF YÜKLE ────────────────────────────────────────────────────────────
+// ── FR PDF FONKSİYONLARI ──────────────────────────────────────────────────────
+let frSonuclar = []; // parse edilen sonuçlar
+
+async function handleFrPdfDrop(files) {
+  if (!files || !files.length) return;
+
+  const statusEl = document.getElementById('frStatus');
+  statusEl.className = 'status-box visible info';
+  statusEl.innerHTML = `⏳ ${files.length} PDF okunuyor...`;
+
+  const pdfs = [];
+  for (const file of files) {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result.split(',')[1]);
+      r.onerror = () => rej(new Error('Dosya okunamadı'));
+      r.readAsDataURL(file);
+    });
+    pdfs.push({ name: file.name, data: b64 });
+  }
+
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/shipments/parse-fr-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdfs }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    frSonuclar = data.sonuclar;
+
+    const basarili = frSonuclar.filter(s => !s.hata).length;
+    const hatali   = frSonuclar.filter(s =>  s.hata).length;
+
+    statusEl.className = 'status-box visible success';
+    statusEl.innerHTML = `✓ ${basarili} PDF parse edildi${hatali ? `, ${hatali} hatalı` : ''}.`;
+
+    buildFrPreviewTable();
+    document.getElementById('fr-preview-desc').textContent =
+      `${basarili} fatura aktarılacak. EUR kurunu girin ve Aktar'a basın.`;
+    document.getElementById('fr-step1').style.display = 'none';
+    document.getElementById('fr-step2').style.display = 'block';
+    loadFrEurKuru();
+
+  } catch (err) {
+    statusEl.className = 'status-box visible error';
+    statusEl.innerHTML = '⚠ ' + err.message;
+  }
+}
+
+function buildFrPreviewTable() {
+  const table = document.getElementById('fr-preview-table');
+  if (!table) return;
+
+  const thStyle = 'padding:6px 10px;background:var(--surface2);border:0.5px solid var(--border2);' +
+                  'font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;white-space:nowrap;';
+  const tdStyle = 'padding:5px 10px;border:0.5px solid var(--border);font-size:11px;white-space:nowrap;';
+  const tdErrStyle = tdStyle + 'color:#EF4444;';
+
+  const headers = ['Dosya', 'Fatura No', 'İhracat Dosya No', 'Nakliye Firması', 'Plaka', 'Tarih', 'USD Tutar', 'USD Kuru', 'TL Tutar', 'Durum'];
+
+  const thead = `<thead><tr>${headers.map(h => `<th style="${thStyle}">${h}</th>`).join('')}</tr></thead>`;
+
+  const tbody = `<tbody>${frSonuclar.map((s, i) => {
+    const bg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
+    if (s.hata) {
+      return `<tr style="background:${bg};">
+        <td style="${tdStyle}">${s.dosya_adi}</td>
+        <td colspan="8" style="${tdErrStyle}">⚠ ${s.hata}</td>
+        <td style="${tdErrStyle}">Hata</td>
+      </tr>`;
+    }
+    return `<tr style="background:${bg};">
+      <td style="${tdStyle}">${s.dosya_adi}</td>
+      <td style="${tdStyle}">${s.fatura_no || '—'}</td>
+      <td style="${tdStyle}">
+        <input type="text" placeholder="ör: 2026-284"
+          value="${s.ihracat_dosya_no || ''}"
+          onchange="frSonuclar[${i}].ihracat_dosya_no = this.value.trim()"
+          style="width:90px;padding:4px 6px;border-radius:var(--radius-sm);
+                 border:0.5px solid var(--border2);background:var(--surface);
+                 color:var(--text);font-family:var(--font);font-size:11px;outline:none;">
+      </td>
+      <td style="${tdStyle}">
+        <input type="text" placeholder="ör: RAPID"
+          value="${s.nakliye_firmasi || ''}"
+          onchange="frSonuclar[${i}].nakliye_firmasi = this.value.trim()"
+          style="width:90px;padding:4px 6px;border-radius:var(--radius-sm);
+                 border:0.5px solid var(--border2);background:var(--surface);
+                 color:var(--text);font-family:var(--font);font-size:11px;outline:none;">
+      </td>
+      <td style="${tdStyle}">
+        <input type="text" placeholder="ör: 34ABC123"
+          value="${s.plaka || ''}"
+          onchange="frSonuclar[${i}].plaka = this.value.trim()"
+          style="width:90px;padding:4px 6px;border-radius:var(--radius-sm);
+                 border:0.5px solid var(--border2);background:var(--surface);
+                 color:var(--text);font-family:var(--font);font-size:11px;outline:none;">
+      </td>
+      <td style="${tdStyle}">${s.yukleme_tarihi || '—'}</td>
+      <td style="${tdStyle}">${s.fatura_bedeli_usd ? s.fatura_bedeli_usd.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '—'}</td>
+      <td style="${tdStyle}">${s.usd_kuru ? s.usd_kuru.toFixed(4) : '—'}</td>
+      <td style="${tdStyle}">${s.fatura_bedeli_tl ? s.fatura_bedeli_tl.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '—'}</td>
+      <td style="${tdStyle};color:var(--success);">✓ Hazır</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+
+  table.innerHTML = thead + tbody;
+}
+
+async function doFrImport() {
+  const eur_kuru = parseFloat(document.getElementById('fr-eur-kuru')?.value || '0');
+
+  if (!eur_kuru) {
+    document.getElementById('frStatus').className = 'status-box visible error';
+    document.getElementById('frStatus').innerHTML = '⚠ EUR kuru yüklenemedi, lütfen sayfayı yenileyin.';
+    return;
+  }
+
+  const aktarilacak = frSonuclar.filter(s => !s.hata && s.fatura_no);
+  if (!aktarilacak.length) {
+    document.getElementById('frStatus').className = 'status-box visible error';
+    document.getElementById('frStatus').innerHTML = '⚠ Aktarılacak geçerli fatura yok.';
+    return;
+  }
+
+  const btn = document.getElementById('fr-import-btn');
+  btn.textContent = '⏳ Aktarılıyor...';
+  btn.disabled = true;
+
+  try {
+    const usd_per_eur = parseFloat(document.getElementById('fr-eur-kuru').dataset.usdPerEur || '0');
+    const rows = aktarilacak.map(s => ({ ...s, eur_kuru, usd_per_eur, ihracat_dosya_no: s.ihracat_dosya_no || '', nakliye_firmasi: s.nakliye_firmasi || '', plaka: s.plaka || '' }));
+
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/shipments/bulk-import-fr', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ rows }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    let msg = `✓ ${data.eklenen} fatura eklendi.`;
+    if (data.atlanan) msg += ` ${data.atlanan} atlandı (duplicate).`;
+
+    document.getElementById('frStatus').className = 'status-box visible success';
+    document.getElementById('frStatus').innerHTML = msg;
+
+    if (data.hatalar && data.hatalar.length) console.warn('FR import uyarıları:', data.hatalar);
+    if (data.eklenen > 0) setTimeout(() => sidebarSelect('sevkiyatlar'), 1500);
+
+  } catch (err) {
+    document.getElementById('frStatus').className = 'status-box visible error';
+    document.getElementById('frStatus').innerHTML = '⚠ ' + err.message;
+  } finally {
+    btn.textContent = '⬆ Aktar';
+    btn.disabled = false;
+  }
+}
+
+async function loadFrEurKuru() {
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/kur', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await resp.json();
+    const eur_try = data?.kurlar?.TRY;
+    const usd_per_eur = data?.kurlar?.USD;
+    if (!eur_try) throw new Error('EUR kuru bulunamadı');
+
+    document.getElementById('fr-eur-kuru').value = eur_try;
+    document.getElementById('fr-eur-kuru').dataset.usdPerEur = usd_per_eur || '';
+    document.getElementById('fr-eur-kuru-display').textContent = `${parseFloat(eur_try).toFixed(4)} TL`;
+  } catch (e) {
+    document.getElementById('fr-eur-kuru-display').textContent = '⚠ Kur alınamadı';
+  }
+}
+
+function resetFrImport() {
+  frSonuclar = [];
+  document.getElementById('fr-step1').style.display = 'block';
+  document.getElementById('fr-step2').style.display = 'none';
+  document.getElementById('frStatus').className = 'status-box';
+  document.getElementById('frStatus').innerHTML = '';
+  const input = document.getElementById('fr-pdf-input');
+  if (input) input.value = '';
+}
+
 async function handleAksuPdf(file) {
   if (!file) return;
 

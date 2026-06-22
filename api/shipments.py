@@ -760,6 +760,158 @@ def bulk_import_shipments(rows):
     return eklenen, atlanan, hatalar
 
 
+# ── FR PDF TOPLU IMPORT ENDPOINT ─────────────────────────────────────────────
+def parse_fr_pdf_import():
+    """
+    Çoklu FR fatura PDF'lerini parse eder, önizleme için veri döner.
+    POST /api/shipments/parse-fr-pdf
+    Body: { "pdfs": [ { "name": "ANT2026...", "data": "<base64>" }, ... ] }
+    """
+    import base64
+
+    body = request.get_json() or {}
+    pdfs = body.get('pdfs', [])
+
+    if not pdfs:
+        return jsonify({'success': False, 'error': 'PDF listesi boş'}), 400
+
+    sonuclar = []
+
+    for item in pdfs:
+        name     = item.get('name', '')
+        b64data  = item.get('data', '')
+
+        try:
+            pdf_bytes = base64.b64decode(b64data)
+            parsed    = parse_fr_fatura_pdf(pdf_bytes)
+
+            usd_kuru = parsed.get('usd_kuru', 0.0)
+            if not usd_kuru and parsed.get('yukleme_tarihi'):
+                usd_kuru = _get_usd_kuru_for_date(parsed['yukleme_tarihi'])
+
+            usd_tutar = parsed.get('fatura_bedeli_usd', 0.0)
+            fatura_tl = round(usd_tutar * usd_kuru, 2) if usd_kuru else 0.0
+
+            sonuclar.append({
+                'dosya_adi':         name,
+                'fatura_no':         parsed.get('fatura_no'),
+                'yukleme_tarihi':    parsed.get('yukleme_tarihi'),
+                'fatura_bedeli_usd': usd_tutar,
+                'usd_kuru':          usd_kuru,
+                'fatura_bedeli_tl':  fatura_tl,
+                'hata':              None,
+            })
+
+        except Exception as e:
+            sonuclar.append({
+                'dosya_adi': name,
+                'fatura_no': None,
+                'hata':      str(e),
+            })
+
+    return jsonify({'success': True, 'sonuclar': sonuclar})
+
+
+def bulk_import_fr_shipments():
+    """
+    Parse edilmiş FR faturalarını toplu olarak shipments tablosuna ekler.
+    POST /api/shipments/bulk-import-fr
+    Body: { "rows": [ { fatura_no, yukleme_tarihi, fatura_bedeli_usd, usd_kuru, fatura_bedeli_tl, eur_kuru } ] }
+    """
+    body = request.get_json() or {}
+    rows = body.get('rows', [])
+
+    if not rows:
+        return jsonify({'success': False, 'error': 'Satır listesi boş'}), 400
+
+    eklenen, atlanan, hatalar = 0, 0, []
+
+    for i, row in enumerate(rows):
+        try:
+            fatura_no = str(row.get('fatura_no', '')).strip()
+            if not fatura_no:
+                atlanan += 1
+                hatalar.append(f'Satır {i+1}: fatura_no boş, atlandı.')
+                continue
+
+            conn = get_conn()
+            cur  = conn.cursor()
+            cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+            if cur.fetchone():
+                cur.close()
+                conn.close()
+                atlanan += 1
+                hatalar.append(f'{fatura_no}: zaten kayıtlı, atlandı.')
+                continue
+            cur.close()
+            conn.close()
+
+            usd_tutar  = float(row.get('fatura_bedeli_usd', 0) or 0)
+            usd_kuru   = float(row.get('usd_kuru', 0) or 0)
+            fatura_tl  = float(row.get('fatura_bedeli_tl', 0) or 0)
+            eur_kuru   = float(row.get('eur_kuru', 0) or 0)   # 1 EUR = kaç TL
+            usd_per_eur = float(row.get('usd_per_eur', 0) or 0)  # 1 EUR = kaç USD
+
+            # USD → EUR: usd_per_eur varsa kullan, yoksa TL üzerinden hesapla
+            if usd_per_eur:
+                fatura_eur = round(usd_tutar / usd_per_eur, 2)
+            elif eur_kuru and usd_kuru:
+                # 1 EUR = eur_kuru TL, 1 USD = usd_kuru TL → 1 EUR = eur_kuru/usd_kuru USD
+                fatura_eur = round(usd_tutar / (eur_kuru / usd_kuru), 2)
+            else:
+                fatura_eur = 0.0
+
+            yukleme_tarihi = row.get('yukleme_tarihi') or None
+
+            new_id = create_shipment({
+                'fatura_no':          fatura_no,
+                'ihracat_dosya_no':   str(row.get('ihracat_dosya_no', '') or ''),
+                'ulke':               'IRAK',
+                'musteri_tipi':       'franchise',
+                'nakliye_firmasi':    str(row.get('nakliye_firmasi', '') or ''),
+                'plaka':              str(row.get('plaka', '') or ''),
+                'yukleme_tarihi':     yukleme_tarihi,
+                'gumruk_tarihi':      yukleme_tarihi,
+                'fatura_bedeli_tl':   fatura_tl,
+                'fatura_bedeli_eur':  fatura_eur,
+                'eur_kuru':           eur_kuru,
+                'durum':              'TESLİM EDİLDİ',
+            })
+            eklenen += 1
+
+        except ValueError as e:
+            atlanan += 1
+            hatalar.append(str(e))
+        except Exception as e:
+            hatalar.append(f'Satır {i+1}: {str(e)}')
+
+    return jsonify({
+        'success': True,
+        'eklenen': eklenen,
+        'atlanan': atlanan,
+        'hatalar': hatalar,
+    })
+
+
+def _get_usd_kuru_for_date(tarih_str):
+    """
+    Verilen tarihe (YYYY-MM-DD) ait USD/TRY kurunu Frankfurter API'den çeker.
+    Bulunamazsa 0.0 döner.
+    """
+    import urllib.request
+    import json
+
+    try:
+        url = f'https://api.frankfurter.app/{tarih_str}?from=USD&to=TRY'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            return float(data['rates']['TRY'])
+    except Exception as e:
+        print(f'USD kuru API hatası ({tarih_str}): {e}')
+        return 0.0
+
+
 def shipments_export():
     ulke         = request.args.get('ulke')
     durum        = request.args.get('durum')
@@ -958,3 +1110,88 @@ def parse_aksu_beyanname_pdf(pdf_bytes):
         print(f'Aksu beyanname PDF parse hatası: {e}')
 
     return faturalar
+
+
+# ── FR FATURA PDF PARSE ───────────────────────────────────────────────────────
+def parse_fr_fatura_pdf(pdf_bytes):
+    """
+    ANT (e-Arşiv) ve IHR (e-Fatura) formatındaki franchise faturalarını parse eder.
+    Sadece ilk sayfa + son 2 sayfa okunur (performans için).
+    """
+    result = {
+        'fatura_no':        None,
+        'yukleme_tarihi':   None,
+        'fatura_bedeli_usd': 0.0,
+        'usd_kuru':          0.0,
+        'fatura_tipi':      None,  # 'ANT' veya 'IHR'
+    }
+
+    def parse_tr_sayi(s):
+        # 59.073,14 → 59073.14
+        s = str(s).strip().replace('.', '').replace(',', '.').strip()
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    def parse_tarih(s):
+        # "06-01-2026 / 15:13" veya "22- 01- 2026" → "2026-01-06"
+        s = re.sub(r'\s+', '', s)          # boşlukları kaldır
+        s = re.sub(r'/.*', '', s).strip()  # saat kısmını at
+        parts = s.split('-')
+        if len(parts) == 3 and len(parts[2]) == 4:
+            return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        return None
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            total = len(pdf.pages)
+            # İlk sayfa + son 2 sayfa (max 3 sayfa, üst üste gelirse tekrar alma)
+            idxs = list(dict.fromkeys(
+                [0] + [i for i in [total - 2, total - 1] if i > 0]
+            ))
+            pages_text = []
+            for i in idxs:
+                raw = pdf.pages[i].extract_text() or ''
+                pages_text.append(re.sub(r'\s+', ' ', raw))
+
+        full = ' '.join(pages_text)
+
+        # ── Fatura No ────────────────────────────────────────────────────────
+        m = re.search(r'Fatura No[:\s]*((?:ANT|IHR)\d+)', full)
+        if m:
+            result['fatura_no'] = m.group(1).strip()
+            result['fatura_tipi'] = 'ANT' if result['fatura_no'].startswith('ANT') else 'IHR'
+
+        # ── Tarih ────────────────────────────────────────────────────────────
+        if result['fatura_tipi'] == 'ANT':
+            # "Tarih / Saat: 06-01-2026 / 15:13"
+            m = re.search(r'Tarih\s*/\s*Saat[:\s]*([\d][\d\s\-]+)', full)
+        else:
+            # "Tarih: 22- 01- 2026"
+            m = re.search(r'Tarih[:\s]*([\d][\d\s\-]+)', full)
+
+        if m:
+            result['yukleme_tarihi'] = parse_tarih(m.group(1))
+
+        # ── USD Tutar ────────────────────────────────────────────────────────
+        if result['fatura_tipi'] == 'ANT':
+            # "Ürün Bedeli: 59.073,14 USD"
+            m = re.search(r'Ürün Bedeli[:\s]*([\d.,]+)\s*USD', full)
+        else:
+            # "Mal Hizmet Toplam Tutarı: 46.289,24USD"
+            m = re.search(r'Mal Hizmet Toplam Tutarı[:\s]*([\d.,]+)\s*USD', full)
+
+        if m:
+            result['fatura_bedeli_usd'] = parse_tr_sayi(m.group(1))
+
+        # ── Döviz Kuru ───────────────────────────────────────────────────────
+        # Her iki formatta da: "Döviz Kuru: 42,9648 TL"
+        m = re.search(r'Döviz Kuru[:\s]*([\d.,]+)\s*TL', full)
+        if m:
+            result['usd_kuru'] = parse_tr_sayi(m.group(1))
+
+    except Exception as e:
+        print(f'FR fatura PDF parse hatası: {e}')
+
+    return result
