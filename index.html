@@ -403,82 +403,146 @@
               style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;flex-wrap:nowrap;overflow-x:auto;">
 
               <!-- Sol taraf: filtreler -->
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;">
-                <div
-                  style="display:flex;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);overflow:hidden;">
-                  <span
-                    style="padding:0 8px;height:32px;display:flex;align-items:center;border-right:0.5px solid var(--border2);color:var(--text3);font-size:13px;">🏢</span>
-                  <select id="filter-musteri-tipi" onchange="filterShipments()"
-                    style="font-size:12px;padding:0 8px;height:32px;border:none;background:transparent;color:var(--text);outline:none;min-width:90px;">
-                    <option value="">Tüm tipler</option>
-                    <option value="kurumsal">Kurumsal</option>
-                    <option value="franchise">Franchise</option>
-                    <option value="toptan">Toptan</option>
-                  </select>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;" id="filter-bar">
+
+                <!-- Müşteri Tipi -->
+                <div class="custom-dd" id="dd-tip">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-tip')">
+                    <i class="ti ti-building" aria-hidden="true"></i>
+                    <span id="dd-tip-label">Tipler</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-tip-menu">
+                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="" checked onchange="onDDChange('tip',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="kurumsal" onchange="onDDChange('tip',this)"><span>Kurumsal</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="franchise" onchange="onDDChange('tip',this)"><span>Franchise</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="toptan" onchange="onDDChange('tip',this)"><span>Toptan</span></label>
+                  </div>
                 </div>
 
-                <div
-                  style="display:flex;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);overflow:hidden;">
-                  <span
-                    style="padding:0 8px;height:32px;display:flex;align-items:center;border-right:0.5px solid var(--border2);color:var(--text3);font-size:13px;">🌍</span>
-                  <select id="filter-ulke" onchange="filterShipments()"
-                    style="font-size:12px;padding:0 8px;height:32px;border:none;background:transparent;color:var(--text);outline:none;min-width:90px;">
-                    <option value="">Tüm ülkeler</option>
-                    <optgroup label="Kurumsal">
-                      <option value="ALMANYA">Almanya</option>
-                      <option value="BELÇİKA">Belçika</option>
-                      <option value="BOSNA">Bosna</option>
-                      <option value="GÜRCİSTAN">Gürcistan</option>
-                      <option value="HOLLANDA">Hollanda</option>
-                      <option value="KAZAKİSTAN">Kazakistan</option>
-                      <option value="KOSOVA">Kosova</option>
-                      <option value="MAKEDONYA">Makedonya</option>
-                      <option value="SIRBİSTAN">Sırbistan</option>
-                    </optgroup>
-                    <optgroup label="Franchise">
-                      <option value="IRAK">Irak</option>
-                      <option value="KIBRIS">Kıbrıs</option>
-                      <option value="LİBERYA">Liberya</option>
-                      <option value="LİBYA">Libya</option>
-                      <option value="LÜBNAN">Lübnan</option>
-                      <option value="ÖZBEKİSTAN">Özbekistan</option>
-                      <option value="RUSYA">Rusya</option>
-                      <option value="ABHAZYA">Abhazya</option>
-
-                    </optgroup>
-                  </select>
+                <!-- Ülke — çok seçmeli -->
+                <div class="custom-dd" id="dd-ulke">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-ulke')">
+                    <i class="ti ti-world" aria-hidden="true"></i>
+                    <span id="dd-ulke-label">Ülkeler</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" style="min-width:180px;" id="dd-ulke-menu">
+                    <div class="dd-group-label">Kurumsal</div>
+                    <label class="dd-item"><input type="checkbox" value="ALMANYA"    onchange="onUlkeChange()"><span>Almanya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="BELÇİKA"   onchange="onUlkeChange()"><span>Belçika</span></label>
+                    <label class="dd-item"><input type="checkbox" value="BOSNA"     onchange="onUlkeChange()"><span>Bosna</span></label>
+                    <label class="dd-item"><input type="checkbox" value="GÜRCİSTAN" onchange="onUlkeChange()"><span>Gürcistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="HOLLANDA"  onchange="onUlkeChange()"><span>Hollanda</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KAZAKİSTAN" onchange="onUlkeChange()"><span>Kazakistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KOSOVA"    onchange="onUlkeChange()"><span>Kosova</span></label>
+                    <label class="dd-item"><input type="checkbox" value="MAKEDONYA" onchange="onUlkeChange()"><span>Makedonya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="SIRBİSTAN" onchange="onUlkeChange()"><span>Sırbistan</span></label>
+                    <div class="dd-group-label">Franchise</div>
+                    <label class="dd-item"><input type="checkbox" value="IRAK"      onchange="onUlkeChange()"><span>Irak</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KIBRIS"    onchange="onUlkeChange()"><span>Kıbrıs</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LİBERYA"   onchange="onUlkeChange()"><span>Liberya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LİBYA"     onchange="onUlkeChange()"><span>Libya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LÜBNAN"    onchange="onUlkeChange()"><span>Lübnan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="ÖZBEKİSTAN" onchange="onUlkeChange()"><span>Özbekistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="RUSYA"     onchange="onUlkeChange()"><span>Rusya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="ABHAZYA"   onchange="onUlkeChange()"><span>Abhazya</span></label>
+                  </div>
                 </div>
 
-                <div
-                  style="display:flex;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);overflow:hidden;">
-                  <span
-                    style="padding:0 8px;height:32px;display:flex;align-items:center;border-right:0.5px solid var(--border2);color:var(--text3);font-size:13px;">⏳</span>
-                  <select id="filter-durum" onchange="filterShipments()"
-                    style="font-size:12px;padding:0 8px;height:32px;border:none;background:transparent;color:var(--text);outline:none;min-width:95px;">
-                    <option value="">Tüm durumlar</option>
-                    <option value="YOLDA">Yolda</option>
-                    <option value="Varış Gümrük">Varış Gümrük</option>
-                    <option value="Gümrükleme">Gümrükleme</option>
-                    <option value="TESLİM EDİLDİ">Teslim Edildi</option>
-                  </select>
+                <!-- Durum -->
+                <div class="custom-dd" id="dd-durum">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-durum')">
+                    <i class="ti ti-loader" aria-hidden="true"></i>
+                    <span id="dd-durum-label">Durumlar</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-durum-menu">
+                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="" checked onchange="onDDChange('durum',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="YOLDA" onchange="onDDChange('durum',this)"><span>Yolda</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="Varış Gümrük" onchange="onDDChange('durum',this)"><span>Varış Gümrük</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="Gümrükleme" onchange="onDDChange('durum',this)"><span>Gümrükleme</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="TESLİM EDİLDİ" onchange="onDDChange('durum',this)"><span>Teslim Edildi</span></label>
+                  </div>
                 </div>
 
-                <div
-                  style="display:flex;align-items:center;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);overflow:hidden;">
-                  <span
-                    style="padding:0 8px;height:32px;display:flex;align-items:center;border-right:0.5px solid var(--border2);color:var(--text3);font-size:13px;">🏭</span>
-                  <select id="filter-depo" onchange="filterShipments()"
-                    style="font-size:12px;padding:0 8px;height:32px;border:none;background:transparent;color:var(--text);outline:none;min-width:90px;">
-                    <option value="">Tüm depolar</option>
-                    <option value="IHR">Serbest (IHR)</option>
-                    <option value="ANT">Antrepo (ANT)</option>
-                  </select>
+                <!-- Depo -->
+                <div class="custom-dd" id="dd-depo">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-depo')">
+                    <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+                    <span id="dd-depo-label">Depolar</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-depo-menu">
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="" checked onchange="onDDChange('depo',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="IHR" onchange="onDDChange('depo',this)"><span>Serbest (IHR)</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="ANT" onchange="onDDChange('depo',this)"><span>Antrepo (ANT)</span></label>
+                  </div>
                 </div>
 
-                <button class="btn-ghost" onclick="clearFilters()"
-                  style="height:32px;padding:0 12px;font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">✕
-                  Temizle</button>
+                <!-- Temizle -->
+                <button onclick="clearFilters()" title="Filtreleri Temizle"
+                  style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;
+                         border-radius:var(--radius-md);border:0.5px solid #FECACA;
+                         background:#FFF5F5;color:#EF4444;cursor:pointer;flex-shrink:0;transition:background 0.15s;"
+                  onmouseenter="this.style.background='#FEE2E2'"
+                  onmouseleave="this.style.background='#FFF5F5'">
+                  <i class="ti ti-trash" style="font-size:15px;" aria-hidden="true"></i>
+                </button>
+
               </div>
+
+              <!-- Hidden inputs — eski kod uyumluluğu için -->
+              <input type="hidden" id="filter-musteri-tipi">
+              <input type="hidden" id="filter-ulke">
+              <input type="hidden" id="filter-durum">
+              <input type="hidden" id="filter-depo">
+
+              <style>
+                .custom-dd { position:relative; }
+                .custom-dd-btn {
+                  display:flex;align-items:center;gap:6px;
+                  height:32px;padding:0 10px;
+                  border-radius:var(--radius-md);
+                  border:0.5px solid var(--border2);
+                  background:var(--surface2);
+                  color:var(--text);
+                  font-family:var(--font);font-size:12px;font-weight:500;
+                  cursor:pointer;white-space:nowrap;
+                  transition:border-color 0.15s,background 0.15s;
+                }
+                .custom-dd-btn:hover { background:var(--surface); border-color:var(--accent); }
+                .custom-dd-btn.active { border-color:var(--accent); background:var(--accent-dim); color:var(--accent-text); }
+                .custom-dd-btn .ti { font-size:14px; }
+                .dd-arrow { font-size:11px !important; opacity:0.6; transition:transform 0.15s; }
+                .custom-dd.open .dd-arrow { transform:rotate(180deg); }
+                .custom-dd-menu {
+                  display:none;position:fixed;
+                  min-width:150px;
+                  background:var(--surface);
+                  border:0.5px solid var(--border2);
+                  border-radius:var(--radius-md);
+                  box-shadow:0 8px 24px rgba(0,0,0,0.12);
+                  z-index:1000;
+                  padding:4px;
+                  max-height:320px;overflow-y:auto;
+                }
+                .custom-dd.open .custom-dd-menu { display:block; }
+                .dd-item {
+                  display:flex;align-items:center;gap:8px;
+                  padding:6px 10px;border-radius:6px;
+                  font-size:12px;color:var(--text);
+                  cursor:pointer;user-select:none;
+                  transition:background 0.1s;
+                }
+                .dd-item:hover { background:var(--accent-dim); }
+                .dd-item input { accent-color:var(--accent);cursor:pointer;width:13px;height:13px;flex-shrink:0; }
+                .dd-group-label {
+                  font-size:10px;font-weight:600;color:var(--text3);
+                  text-transform:uppercase;letter-spacing:0.06em;
+                  padding:8px 10px 4px;
+                }
+              </style>
 
               <!-- Sağ taraf: butonlar -->
               <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">

@@ -543,10 +543,6 @@ async function downloadRS() {
   try {
     const excelB64 = arrayBufferToBase64(lastFileData);
     let logoB64 = '';
-    try {
-      const lr = await fetch('./logo.png');
-      if (lr.ok) { const la = await lr.arrayBuffer(); logoB64 = arrayBufferToBase64(la); }
-    } catch (e) { }
     let pdfB64 = '';
     if (lastPdfData) pdfB64 = arrayBufferToBase64(lastPdfData);
 
@@ -711,7 +707,7 @@ async function downloadRS() {
           nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
           yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
           gumruk_tarihi:  document.getElementById('gumrukTarihiInput')?.value || '',
-          palet: data.pdfFields?.kap || '',
+          palet: data.pdfFields?.kap || null,
         })
       });
       const sevkData = await sevkRes.json();

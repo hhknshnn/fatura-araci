@@ -1,6 +1,142 @@
 // js/shipments.js
 // Sevkiyatlar sayfası — listeleme, filtreleme, güncelleme
 
+// ── SÜTUN GENİŞLİKLERİ ───────────────────────────────────────────────────────
+const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','yukleme_tarihi','durum'];
+const COL_DEFAULTS = { ihracat_dosya_no:110, fatura_no:130, palet:60, _depo:60, ulke:90, nakliye_firmasi:120, plaka:100, sefer_id:80, fatura_bedeli_eur:110, yukleme_tarihi:90, durum:110 };
+
+function loadColWidths() {
+  try {
+    const saved = localStorage.getItem('shipments_col_widths');
+    return saved ? { ...COL_DEFAULTS, ...JSON.parse(saved) } : { ...COL_DEFAULTS };
+  } catch(e) { return { ...COL_DEFAULTS }; }
+}
+
+function saveColWidths(widths) {
+  try { localStorage.setItem('shipments_col_widths', JSON.stringify(widths)); } catch(e) {}
+}
+
+let colWidths = loadColWidths();
+
+function initColResize() {
+  const table = document.querySelector('#shipments-table-wrapper table');
+  if (!table) return;
+
+  const ths = table.querySelectorAll('thead th');
+  ths.forEach((th, i) => {
+    if (i === 0) return;
+    const colKey = COL_KEYS[i - 1];
+    if (!colKey) return;
+
+    const existing = th.querySelector('.col-resize-handle');
+    if (existing) existing.remove();
+
+    const handle = document.createElement('div');
+    handle.className = 'col-resize-handle';
+    handle.style.cssText = `
+      position:absolute;right:0;top:0;bottom:0;width:6px;
+      cursor:col-resize;z-index:10;user-select:none;
+      background:transparent;
+    `;
+    th.style.position = 'relative';
+    th.style.width = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
+    th.style.minWidth = '40px';
+    th.style.overflow = 'hidden';
+    th.appendChild(handle);
+
+    // Tüm td'leri de baştan genişliğe göre ayarla
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const td = row.cells[i];
+      if (td) {
+        td.style.width = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
+        td.style.maxWidth = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
+        td.style.overflow = 'hidden';
+        td.style.textOverflow = 'ellipsis';
+      }
+    });
+
+    let startX, startW, isDragging = false;
+
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      isDragging = false;
+      startX = e.clientX;
+      startW = th.offsetWidth;
+      handle.style.background = 'var(--accent)';
+
+      const onMove = e => {
+        isDragging = true;
+        const newW = Math.max(40, startW + e.clientX - startX);
+        th.style.width = newW + 'px';
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const td = row.cells[i];
+          if (td) {
+            td.style.width = newW + 'px';
+            td.style.maxWidth = newW + 'px';
+            td.style.overflow = 'hidden';
+            td.style.textOverflow = 'ellipsis';
+          }
+        });
+      };
+
+      const onUp = e => {
+        const newW = Math.max(40, startW + e.clientX - startX);
+        if (isDragging) {
+          colWidths[colKey] = newW;
+          saveColWidths(colWidths);
+        }
+        handle.style.background = 'transparent';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    handle.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    handle.addEventListener('dblclick', e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // O sütundaki tüm hücrelerin içerik genişliğini ölç
+      let maxW = 60;
+      const allCells = table.querySelectorAll(`tr td:nth-child(${i + 1}), tr th:nth-child(${i + 1})`);
+      const measurer = document.createElement('span');
+      measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:12px;font-family:var(--font);padding:0 8px;';
+      document.body.appendChild(measurer);
+      allCells.forEach(cell => {
+        measurer.textContent = cell.textContent.trim();
+        maxW = Math.max(maxW, measurer.offsetWidth + 16);
+      });
+      document.body.removeChild(measurer);
+      maxW = Math.min(maxW, 400); // max 400px
+
+      th.style.width = maxW + 'px';
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const td = row.cells[i];
+        if (td) {
+          td.style.width = maxW + 'px';
+          td.style.maxWidth = maxW + 'px';
+        }
+      });
+      colWidths[colKey] = maxW;
+      saveColWidths(colWidths);
+    });
+
+    handle.addEventListener('mouseenter', () => handle.style.background = 'var(--accent-mid)');
+    handle.addEventListener('mouseleave', () => handle.style.background = 'transparent');
+  });
+}
+
 let allShipments    = [];
 let seciliSatirlar  = new Set(); // çoklu silme için seçili id'ler
 
@@ -57,18 +193,83 @@ function onSort(col) {
 }
 
 function applyFiltersAndRender() {
-  const ulke         = document.getElementById('filter-ulke')?.value         || '';
-  const durum        = document.getElementById('filter-durum')?.value        || '';
-  const depo         = document.getElementById('filter-depo')?.value         || '';
-  const musteriTipi  = document.getElementById('filter-musteri-tipi')?.value || '';
+  const durum       = document.getElementById('filter-durum')?.value        || '';
+  const depo        = document.getElementById('filter-depo')?.value         || '';
+  const musteriTipi = document.getElementById('filter-musteri-tipi')?.value || '';
 
+  const sorted = sortShipments(allShipments);
+
+  // Tablo zaten çizilmişse sadece satırları göster/gizle
+  const tbody = document.getElementById('shipments-tbody');
+  if (tbody && tbody.children.length > 0 && tbody.children[0].dataset.id) {
+    const rows = tbody.querySelectorAll('tr[data-id]');
+    let visible = 0;
+    rows.forEach(tr => {
+      const id = parseInt(tr.dataset.id);
+      const s  = allShipments.find(x => x.id === id);
+      if (!s) { tr.style.display = 'none'; return; }
+
+      const pass =
+        (!selectedUlkeler || selectedUlkeler.size === 0 || selectedUlkeler.has(s.ulke?.toUpperCase())) &&
+        (!durum       || normalizeDurum(s.durum) === durum) &&
+        (!depo        || s.fatura_no?.startsWith(depo)) &&
+        (!musteriTipi || s.musteri_tipi === musteriTipi);
+
+      tr.style.display = pass ? '' : 'none';
+      if (pass) visible++;
+    });
+    updateOzetFromVisible(visible);
+    return;
+  }
+
+  // İlk render — tam çiz
   let filtered = allShipments;
-  if (ulke)        filtered = filtered.filter(s => s.ulke?.toLowerCase().includes(ulke.toLowerCase()));
+  if (selectedUlkeler && selectedUlkeler.size > 0)
+    filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
   if (durum)       filtered = filtered.filter(s => normalizeDurum(s.durum) === durum);
   if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
   if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
 
   renderShipments(sortShipments(filtered));
+}
+
+function updateOzetFromVisible(count) {
+  const tbody = document.getElementById('shipments-tbody');
+  if (!tbody) return;
+  const visibleRows = [...tbody.querySelectorAll('tr[data-id]')].filter(r => r.style.display !== 'none');
+  const ids = visibleRows.map(r => parseInt(r.dataset.id));
+  const list = allShipments.filter(s => ids.includes(s.id));
+
+  const grupTemsilci = new Set();
+  let toplam = 0;
+  list.forEach(item => {
+    if (!item.sefer_id) toplam++;
+    else if (!grupTemsilci.has(item.sefer_id)) { grupTemsilci.add(item.sefer_id); toplam++; }
+  });
+  const faturaEur  = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
+  const faturaTl   = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
+  const navlunEur  = list.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
+  const sigortaEur = list.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
+  const fmt   = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(val) + ' €';
+  const fmtTl = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(val) + ' ₺';
+
+  const ozet = document.getElementById('shipments-ozet');
+  if (!ozet) return;
+  const pill = (icon, label, val, iconColor) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+                background:var(--surface);border:0.5px solid var(--border2);
+                border-radius:20px;white-space:nowrap;">
+      <i class="ti ti-${icon}" style="font-size:13px;color:${iconColor};" aria-hidden="true"></i>
+      <span style="font-size:12px;color:var(--text3);">${label}</span>
+      <span style="font-size:12px;font-weight:600;color:var(--text);">${val}</span>
+    </div>`;
+  ozet.innerHTML = `
+    ${pill('package',       'Sevkiyat', toplam,          'var(--text2)')}
+    ${pill('currency-euro', 'Fatura',   fmt(faturaEur),  '#185FA5')}
+    ${pill('currency-lira', 'TL',       fmtTl(faturaTl), '#3B6D11')}
+    ${pill('ship',          'Navlun',   fmt(navlunEur),  '#854F0B')}
+    ${pill('shield',        'Sigorta',  fmt(sigortaEur), '#533AB7')}
+  `;
 }
 
 // Sıralama ok ikonu
@@ -81,54 +282,15 @@ function sortIcon(col) {
 
 // Tıklanabilir başlık hücresi
 function thCell(label, col, extraStyle = '') {
-  return `<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text3);font-weight:500;cursor:pointer;user-select:none;${extraStyle}"
-    onclick="onSort('${col}')">
-    ${label}${sortIcon(col)}
+  return `<th style="padding:6px 8px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;user-select:none;border-right:1px solid rgba(255,255,255,0.08);overflow:hidden;letter-spacing:0.04em;text-transform:uppercase;${extraStyle}">
+    <span style="cursor:pointer;" onclick="onSort('${col}')">${label}${sortIcon(col)}</span>
   </th>`;
 }
 
 
 // Sticky yatay scroll bar — viewport'a yapışık
 function initStickyScroll() {
-  const wrapper = document.getElementById('shipments-table-wrapper');
-  if (!wrapper) return;
-
-  const fakeScroll = document.createElement('div');
-  fakeScroll.id = 'fake-scrollbar';
-  fakeScroll.style.cssText = `
-    position: fixed;
-    bottom: 0;
-    left: 0; right: 0;
-    height: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    z-index: 50;
-    background: var(--surface2);
-    border-top: 0.5px solid var(--border2);
-  `;
-
-  const fakeInner = document.createElement('div');
-  fakeInner.id = 'fake-scrollbar-inner';
-  fakeScroll.appendChild(fakeInner);
-  document.body.appendChild(fakeScroll);
-
-  function syncWidth() {
-    fakeInner.style.width = wrapper.scrollWidth + 'px';
-    const rect = wrapper.getBoundingClientRect();
-    fakeScroll.style.display = rect.width > 0 ? 'block' : 'none';
-  }
-
-  wrapper.addEventListener('scroll', () => { fakeScroll.scrollLeft = wrapper.scrollLeft; });
-  fakeScroll.addEventListener('scroll', () => { wrapper.scrollLeft = fakeScroll.scrollLeft; });
-
-  syncWidth();
-  window.addEventListener('resize', syncWidth);
-
-  const origRender = window.renderShipments;
-  window.renderShipments = function(list) {
-    origRender(list);
-    setTimeout(syncWidth, 50);
-  };
+  // fake scrollbar kaldırıldı — wrapper direkt scroll yapıyor
 }
 
 // Durum normalize
@@ -145,11 +307,19 @@ function normalizeDurum(raw) {
 }
 
 async function loadShipments(ulke = '', durum = '') {
+  // Wrapper scroll ayarları
+  const wrapper = document.getElementById('shipments-table-wrapper');
+  if (wrapper) {
+    wrapper.style.overflowX = 'auto';
+    wrapper.style.overflowY = 'auto';
+    wrapper.style.maxHeight = 'calc(100vh - 172px)';
+    wrapper.style.background = 'var(--surface2)';
+  }
+
   if (!document.getElementById('shipments-ozet')) {
     const ozet = document.createElement('div');
     ozet.id = 'shipments-ozet';
-    ozet.style.cssText = 'display:flex;gap:16px;align-items:center;padding:8px 24px;background:var(--accent-dim);border-bottom:0.5px solid var(--accent-mid);font-size:12.5px;color:var(--accent-text);flex-wrap:wrap;';
-    const wrapper = document.getElementById('shipments-table-wrapper');
+    ozet.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--surface2);border-bottom:0.5px solid var(--border2);flex-wrap:wrap;';
     if (wrapper) wrapper.parentNode.insertBefore(ozet, wrapper);
   }
   try {
@@ -165,6 +335,8 @@ async function loadShipments(ulke = '', durum = '') {
     if (!data.success) return;
 
     allShipments = data.shipments;
+    sortColumn = 'ihracat_dosya_no';
+    sortDir = 'desc';
     applyFiltersAndRender();
     if (!document.getElementById('fake-scrollbar')) initStickyScroll();
   } catch (e) {
@@ -196,39 +368,43 @@ function renderShipments(list) {
 
   const ozet = document.getElementById('shipments-ozet');
   if (ozet) {
+    const pill = (icon, label, val, iconColor) => `
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+                  background:var(--surface);border:0.5px solid var(--border2);
+                  border-radius:20px;white-space:nowrap;">
+        <i class="ti ti-${icon}" style="font-size:13px;color:${iconColor};" aria-hidden="true"></i>
+        <span style="font-size:12px;color:var(--text3);">${label}</span>
+        <span style="font-size:12px;font-weight:600;color:var(--text);">${val}</span>
+      </div>`;
     ozet.innerHTML = `
-      <span>📦 <b>${toplam}</b> sevkiyat</span>
-      <span style="color:var(--border2);">|</span>
-      <span>Fatura: <b>${fmt(faturaEur)}</b></span>
-      <span style="color:var(--border2);">·</span>
-      <span><b>${fmtTl(faturaTl)}</b></span>
-      <span style="color:var(--border2);">|</span>
-      <span>Navlun: <b>${fmt(navlunEur)}</b></span>
-      <span style="color:var(--border2);">|</span>
-      <span>Sigorta: <b>${fmt(sigortaEur)}</b></span>
+      ${pill('package',       'Sevkiyat', toplam,          'var(--text2)')}
+      ${pill('currency-euro', 'Fatura',   fmt(faturaEur),  '#185FA5')}
+      ${pill('currency-lira', 'TL',       fmtTl(faturaTl), '#3B6D11')}
+      ${pill('ship',          'Navlun',   fmt(navlunEur),  '#854F0B')}
+      ${pill('shield',        'Sigorta',  fmt(sigortaEur), '#533AB7')}
     `;
   }
 
   // Tablo — Varış sütunu yok
   wrapper.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="background:var(--surface2);border-bottom:0.5px solid var(--border2);">
-          <th style="padding:8px 12px;width:36px;">
+    <table style="width:max-content;border-collapse:collapse;table-layout:fixed;">
+      <thead style="position:sticky;top:0;z-index:5;">
+        <tr style="background:#2d3f55;border-bottom:1.5px solid var(--border2);">
+          <th style="padding:6px 8px;width:32px;border-right:1px solid rgba(255,255,255,0.08);">
             <input type="checkbox" id="chk-all" onclick="toggleTumSatirlar(this)"
               style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
           </th>
-          ${thCell('Dosya No',        'ihracat_dosya_no')}
-          ${thCell('Fatura No',       'fatura_no')}
-          ${thCell('Palet',           'palet', 'width:70px;text-align:center;')}
-          ${thCell('Depo',            '_depo')}
-          ${thCell('Ülke',            'ulke')}
-          ${thCell('Nakliye Firması', 'nakliye_firmasi')}
-          ${thCell('Plaka',           'plaka')}
-          ${thCell('Grup', 'sefer_id', 'width:70px;')}
-          ${thCell('Fatura EUR',      'fatura_bedeli_eur')}
-          ${thCell('Yükleme',         'yukleme_tarihi')}
-          ${thCell('Durum',           'durum')}
+          ${thCell('Dosya No',        'ihracat_dosya_no', `width:${colWidths.ihracat_dosya_no}px;`)}
+          ${thCell('Fatura No',       'fatura_no',        `width:${colWidths.fatura_no}px;overflow:hidden;text-overflow:ellipsis;`)}
+          ${thCell('Palet',           'palet',            `width:${colWidths.palet}px;text-align:center;`)}
+          ${thCell('Depo',            '_depo',            `width:${colWidths._depo}px;`)}
+          ${thCell('Ülke',            'ulke',             `width:${colWidths.ulke}px;`)}
+          ${thCell('Nakliye Firması', 'nakliye_firmasi',  `width:${colWidths.nakliye_firmasi}px;`)}
+          ${thCell('Plaka',           'plaka',            `width:${colWidths.plaka}px;`)}
+          ${thCell('Grup',            'sefer_id',         `width:${colWidths.sefer_id}px;`)}
+          ${thCell('Fatura EUR',      'fatura_bedeli_eur',`width:${colWidths.fatura_bedeli_eur}px;`)}
+          ${thCell('Yükleme',         'yukleme_tarihi',   `width:${colWidths.yukleme_tarihi}px;`)}
+          ${thCell('Durum',           'durum',            `width:${colWidths.durum}px;`)}
         </tr>
       </thead>
       <tbody id="shipments-tbody">
@@ -240,36 +416,39 @@ function renderShipments(list) {
               const depoTag  = isAnt
                 ? `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#FAEEDA;color:#633806;">ANT</span>`
                 : `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#E6F1FB;color:#0C447C;">IHR</span>`;
-              const rowBg = idx % 2 === 1 ? 'var(--surface2)' : 'transparent';
+              const rowBg = idx % 2 === 1 ? 'var(--surface2)' : 'var(--surface)';
               return `
-                <tr style="border-bottom:0.5px solid var(--border);cursor:pointer;background:${rowBg};transition:background 0.1s;"
+                <tr data-id="${s.id}" style="border-bottom:1px solid var(--border2);cursor:pointer;background:${rowBg};transition:background 0.1s;"
                     onmouseover="this.style.background='var(--accent-dim)'"
                     onmouseout="this.style.background='${rowBg}'">
-                  <td style="padding:8px 12px;width:36px;" onclick="event.stopPropagation()">
+                  <td style="padding:5px 8px;width:32px;border-right:1px solid var(--border2);" onclick="event.stopPropagation()">
                     <input type="checkbox" data-id="${s.id}"
                       ${seciliSatirlar.has(s.id) ? 'checked' : ''}
                       onclick="toggleSatirSec(event, ${s.id})"
                       style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
                   </td>
-                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ihracat_dosya_no || '-'}</td>
-                  <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap;font-family:var(--mono);" onclick="openShipmentDetail(${s.id})">${s.fatura_no || '-'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;text-align:center;" onclick="openShipmentDetail(${s.id})">${s.palet || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${depoTag}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ulke || '-'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.nakliye_firmasi || '-'}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.plaka || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;width:70px;" onclick="openShipmentDetail(${s.id})">
-                    ${s.sefer_id ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:12px;">-</span>'}
+                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.ihracat_dosya_no || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.fatura_no || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.palet || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${depoTag}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.ulke || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.nakliye_firmasi || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.plaka || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;width:70px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">
+                    ${s.sefer_id ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:11px;">-</span>'}
                   </td>
-                  <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.yukleme_tarihi || '-'}</td>
-                  <td style="padding:8px 12px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">
+                  <td style="padding:5px 8px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${formatEUR(s.fatura_bedeli_eur)}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.yukleme_tarihi || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">
                     <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
                 </tr>`;
             }).join('')}
       </tbody>
     </table>`;
+  if (!document.querySelector('#shipments-table-wrapper .col-resize-handle')) {
+    setTimeout(initColResize, 0);
+  }
 }
 
 function durumStyle(durum) {
@@ -537,15 +716,97 @@ async function deleteShipment() {
   else alert('Silme hatası: ' + (data.error || 'Bilinmeyen hata'));
 }
 
+// ── CUSTOM DROPDOWN ───────────────────────────────────────────────────────────
+let selectedUlkeler = new Set();
+
+function toggleDD(id) {
+  const dd = document.getElementById(id);
+  const isOpen = dd.classList.contains('open');
+  document.querySelectorAll('.custom-dd.open').forEach(d => d.classList.remove('open'));
+  if (!isOpen) {
+    dd.classList.add('open');
+    // Menü pozisyonunu butonun altına fixed olarak ayarla
+    const btn = dd.querySelector('.custom-dd-btn');
+    const menu = dd.querySelector('.custom-dd-menu');
+    const rect = btn.getBoundingClientRect();
+    menu.style.top  = (rect.bottom + 6) + 'px';
+    menu.style.left = rect.left + 'px';
+  }
+}
+
+// Dışarı tıklayınca kapat
+document.addEventListener('click', e => {
+  if (!e.target.closest('.custom-dd')) {
+    document.querySelectorAll('.custom-dd.open').forEach(d => d.classList.remove('open'));
+  }
+});
+
+function onDDChange(type, input) {
+  document.querySelectorAll('.custom-dd.open').forEach(d => d.classList.remove('open'));
+  const val = input.value;
+  if (type === 'tip') {
+    document.getElementById('filter-musteri-tipi').value = val;
+    const btn = document.querySelector('#dd-tip .custom-dd-btn');
+    const label = document.getElementById('dd-tip-label');
+    label.textContent = val ? (val.charAt(0).toUpperCase() + val.slice(1)) : 'Tipler';
+    btn.classList.toggle('active', !!val);
+  } else if (type === 'durum') {
+    document.getElementById('filter-durum').value = val;
+    const btn = document.querySelector('#dd-durum .custom-dd-btn');
+    const label = document.getElementById('dd-durum-label');
+    label.textContent = val ? val : 'Durumlar';
+    btn.classList.toggle('active', !!val);
+  } else if (type === 'depo') {
+    document.getElementById('filter-depo').value = val;
+    const btn = document.querySelector('#dd-depo .custom-dd-btn');
+    const label = document.getElementById('dd-depo-label');
+    label.textContent = val ? val : 'Depolar';
+    btn.classList.toggle('active', !!val);
+  }
+  applyFiltersAndRender();
+}
+
+function onUlkeChange() {
+  const checkboxes = document.querySelectorAll('#dd-ulke-menu input[type=checkbox]');
+  selectedUlkeler = new Set();
+  checkboxes.forEach(cb => { if (cb.checked) selectedUlkeler.add(cb.value); });
+
+  const btn = document.querySelector('#dd-ulke .custom-dd-btn');
+  const label = document.getElementById('dd-ulke-label');
+  if (selectedUlkeler.size === 0) {
+    label.textContent = 'Ülkeler';
+    btn.classList.remove('active');
+  } else if (selectedUlkeler.size === 1) {
+    label.textContent = [...selectedUlkeler][0].charAt(0) + [...selectedUlkeler][0].slice(1).toLowerCase();
+    btn.classList.add('active');
+  } else {
+    label.textContent = `${selectedUlkeler.size} Ülke`;
+    btn.classList.add('active');
+  }
+  applyFiltersAndRender();
+}
+
 function clearFilters() {
   document.getElementById('filter-ulke').value  = '';
   document.getElementById('filter-durum').value = '';
   document.getElementById('filter-depo').value  = '';
-  const mt = document.getElementById('filter-musteri-tipi');
-  if (mt) mt.value = '';
-  sortColumn = null;
-  sortDir    = 'asc';
-  loadShipments();
+  document.getElementById('filter-musteri-tipi').value = '';
+
+  // Dropdown'ları sıfırla
+  selectedUlkeler = new Set();
+  document.querySelectorAll('#dd-ulke-menu input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('input[name="dd-tip-r"]')[0].checked   = true;
+  document.querySelectorAll('input[name="dd-durum-r"]')[0].checked = true;
+  document.querySelectorAll('input[name="dd-depo-r"]')[0].checked  = true;
+  document.getElementById('dd-tip-label').textContent   = 'Tipler';
+  document.getElementById('dd-ulke-label').textContent  = 'Ülkeler';
+  document.getElementById('dd-durum-label').textContent = 'Durumlar';
+  document.getElementById('dd-depo-label').textContent  = 'Depolar';
+  document.querySelectorAll('.custom-dd-btn').forEach(b => b.classList.remove('active'));
+
+  sortColumn = 'ihracat_dosya_no';
+  sortDir    = 'desc';
+  applyFiltersAndRender();
 }
 
 // ── GRUPLAMA ──────────────────────────────────────────────────────────────────

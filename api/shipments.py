@@ -111,8 +111,8 @@ def create_shipment(data):
             ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
             fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
             eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
-            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi, palet
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         RETURNING id
     ''', (
         data.get('ihracat_dosya_no', ''),
@@ -132,6 +132,7 @@ def create_shipment(data):
         gumrukleme_bitis,
         _normalize_durum(durum_default),
         musteri_tipi,
+        data.get('palet') or None,
     ))
     new_id = cur.fetchone()[0]
     conn.commit()
