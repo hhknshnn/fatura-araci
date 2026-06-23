@@ -220,6 +220,7 @@ function renderShipments(list) {
           </th>
           ${thCell('Dosya No',        'ihracat_dosya_no')}
           ${thCell('Fatura No',       'fatura_no')}
+          ${thCell('Palet',           'palet', 'width:70px;text-align:center;')}
           ${thCell('Depo',            '_depo')}
           ${thCell('Ülke',            'ulke')}
           ${thCell('Nakliye Firması', 'nakliye_firmasi')}
@@ -252,6 +253,7 @@ function renderShipments(list) {
                   </td>
                   <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ihracat_dosya_no || '-'}</td>
                   <td style="padding:8px 12px;font-size:11px;color:var(--text2);white-space:nowrap;font-family:var(--mono);" onclick="openShipmentDetail(${s.id})">${s.fatura_no || '-'}</td>
+                  <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;text-align:center;" onclick="openShipmentDetail(${s.id})">${s.palet || '-'}</td>
                   <td style="padding:8px 12px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${depoTag}</td>
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.ulke || '-'}</td>
                   <td style="padding:8px 12px;font-size:12px;color:var(--text2);white-space:nowrap;" onclick="openShipmentDetail(${s.id})">${s.nakliye_firmasi || '-'}</td>
@@ -320,6 +322,7 @@ async function openShipmentDetail(id) {
   document.getElementById('edit-dosya-no').value      = s.ihracat_dosya_no || '';
   document.getElementById('edit-nakliye').value       = s.nakliye_firmasi || '';
   document.getElementById('edit-plaka').value         = s.plaka || '';
+  document.getElementById('edit-palet').value         = s.palet || '';
   document.getElementById('edit-durum').value         = normalizeDurum(s.durum);
   document.getElementById('edit-varis').value         = s.varis_tarihi || '';
   document.getElementById('edit-gumruk-bitis').value  = s.gumrukleme_bitis || '';
@@ -434,6 +437,7 @@ async function saveShipmentDetail() {
       ihracat_dosya_no:      document.getElementById('edit-dosya-no').value.trim(),
       nakliye_firmasi:       document.getElementById('edit-nakliye').value,
       plaka:                 document.getElementById('edit-plaka').value,
+      palet:                 document.getElementById('edit-palet').value.trim() || null,
       durum:                 document.getElementById('edit-durum').value,
       varis_tarihi:          document.getElementById('edit-varis').value,
       gumrukleme_bitis:      document.getElementById('edit-gumruk-bitis').value,

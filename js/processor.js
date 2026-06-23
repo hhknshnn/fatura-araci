@@ -42,6 +42,22 @@ function handleMultiFile(files) {
     // Kıbrıs: en az 1 dosya seçilince loaded ekle
     const dz = document.getElementById('dropZone');
     if (dz) dz.classList.add('loaded');
+
+    // Dosya bilgi alanlarını göster (Kıbrıs dahil tüm ülkelerde ortak)
+    if (cyExcelFiles.length > 0) {
+      const dosyaSec = document.getElementById('dosyaNoSection');
+      if (dosyaSec) dosyaSec.style.display = 'block';
+      const plakaSec = document.getElementById('plakaSection');
+      if (plakaSec) plakaSec.style.display = 'block';
+      const nakliyeSec = document.getElementById('nakliyeSection');
+      if (nakliyeSec) nakliyeSec.style.display = 'block';
+      const yuklemeSec = document.getElementById('yuklemeTarihiSection');
+      if (yuklemeSec) yuklemeSec.style.display = 'block';
+      const gumrukSec = document.getElementById('gumrukTarihiSection');
+      if (gumrukSec) gumrukSec.style.display = 'block';
+      const gumrukEl = document.getElementById('gumrukTarihiInput');
+      if (gumrukEl && !gumrukEl.value) gumrukEl.value = new Date().toISOString().split('T')[0];
+    }
     return;
   }
   // Diğer ülkeler — mevcut kod aynen

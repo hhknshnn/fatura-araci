@@ -36,7 +36,7 @@ def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
                varis_tarihi, gumrukleme_bitis, created_at,
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
-               toplam_maliyet_eur, musteri_tipi, sefer_id
+               toplam_maliyet_eur, musteri_tipi, sefer_id, palet
         FROM shipments
         WHERE 1=1
     '''
@@ -173,7 +173,8 @@ def update_shipment(shipment_id, data):
             toplam_maliyet_eur    = %s,
             varis_tarihi          = %s,
             gumrukleme_bitis      = %s,
-            durum                 = %s
+            durum                 = %s,
+            palet                 = %s
         WHERE id = %s
     ''', (
         data.get('ihracat_dosya_no', ''),
@@ -195,6 +196,7 @@ def update_shipment(shipment_id, data):
         data.get('varis_tarihi') or None,
         data.get('gumrukleme_bitis') or None,
         _normalize_durum(data.get('durum', 'YOLDA')),
+        data.get('palet') or None,
         shipment_id,
     ))
     conn.commit()
@@ -320,7 +322,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
 
     headers = [
         'İhracat Dosya No', 'Fatura No', 'Depo', 'Ülke', 'Müşteri Tipi',
-        'Nakliye Firması', 'Plaka', 'Grup',
+        'Nakliye Firması', 'Plaka', 'Grup', 'Palet',
         'Fatura Bedeli TL', 'Fatura Bedeli EUR', 'Mal Bedeli EUR',
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
@@ -358,23 +360,24 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
         c(6,  s.get('nakliye_firmasi', ''))
         c(7,  s.get('plaka', ''))
         c(8,  f"Grup {s['sefer_id']}" if s.get('sefer_id') else '')
-        c(9,  float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
-        c(10, float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
-        c(11, float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
-        c(12, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
-        c(13, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
-        c(14, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
-        c(15, s.get('yukleme_tarihi', ''))
-        c(16, s.get('gumruk_tarihi', ''))
-        c(17, s.get('varis_tarihi', ''))
-        c(18, s.get('gumrukleme_bitis', ''))
-        c(19, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
-        c(20, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
-        c(21, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
-        c(22, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(23, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(24, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(25, s.get('durum', ''))
+        c(9,  s.get('palet') or '')
+        c(10, float(s.get('fatura_bedeli_tl', 0) or 0),  TL_FMT)
+        c(11, float(s.get('fatura_bedeli_eur', 0) or 0), EUR_FMT)
+        c(12, float(s.get('mal_bedeli_eur', 0) or 0),    EUR_FMT)
+        c(13, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
+        c(14, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
+        c(15, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
+        c(16, s.get('yukleme_tarihi', ''))
+        c(17, s.get('gumruk_tarihi', ''))
+        c(18, s.get('varis_tarihi', ''))
+        c(19, s.get('gumrukleme_bitis', ''))
+        c(20, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
+        c(21, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
+        c(22, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(23, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(24, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(25, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(26, s.get('durum', ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -445,6 +448,7 @@ def _row_to_dict(row):
         'toplam_maliyet_eur':    float(row[25] or 0),
         'musteri_tipi':          row[26] if len(row) > 26 else 'kurumsal',
         'sefer_id':              row[27] if len(row) > 27 else None,
+        'palet':                 row[28] if len(row) > 28 else None,
     }
 
 
@@ -799,6 +803,7 @@ def parse_fr_pdf_import():
                 'fatura_bedeli_usd': usd_tutar,
                 'usd_kuru':          usd_kuru,
                 'fatura_bedeli_tl':  fatura_tl,
+                'palet':             parsed.get('palet'),
                 'hata':              None,
             })
 
@@ -952,6 +957,42 @@ def ungroup_shipment(shipment_id):
     conn.close()
     
     
+def bulk_update_palet(rows):
+    """
+    Fatura no eşleşimine göre palet alanını toplu günceller.
+    rows: [{ fatura_no, palet }, ...]
+    Döner: (guncellenen, atlanan, hatalar)
+    """
+    conn = get_conn()
+    cur  = conn.cursor()
+    guncellenen, atlanan, hatalar = 0, 0, []
+
+    for i, row in enumerate(rows):
+        try:
+            fatura_no = str(row.get('fatura_no', '')).strip()
+            palet     = str(row.get('palet', '')).strip()
+            if not fatura_no or not palet:
+                atlanan += 1
+                continue
+
+            cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+            if not cur.fetchone():
+                atlanan += 1
+                hatalar.append(f'{fatura_no}: kayıt bulunamadı, atlandı.')
+                continue
+
+            cur.execute('UPDATE shipments SET palet = %s WHERE fatura_no = %s', (palet, fatura_no))
+            guncellenen += 1
+
+        except Exception as e:
+            hatalar.append(f'Satır {i+1}: {str(e)}')
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return guncellenen, atlanan, hatalar
+
+
 def bulk_delete_shipments(ids):
     """Birden fazla sevkiyatı id listesine göre siler."""
     if not ids:
@@ -1124,6 +1165,7 @@ def parse_fr_fatura_pdf(pdf_bytes):
         'fatura_bedeli_usd': 0.0,
         'usd_kuru':          0.0,
         'fatura_tipi':      None,  # 'ANT' veya 'IHR'
+        'palet':            None,
     }
 
     def parse_tr_sayi(s):
@@ -1148,7 +1190,7 @@ def parse_fr_fatura_pdf(pdf_bytes):
             total = len(pdf.pages)
             # İlk sayfa + son 2 sayfa (max 3 sayfa, üst üste gelirse tekrar alma)
             idxs = list(dict.fromkeys(
-                [0] + [i for i in [total - 2, total - 1] if i > 0]
+                [0] + [i for i in [total - 2, total - 1] if i >= 0]
             ))
             pages_text = []
             for i in idxs:
@@ -1190,6 +1232,19 @@ def parse_fr_fatura_pdf(pdf_bytes):
         m = re.search(r'Döviz Kuru[:\s]*([\d.,]+)\s*TL', full)
         if m:
             result['usd_kuru'] = parse_tr_sayi(m.group(1))
+
+        # ── Palet / Kap ──────────────────────────────────────────────────────
+        m = re.search(r'KAP(?:\s*ADETİ)?[:\s]*([\d]+(?:\s*\([^)]+\))?)', full, re.IGNORECASE)
+        if m:
+            import math
+            kap_str = m.group(1).strip()
+            kap = int(re.search(r'[\d]+', kap_str).group())
+            if result['fatura_tipi'] == 'ANT':
+                palet = math.ceil(kap / 30)
+                result['palet'] = f'{kap} ({palet})'
+            else:
+                # IHR: parantez varsa tümünü al, yoksa sadece sayıyı al
+                result['palet'] = kap_str
 
     except Exception as e:
         print(f'FR fatura PDF parse hatası: {e}')

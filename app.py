@@ -22,7 +22,7 @@ from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
-from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 
 def read_port():
     try:
@@ -96,8 +96,13 @@ def api_generate():
 
         # ── Kıbrıs özel ──────────────────────────────────────────────────────
         if ulke_kodu == 'cy':
+            from invoice.cy_engine import generate_cy
             faturalar = body.get('faturalar', [])
-            excel_out = gen_mod.generate_excel_cy(faturalar, grup_kilolari, exception_skus)
+            excel_out = generate_cy(
+                faturalar,
+                grup_kilolari  = grup_kilolari,
+                exception_skus = exception_skus,
+            )
             fatura_no = '_'.join(f.get('faturaNo', '') for f in faturalar)
             return jsonify({
                 'success':   True,
@@ -501,6 +506,25 @@ def api_parse_aksu_pdf():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
     
+@app.route('/api/shipments/bulk-update-palet', methods=['POST', 'OPTIONS'])
+def api_bulk_update_palet():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True)
+        rows = body.get('rows', [])
+        if not rows:
+            return jsonify({'success': False, 'error': 'Satır listesi boş'}), 400
+        guncellenen, atlanan, hatalar = bulk_update_palet(rows)
+        return jsonify({
+            'success':     True,
+            'guncellenen': guncellenen,
+            'atlanan':     atlanan,
+            'hatalar':     hatalar,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/shipments/parse-fr-pdf', methods=['POST', 'OPTIONS'])
 def api_parse_fr_pdf():
     if request.method == 'OPTIONS':

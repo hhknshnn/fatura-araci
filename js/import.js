@@ -107,6 +107,12 @@ function initImportPanel() {
                margin-bottom:-1.5px;cursor:pointer;">
         🇮🇶 FR PDF Import
       </button>
+      <button id="import-tab-palet" onclick="switchImportTab('palet')"
+        style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
+               font-size:13px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;
+               margin-bottom:-1.5px;cursor:pointer;">
+        📦 Palet Güncelle
+      </button>
     </div>
 
     <!-- Excel Sekmesi -->
@@ -247,6 +253,46 @@ function initImportPanel() {
         <div style="display:flex;gap:8px;">
           <button class="btn-secondary" id="fr-import-btn" onclick="doFrImport()">⬆ Aktar</button>
           <button class="btn-ghost" onclick="resetFrImport()">← Yeni Dosyalar</button>
+        </div>
+      </div>
+    </div>
+
+  <!-- Palet Güncelle Sekmesi -->
+    <div id="import-tab-content-palet" style="display:none;">
+      <div class="panel-title">Palet Güncelle</div>
+      <div class="panel-desc">ANT/IHR fatura PDF'lerini yükle — fatura no eşleşimine göre palet alanı güncellenir.</div>
+
+      <div class="status-box" id="paletStatus"></div>
+
+      <!-- Adım 1: Yükle -->
+      <div id="palet-step1">
+        <div id="palet-drop-zone"
+          ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+          ondragleave="this.classList.remove('vergi-drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handlePaletPdfDrop(event.dataTransfer.files)"
+          onclick="document.getElementById('palet-pdf-input').click()"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                 gap:10px;padding:32px 20px;background:var(--surface2);
+                 border:1.5px dashed var(--border2);border-radius:var(--radius-md);
+                 cursor:pointer;transition:border-color 0.15s,background 0.15s;text-align:center;">
+          <input type="file" id="palet-pdf-input" accept=".pdf" multiple style="display:none;"
+            onchange="handlePaletPdfDrop(this.files)">
+          <span style="font-size:32px;">📦</span>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">PDF'leri buraya sürükleyin veya tıklayın</div>
+          <div style="font-size:12px;color:var(--text3);">Çoklu seçim desteklenir — ANT ve IHR formatları</div>
+        </div>
+      </div>
+
+      <!-- Adım 2: Önizleme -->
+      <div id="palet-step2" style="display:none;margin-top:16px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">Önizleme</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;" id="palet-preview-desc"></div>
+        <div style="overflow-x:auto;margin-bottom:14px;">
+          <table id="palet-preview-table" style="width:100%;border-collapse:collapse;font-size:11px;"></table>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-secondary" id="palet-import-btn" onclick="doPaletImport()">📦 Palet Güncelle</button>
+          <button class="btn-ghost" onclick="resetPaletImport()">← Yeni Dosyalar</button>
         </div>
       </div>
     </div>
@@ -607,7 +653,7 @@ function showImportStatus(type, html) {
 
 // ── SEKME GEÇİŞİ ─────────────────────────────────────────────────────────────
 function switchImportTab(tab) {
-  const tabs = ['excel', 'aksu', 'fr'];
+  const tabs = ['excel', 'aksu', 'fr', 'palet'];
   tabs.forEach(t => {
     const btn     = document.getElementById('import-tab-' + t);
     const content = document.getElementById('import-tab-content-' + t);
@@ -622,6 +668,7 @@ function switchImportTab(tab) {
 // ── AKSU PDF YÜKLE ────────────────────────────────────────────────────────────
 // ── FR PDF FONKSİYONLARI ──────────────────────────────────────────────────────
 let frSonuclar = []; // parse edilen sonuçlar
+let frMode     = 'import'; // 'import' | 'palet'
 
 async function handleFrPdfDrop(files) {
   if (!files || !files.length) return;
@@ -681,7 +728,7 @@ function buildFrPreviewTable() {
   const tdStyle = 'padding:5px 10px;border:0.5px solid var(--border);font-size:11px;white-space:nowrap;';
   const tdErrStyle = tdStyle + 'color:#EF4444;';
 
-  const headers = ['Dosya', 'Fatura No', 'İhracat Dosya No', 'Nakliye Firması', 'Plaka', 'Tarih', 'USD Tutar', 'USD Kuru', 'TL Tutar', 'Durum'];
+  const headers = ['Dosya', 'Fatura No', 'İhracat Dosya No', 'Nakliye Firması', 'Plaka', 'Tarih', 'USD Tutar', 'USD Kuru', 'TL Tutar', 'Palet', 'Durum'];
 
   const thead = `<thead><tr>${headers.map(h => `<th style="${thStyle}">${h}</th>`).join('')}</tr></thead>`;
 
@@ -725,6 +772,7 @@ function buildFrPreviewTable() {
       <td style="${tdStyle}">${s.fatura_bedeli_usd ? s.fatura_bedeli_usd.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '—'}</td>
       <td style="${tdStyle}">${s.usd_kuru ? s.usd_kuru.toFixed(4) : '—'}</td>
       <td style="${tdStyle}">${s.fatura_bedeli_tl ? s.fatura_bedeli_tl.toLocaleString('tr-TR', {minimumFractionDigits:2}) : '—'}</td>
+      <td style="${tdStyle};font-weight:600;color:var(--accent);">${s.palet || '—'}</td>
       <td style="${tdStyle};color:var(--success);">✓ Hazır</td>
     </tr>`;
   }).join('')}</tbody>`;
@@ -804,11 +852,169 @@ async function loadFrEurKuru() {
 
 function resetFrImport() {
   frSonuclar = [];
+  frMode     = 'import';
   document.getElementById('fr-step1').style.display = 'block';
   document.getElementById('fr-step2').style.display = 'none';
   document.getElementById('frStatus').className = 'status-box';
   document.getElementById('frStatus').innerHTML = '';
   const input = document.getElementById('fr-pdf-input');
+  if (input) input.value = '';
+}
+
+function setFrMode(mode) {
+  frMode = mode;
+  const importEl = document.getElementById('fr-mode-import');
+  const paletEl  = document.getElementById('fr-mode-palet');
+  const btn      = document.getElementById('fr-import-btn');
+  if (!importEl || !paletEl) return;
+
+  if (mode === 'import') {
+    importEl.style.border     = '1.5px solid var(--accent)';
+    importEl.style.background = 'var(--accent-dim)';
+    importEl.querySelector('div').style.color = 'var(--accent-text)';
+    paletEl.style.border     = '1.5px solid var(--border2)';
+    paletEl.style.background = 'var(--surface2)';
+    paletEl.querySelector('div').style.color = 'var(--text)';
+    if (btn) btn.textContent = '⬆ Yeni Kayıt Ekle';
+  } else {
+    paletEl.style.border     = '1.5px solid var(--accent)';
+    paletEl.style.background = 'var(--accent-dim)';
+    paletEl.querySelector('div').style.color = 'var(--accent-text)';
+    importEl.style.border     = '1.5px solid var(--border2)';
+    importEl.style.background = 'var(--surface2)';
+    importEl.querySelector('div').style.color = 'var(--text)';
+    if (btn) btn.textContent = '📦 Palet Güncelle';
+  }
+}
+
+// ── PALET GÜNCELLE FONKSİYONLARI ─────────────────────────────────────────────
+let paletSonuclar = [];
+
+async function handlePaletPdfDrop(files) {
+  if (!files || !files.length) return;
+
+  const statusEl = document.getElementById('paletStatus');
+  statusEl.className = 'status-box visible info';
+  statusEl.innerHTML = `⏳ ${files.length} PDF okunuyor...`;
+
+  const pdfs = [];
+  for (const file of files) {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result.split(',')[1]);
+      r.onerror = () => rej(new Error('Dosya okunamadı'));
+      r.readAsDataURL(file);
+    });
+    pdfs.push({ name: file.name, data: b64 });
+  }
+
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/shipments/parse-fr-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdfs }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    paletSonuclar = data.sonuclar;
+
+    const basarili = paletSonuclar.filter(s => !s.hata && s.palet).length;
+    const hatali   = paletSonuclar.filter(s =>  s.hata || !s.palet).length;
+
+    statusEl.className = 'status-box visible success';
+    statusEl.innerHTML = `✓ ${basarili} PDF parse edildi${hatali ? `, ${hatali} palet bulunamadı` : ''}.`;
+
+    buildPaletPreviewTable();
+    document.getElementById('palet-preview-desc').textContent =
+      `${basarili} kayıt güncellenecek.`;
+    document.getElementById('palet-step1').style.display = 'none';
+    document.getElementById('palet-step2').style.display = 'block';
+
+  } catch (err) {
+    statusEl.className = 'status-box visible error';
+    statusEl.innerHTML = '⚠ ' + err.message;
+  }
+}
+
+function buildPaletPreviewTable() {
+  const table = document.getElementById('palet-preview-table');
+  if (!table) return;
+
+  const thStyle = 'padding:6px 10px;background:var(--surface2);border:0.5px solid var(--border2);' +
+                  'font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;white-space:nowrap;';
+  const tdStyle = 'padding:5px 10px;border:0.5px solid var(--border);font-size:11px;white-space:nowrap;';
+  const tdErrStyle = tdStyle + 'color:#EF4444;';
+
+  const headers = ['Dosya', 'Fatura No', 'Palet'];
+  const thead = `<thead><tr>${headers.map(h => `<th style="${thStyle}">${h}</th>`).join('')}</tr></thead>`;
+
+  const tbody = `<tbody>${paletSonuclar.map((s, i) => {
+    const bg = i % 2 === 0 ? 'var(--surface)' : 'var(--surface2)';
+    if (s.hata || !s.palet) {
+      return `<tr style="background:${bg};">
+        <td style="${tdStyle}">${s.dosya_adi}</td>
+        <td style="${tdStyle}">${s.fatura_no || '—'}</td>
+        <td style="${tdErrStyle}">⚠ ${s.hata || 'Palet bulunamadı'}</td>
+      </tr>`;
+    }
+    return `<tr style="background:${bg};">
+      <td style="${tdStyle}">${s.dosya_adi}</td>
+      <td style="${tdStyle}">${s.fatura_no || '—'}</td>
+      <td style="${tdStyle};font-weight:600;color:var(--accent);">${s.palet}</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+
+  table.innerHTML = thead + tbody;
+}
+
+async function doPaletImport() {
+  const aktarilacak = paletSonuclar.filter(s => !s.hata && s.fatura_no && s.palet);
+  if (!aktarilacak.length) {
+    document.getElementById('paletStatus').className = 'status-box visible error';
+    document.getElementById('paletStatus').innerHTML = '⚠ Güncellenecek geçerli kayıt yok.';
+    return;
+  }
+
+  const btn = document.getElementById('palet-import-btn');
+  btn.textContent = '⏳ Güncelleniyor...';
+  btn.disabled = true;
+
+  try {
+    const rows  = aktarilacak.map(s => ({ fatura_no: s.fatura_no, palet: s.palet }));
+    const token = sessionStorage.getItem('fa_auth_token');
+    const resp  = await fetch('/api/shipments/bulk-update-palet', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ rows }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    let msg = `✓ ${data.guncellenen} kayıt güncellendi.`;
+    if (data.atlanan) msg += ` ${data.atlanan} atlandı.`;
+
+    document.getElementById('paletStatus').className = 'status-box visible success';
+    document.getElementById('paletStatus').innerHTML = msg;
+    if (data.guncellenen > 0) setTimeout(() => sidebarSelect('sevkiyatlar'), 1500);
+
+  } catch (err) {
+    document.getElementById('paletStatus').className = 'status-box visible error';
+    document.getElementById('paletStatus').innerHTML = '⚠ ' + err.message;
+  } finally {
+    btn.textContent = '📦 Palet Güncelle';
+    btn.disabled = false;
+  }
+}
+
+function resetPaletImport() {
+  paletSonuclar = [];
+  document.getElementById('palet-step1').style.display = 'block';
+  document.getElementById('palet-step2').style.display = 'none';
+  document.getElementById('paletStatus').className = 'status-box';
+  document.getElementById('paletStatus').innerHTML = '';
+  const input = document.getElementById('palet-pdf-input');
   if (input) input.value = '';
 }
 

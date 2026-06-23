@@ -711,6 +711,7 @@ async function downloadRS() {
           nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
           yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
           gumruk_tarihi:  document.getElementById('gumrukTarihiInput')?.value || '',
+          palet: data.pdfFields?.kap || '',
         })
       });
       const sevkData = await sevkRes.json();
@@ -781,7 +782,54 @@ async function downloadCY() {
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
     _downloadBlob(data.excel, `PL_Kibris_${faturalar.map(f => f.faturaNo).join('_')}.xlsx`,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    showStatus('success', `<div class="stat">✓ İndirildi: ${faturalar.length} fatura</div>`);
+    // ── SEVKİYAT TABLOSUNA OTOMATIK KAYDET ───────────────────────────────────
+    try {
+      const kurResp = await fetch('/api/kur');
+      const kurData = await kurResp.json();
+      const eur_kuru = kurData.kurlar?.TRY || 0;
+
+      for (const f of faturalar) {
+        // Excel'den fatura toplam TL hesapla (Miktar × Fiyat)
+        let fatura_bedeli_tl = 0;
+        try {
+          const excelBuf = await fileToArrayBuffer(cyExcelFiles[faturalar.indexOf(f)]);
+          const wb2 = XLSX.read(excelBuf, { type: 'array' });
+          const rows2 = XLSX.utils.sheet_to_json(wb2.Sheets[wb2.SheetNames[0]], { defval: 0 });
+          fatura_bedeli_tl = rows2.reduce((s, r) => s + (parseNum(r['Miktar']) * parseNum(r['Fiyat'])), 0);
+          fatura_bedeli_tl = Math.round(fatura_bedeli_tl * 100) / 100;
+        } catch (e) {
+          console.warn('Kıbrıs TL hesaplama hatası:', e);
+        }
+        const fatura_bedeli_eur = eur_kuru > 0 ? Math.round(fatura_bedeli_tl / eur_kuru * 100) / 100 : 0;
+
+        const sevkRes = await fetch('/api/shipments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
+          body: JSON.stringify({
+            fatura_no:         f.faturaNo,
+            ihracat_dosya_no:  document.getElementById('ihracatDosyaNo')?.value?.trim() ? '2026-' + document.getElementById('ihracatDosyaNo').value.trim() : '',
+            ulke:              'KIBRIS',
+            durum:             'YOLDA',
+            eur_kuru:          Math.round(eur_kuru * 10000) / 10000,
+            fatura_bedeli_tl,
+            fatura_bedeli_eur,
+            mal_bedeli_eur:    fatura_bedeli_eur,
+            plaka:             document.getElementById('plakaInput')?.value?.trim() || '',
+            nakliye_firmasi:   document.getElementById('nakliyeInput')?.value?.trim() || '',
+            yukleme_tarihi:    document.getElementById('yuklemeTarihiInput')?.value || '',
+            gumruk_tarihi:     document.getElementById('gumrukTarihiInput')?.value || '',
+          })
+        });
+        const sevkData = await sevkRes.json();
+        if (!sevkData.success && sevkData.error?.includes('zaten kay')) {
+          showDuplicateWarning(f.faturaNo, 'fatura');
+        }
+      }
+    } catch (e) {
+      console.warn('Kıbrıs sevkiyat kayıt hatası:', e);
+    }
+
+    showStatus('success', `<div class="stat">✓ İndirildi: ${faturalar.length} faturalı PL</div>`);
   } catch (err) {
     showStatus('error', '⚠ ' + err.message);
   } finally {

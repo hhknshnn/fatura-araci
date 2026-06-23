@@ -279,7 +279,7 @@ def generate_price_list_pdf_kz(rows, fatura_no):
                 canv.setStrokeColor(colors.HexColor('#C0C0C0'))
                 canv.setFillColor(colors.HexColor('#FAFAFA'))
                 canv.rect(x, y, 40 * mm, 25 * mm, fill=1, stroke=1)
-                canv.setFont('DejaVu-Oblique', 9)
+                canv.setFont('DejaVu', 9)
                 canv.setFillColor(colors.grey)
                 canv.drawCentredString(x + 20 * mm, y + 11 * mm, 'KAŞE')
         canv.restoreState()
