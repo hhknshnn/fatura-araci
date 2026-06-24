@@ -98,18 +98,22 @@ def api_generate():
         if ulke_kodu == 'cy':
             from invoice.cy_engine import generate_cy
             faturalar = body.get('faturalar', [])
-            excel_out = generate_cy(
+            pl_out, master_out = generate_cy(
                 faturalar,
                 grup_kilolari  = grup_kilolari,
                 exception_skus = exception_skus,
             )
             fatura_no = '_'.join(f.get('faturaNo', '') for f in faturalar)
+            master_list = [
+                {'fatura_no': m['fatura_no'], 'data': base64.b64encode(m['bytes']).decode(), 'kap': m.get('kap', '')}
+                for m in master_out
+            ]
             return jsonify({
-                'success':   True,
-                'excel':     base64.b64encode(excel_out).decode(),
-                'master':    '',
-                'faturaNo':  fatura_no,
-                'pdfFields': {},
+                'success':    True,
+                'excel':      base64.b64encode(pl_out).decode(),
+                'masterList': master_list,
+                'faturaNo':   fatura_no,
+                'pdfFields':  {},
             })
 
         df          = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')

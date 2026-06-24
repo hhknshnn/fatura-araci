@@ -200,9 +200,27 @@ function applyFiltersAndRender() {
 
   const sorted = sortShipments(allShipments);
 
-  // Tablo zaten çizilmişse sadece satırları göster/gizle
+  // Sıralama değiştiyse tam yeniden çiz
   const tbody = document.getElementById('shipments-tbody');
   if (tbody && tbody.children.length > 0 && tbody.children[0].dataset.id) {
+    const currentSort = tbody.dataset.sortKey || '';
+    const newSort = sortColumn + '_' + sortDir;
+
+    if (currentSort !== newSort) {
+      // Sıralama değişti — tam render
+      let filtered = allShipments;
+      if (selectedUlkeler && selectedUlkeler.size > 0)
+        filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
+      if (durum)       filtered = filtered.filter(s => normalizeDurum(s.durum) === durum);
+      if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
+      if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
+      if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
+      renderShipments(sortShipments(filtered));
+      document.getElementById('shipments-tbody').dataset.sortKey = newSort;
+      return;
+    }
+
+    // Sadece filtre — show/hide yeterli
     const rows = tbody.querySelectorAll('tr[data-id]');
     let visible = 0;
     rows.forEach(tr => {
@@ -285,8 +303,8 @@ function sortIcon(col) {
 
 // Tıklanabilir başlık hücresi
 function thCell(label, col, extraStyle = '') {
-  return `<th style="padding:6px 8px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;user-select:none;border-right:1px solid rgba(255,255,255,0.08);overflow:hidden;letter-spacing:0.04em;text-transform:uppercase;${extraStyle}">
-    <span style="cursor:pointer;" onclick="onSort('${col}')">${label}${sortIcon(col)}</span>
+  return `<th onclick="onSort('${col}')" style="padding:6px 8px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;user-select:none;border-right:1px solid rgba(255,255,255,0.08);overflow:hidden;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;${extraStyle}">
+    <span>${label}${sortIcon(col)}</span>
   </th>`;
 }
 
@@ -340,6 +358,17 @@ async function loadShipments(ulke = '', durum = '') {
     allShipments = data.shipments;
     sortColumn = 'ihracat_dosya_no';
     sortDir = 'desc';
+
+    // Sayfa ilk yüklenişinde Kurumsal default seçili
+    if (!document.getElementById('filter-musteri-tipi').value) {
+      document.getElementById('filter-musteri-tipi').value = 'kurumsal';
+      document.querySelectorAll('input[name="dd-tip-r"]').forEach(r => {
+        r.checked = r.value === 'kurumsal';
+      });
+      document.getElementById('dd-tip-label').textContent = 'Kurumsal';
+      document.querySelector('#dd-tip .custom-dd-btn')?.classList.add('active');
+    }
+
     applyFiltersAndRender();
     if (!document.getElementById('fake-scrollbar')) initStickyScroll();
   } catch (e) {
@@ -824,6 +853,8 @@ function clearFilters() {
 
   sortColumn = 'ihracat_dosya_no';
   sortDir    = 'desc';
+  const tbody = document.getElementById('shipments-tbody');
+  if (tbody) tbody.dataset.sortKey = '';
   applyFiltersAndRender();
 }
 
@@ -1081,7 +1112,10 @@ async function topluSil() {
           if (!data.success) throw new Error(data.error);
           seciliSatirlar.clear();
           updateSecimToolbar();
-          loadShipments();
+          allShipments = [];
+          const tbody = document.getElementById('shipments-tbody');
+          if (tbody) tbody.innerHTML = '';
+          await loadShipments();
         } catch (e) {
           showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
         }
@@ -1128,7 +1162,10 @@ function topluGrupla() {
           if (!data.success) throw new Error(data.error);
           seciliSatirlar.clear();
           updateSecimToolbar();
-          loadShipments();
+          allShipments = [];
+          const tbody = document.getElementById('shipments-tbody');
+          if (tbody) tbody.innerHTML = '';
+          await loadShipments();
         } catch (e) {
           showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
         }
@@ -1185,9 +1222,9 @@ function showMiniModal(title, bodyHtml, buttons) {
   overlay.querySelectorAll('button').forEach(btn => {
     const label = btn.dataset.action;
     const found = buttons.find(b => b.label === label);
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       overlay.remove();
-      if (found?.action) found.action();
+      if (found?.action) await found.action();
     });
   });
 

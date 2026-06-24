@@ -95,9 +95,9 @@ def create_shipment(data):
 
     # Franchise veya toptan ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
     gumruk_tarihi = data.get('gumruk_tarihi') or None
-    if musteri_tipi in ('franchise', 'toptan') and gumruk_tarihi:
-        varis_tarihi      = gumruk_tarihi
-        gumrukleme_bitis  = gumruk_tarihi
+    if musteri_tipi in ('franchise', 'toptan'):
+        varis_tarihi      = gumruk_tarihi or data.get('varis_tarihi') or None
+        gumrukleme_bitis  = gumruk_tarihi or data.get('gumrukleme_bitis') or None
         durum_default     = 'TESLİM EDİLDİ'
     else:
         varis_tarihi      = data.get('varis_tarihi') or None
@@ -567,13 +567,15 @@ def bulk_update_shipments(rows):
                 hatalar.append(f'Satır {i+1}: fatura_no boş, atlandı.')
                 continue
 
-            # Kayıt var mı kontrol et
-            cur.execute('SELECT id FROM shipments WHERE fatura_no = %s', (fatura_no,))
+            # Kayıt var mı kontrol et, musteri_tipi ve eur_kuru'yu da al
+            cur.execute('SELECT id, musteri_tipi, eur_kuru FROM shipments WHERE fatura_no = %s', (fatura_no,))
             existing = cur.fetchone()
             if not existing:
                 atlanan += 1
                 hatalar.append(f'Satır {i+1}: {fatura_no} bulunamadı, atlandı.')
                 continue
+            db_musteri_tipi = existing[1] or ''
+            db_eur_kuru = float(existing[2]) if existing[2] else 0
 
             # Sadece gönderilen alanları güncelle (None olanları atla)
             fields = {}
@@ -610,6 +612,18 @@ def bulk_update_shipments(rows):
                     fields['durum'] = 'TESLİM EDİLDİ'
                 elif 'durum' not in fields:
                     fields['durum'] = 'YOLDA'
+
+            # Franchise/toptan ise durum otomatik TESLİM EDİLDİ yap
+            if db_musteri_tipi in ('franchise', 'toptan'):
+                if 'durum' not in fields or not fields.get('durum'):
+                    fields['durum'] = 'TESLİM EDİLDİ'
+
+            # fatura_bedeli_tl güncellendiyse EUR otomatik hesapla
+            if 'fatura_bedeli_tl' in fields and fields['fatura_bedeli_tl']:
+                if db_eur_kuru > 0:
+                    tl = float(fields['fatura_bedeli_tl'])
+                    fields['fatura_bedeli_eur'] = round(tl / db_eur_kuru, 4)
+                    fields['mal_bedeli_eur'] = round(tl / db_eur_kuru, 4)
 
             if not fields:
                 atlanan += 1
@@ -796,14 +810,28 @@ def parse_fr_pdf_import():
             if not usd_kuru and parsed.get('yukleme_tarihi'):
                 usd_kuru = _get_usd_kuru_for_date(parsed['yukleme_tarihi'])
 
-            usd_tutar = parsed.get('fatura_bedeli_usd', 0.0)
-            fatura_tl = round(usd_tutar * usd_kuru, 2) if usd_kuru else 0.0
+            para_birimi = parsed.get('para_birimi', 'TL')
+            usd_tutar   = parsed.get('fatura_bedeli_usd', 0.0)
+            eur_tutar   = parsed.get('fatura_bedeli_eur', 0.0)
+            tl_tutar    = parsed.get('fatura_bedeli_tl', 0.0)
+
+            # TL hesapla — para birimine göre
+            if para_birimi == 'USD' and usd_kuru:
+                fatura_tl = round(usd_tutar * usd_kuru, 2)
+            elif para_birimi == 'EUR' and usd_kuru:
+                fatura_tl = round(eur_tutar * usd_kuru, 2)  # usd_kuru burada EUR/TL kuru
+            elif para_birimi == 'TL':
+                fatura_tl = tl_tutar
+            else:
+                fatura_tl = 0.0
 
             sonuclar.append({
                 'dosya_adi':         name,
                 'fatura_no':         parsed.get('fatura_no'),
                 'yukleme_tarihi':    parsed.get('yukleme_tarihi'),
+                'para_birimi':       para_birimi,
                 'fatura_bedeli_usd': usd_tutar,
+                'fatura_bedeli_eur': eur_tutar,
                 'usd_kuru':          usd_kuru,
                 'fatura_bedeli_tl':  fatura_tl,
                 'palet':             parsed.get('palet'),
@@ -1165,12 +1193,14 @@ def parse_fr_fatura_pdf(pdf_bytes):
     Sadece ilk sayfa + son 2 sayfa okunur (performans için).
     """
     result = {
-        'fatura_no':        None,
-        'yukleme_tarihi':   None,
+        'fatura_no':         None,
+        'yukleme_tarihi':    None,
         'fatura_bedeli_usd': 0.0,
+        'fatura_bedeli_tl':  0.0,
         'usd_kuru':          0.0,
-        'fatura_tipi':      None,  # 'ANT' veya 'IHR'
-        'palet':            None,
+        'para_birimi':       'TL',
+        'fatura_tipi':       None,  # 'ANT' veya 'IHR'
+        'palet':             None,
     }
 
     def parse_tr_sayi(s):
@@ -1221,22 +1251,34 @@ def parse_fr_fatura_pdf(pdf_bytes):
         if m:
             result['yukleme_tarihi'] = parse_tarih(m.group(1))
 
-        # ── USD Tutar ────────────────────────────────────────────────────────
+        # ── Tutar ve Para Birimi (otomatik tespit) ───────────────────────────
+        # ANT: "Ürün Bedeli: 59.073,14 USD/EUR/TL"
+        # IHR: "Mal Hizmet Toplam Tutarı: 312.145,20TL"
         if result['fatura_tipi'] == 'ANT':
-            # "Ürün Bedeli: 59.073,14 USD"
-            m = re.search(r'Ürün Bedeli[:\s]*([\d.,]+)\s*USD', full)
+            m = re.search(r'Ürün Bedeli[:\s]*([\d.,]+)\s*(USD|EUR|TL)', full)
         else:
-            # "Mal Hizmet Toplam Tutarı: 46.289,24USD"
-            m = re.search(r'Mal Hizmet Toplam Tutarı[:\s]*([\d.,]+)\s*USD', full)
+            m = re.search(r'Mal Hizmet Toplam Tutarı[:\s]*([\d.,]+)\s*(USD|EUR|TL)', full)
 
         if m:
-            result['fatura_bedeli_usd'] = parse_tr_sayi(m.group(1))
+            tutar = parse_tr_sayi(m.group(1))
+            para_birimi = m.group(2).strip()
+            result['para_birimi'] = para_birimi
+            if para_birimi == 'USD':
+                result['fatura_bedeli_usd'] = tutar
+            elif para_birimi == 'EUR':
+                result['fatura_bedeli_eur'] = tutar
+            elif para_birimi == 'TL':
+                result['fatura_bedeli_tl'] = tutar
 
         # ── Döviz Kuru ───────────────────────────────────────────────────────
-        # Her iki formatta da: "Döviz Kuru: 42,9648 TL"
-        m = re.search(r'Döviz Kuru[:\s]*([\d.,]+)\s*TL', full)
+        # "Döviz Kuru: 42,9648 TL" veya "Döviz Kuru: 1,2345 USD" gibi
+        m = re.search(r'Döviz Kuru[:\s]*([\d.,]+)\s*(TL|USD|EUR)', full)
         if m:
-            result['usd_kuru'] = parse_tr_sayi(m.group(1))
+            kur_deger = parse_tr_sayi(m.group(1))
+            kur_birimi = m.group(2).strip()
+            if kur_birimi == 'TL' and kur_deger > 1:
+                # 1 USD/EUR = X TL formatı
+                result['usd_kuru'] = kur_deger
 
         # ── Palet / Kap ──────────────────────────────────────────────────────
         m = re.search(r'KAP(?:\s*ADETİ)?[:\s]*([\d]+(?:\s*\([^)]+\))?)', full, re.IGNORECASE)

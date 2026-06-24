@@ -776,8 +776,23 @@ async function downloadCY() {
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-    _downloadBlob(data.excel, `PL_Kibris_${faturalar.map(f => f.faturaNo).join('_')}.xlsx`,
+    const plakaVal2    = document.getElementById('plakaInput')?.value?.trim() || '';
+    const depoLabel2   = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
+    const faturaNolar  = faturalar.map(f => f.faturaNo).join(' - ');
+    const plDosyaAdi   = plakaVal2
+      ? `PL- ${faturaNolar} - ${depoLabel2} - ${plakaVal2}.xlsx`
+      : `PL- ${faturaNolar} - ${depoLabel2}.xlsx`;
+
+    _downloadBlob(data.excel, plDosyaAdi,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    console.log('[CY] data.master length:', data.master?.length, '| truthy:', !!data.master);
+    if (data.masterList && data.masterList.length > 0) {
+      for (const m of data.masterList) {
+        _downloadBlob(m.data, `${m.fatura_no}.xlsx`,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      }
+    }
     // ── SEVKİYAT TABLOSUNA OTOMATIK KAYDET ───────────────────────────────────
     try {
       const kurResp = await fetch('/api/kur');
@@ -798,6 +813,7 @@ async function downloadCY() {
         }
         const fatura_bedeli_eur = eur_kuru > 0 ? Math.round(fatura_bedeli_tl / eur_kuru * 100) / 100 : 0;
 
+        const masterInfo = (data.masterList || []).find(m => m.fatura_no === f.faturaNo);
         const sevkRes = await fetch('/api/shipments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
@@ -805,7 +821,7 @@ async function downloadCY() {
             fatura_no:         f.faturaNo,
             ihracat_dosya_no:  document.getElementById('ihracatDosyaNo')?.value?.trim() ? '2026-' + document.getElementById('ihracatDosyaNo').value.trim() : '',
             ulke:              'KIBRIS',
-            durum:             'YOLDA',
+            durum:             'TESLİM EDİLDİ',
             eur_kuru:          Math.round(eur_kuru * 10000) / 10000,
             fatura_bedeli_tl,
             fatura_bedeli_eur,
@@ -814,6 +830,7 @@ async function downloadCY() {
             nakliye_firmasi:   document.getElementById('nakliyeInput')?.value?.trim() || '',
             yukleme_tarihi:    document.getElementById('yuklemeTarihiInput')?.value || '',
             gumruk_tarihi:     document.getElementById('gumrukTarihiInput')?.value || '',
+            palet:             masterInfo?.kap || null,
           })
         });
         const sevkData = await sevkRes.json();

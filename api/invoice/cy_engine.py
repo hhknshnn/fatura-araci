@@ -51,7 +51,7 @@ def _parse_cy_pdf(pdf_bytes):
     return result
 
 
-def generate_cy(faturalar, grup_kilolari, exception_skus):
+def generate_cy(faturalar, grup_kilolari, exception_skus, df_original=None):
     """
     Kıbrıs PL üretimi.
 
@@ -178,4 +178,17 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return buf.getvalue()
+    pl_bytes = buf.getvalue()
+
+    # Master Excel — her fatura için ayrı üret
+    from .weights import generate_master_excel
+
+    master_list = []
+    for f in fatura_list:
+        mb = generate_master_excel(
+            f['df'], f['brut_list'], f['net_list'],
+            hedef_net=0, depo_tipi='serbest',
+        )
+        master_list.append({'fatura_no': f['fatura_no'], 'bytes': mb, 'kap': f.get('kap', '')})
+
+    return pl_bytes, master_list
