@@ -304,10 +304,12 @@ def get_dashboard_stats():
 
 
 # ── MALİYET RAPORU EXPORT ────────────────────────────────────────────────────
-def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None):
+def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=None):
     rows = get_all_shipments(ulke=ulke, durum=durum, musteri_tipi=musteri_tipi)
     if depo:
         rows = [r for r in rows if str(r.get('fatura_no', '')).startswith(depo)]
+    if ids:
+        rows = [r for r in rows if r.get('id') in ids]
     try:
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment
@@ -923,7 +925,9 @@ def shipments_export():
     durum        = request.args.get('durum')
     depo         = request.args.get('depo')
     musteri_tipi = request.args.get('musteri_tipi')
-    return export_shipments(ulke=ulke, durum=durum, depo=depo, musteri_tipi=musteri_tipi)
+    ids_raw      = request.args.get('ids')
+    ids          = [int(i) for i in ids_raw.split(',') if i.strip().isdigit()] if ids_raw else None
+    return export_shipments(ulke=ulke, durum=durum, depo=depo, musteri_tipi=musteri_tipi, ids=ids)
 
 # ── GRUPLAMA ──────────────────────────────────────────────────────────────────
 def group_shipments(shipment_ids):

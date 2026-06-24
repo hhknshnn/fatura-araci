@@ -196,6 +196,7 @@ function applyFiltersAndRender() {
   const durum       = document.getElementById('filter-durum')?.value        || '';
   const depo        = document.getElementById('filter-depo')?.value         || '';
   const musteriTipi = document.getElementById('filter-musteri-tipi')?.value || '';
+  const ay          = document.getElementById('filter-ay')?.value            || '';
 
   const sorted = sortShipments(allShipments);
 
@@ -213,7 +214,8 @@ function applyFiltersAndRender() {
         (!selectedUlkeler || selectedUlkeler.size === 0 || selectedUlkeler.has(s.ulke?.toUpperCase())) &&
         (!durum       || normalizeDurum(s.durum) === durum) &&
         (!depo        || s.fatura_no?.startsWith(depo)) &&
-        (!musteriTipi || s.musteri_tipi === musteriTipi);
+        (!musteriTipi || s.musteri_tipi === musteriTipi) &&
+        (!ay          || (s.yukleme_tarihi || '').slice(5, 7) === ay);
 
       tr.style.display = pass ? '' : 'none';
       if (pass) visible++;
@@ -229,6 +231,7 @@ function applyFiltersAndRender() {
   if (durum)       filtered = filtered.filter(s => normalizeDurum(s.durum) === durum);
   if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
   if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
+  if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
 
   renderShipments(sortShipments(filtered));
 }
@@ -646,14 +649,19 @@ async function saveShipmentDetail() {
 
 async function downloadMaliyetRaporu() {
   const token = sessionStorage.getItem('fa_auth_token');
-  const ulke  = document.getElementById('filter-ulke')?.value  || '';
-  const durum = document.getElementById('filter-durum')?.value || '';
-  const depo  = document.getElementById('filter-depo')?.value  || '';
+
+  // Ekranda görünen (filtrelenmiş) satırların id listesini topla
+  const tbody = document.getElementById('shipments-tbody');
+  const visibleIds = tbody
+    ? [...tbody.querySelectorAll('tr[data-id]')]
+        .filter(r => r.style.display !== 'none')
+        .map(r => parseInt(r.dataset.id))
+    : [];
+
   let url = '/api/shipments/export';
   const params = [];
-  if (ulke)  params.push(`ulke=${encodeURIComponent(ulke)}`);
-  if (durum) params.push(`durum=${encodeURIComponent(durum)}`);
-  if (depo)  params.push(`depo=${encodeURIComponent(depo)}`);
+  if (visibleIds.length > 0)
+    params.push(`ids=${visibleIds.join(',')}`);
   if (params.length) url += '?' + params.join('&');
 
   try {
@@ -762,6 +770,13 @@ function onDDChange(type, input) {
     const label = document.getElementById('dd-depo-label');
     label.textContent = val ? val : 'Depolar';
     btn.classList.toggle('active', !!val);
+  } else if (type === 'ay') {
+    document.getElementById('filter-ay').value = val;
+    const btn = document.querySelector('#dd-ay .custom-dd-btn');
+    const label = document.getElementById('dd-ay-label');
+    const ayAdlari = {'01':'Ocak','02':'Şubat','03':'Mart','04':'Nisan','05':'Mayıs','06':'Haziran','07':'Temmuz','08':'Ağustos','09':'Eylül','10':'Ekim','11':'Kasım','12':'Aralık'};
+    label.textContent = val ? ayAdlari[val] : 'Ay';
+    btn.classList.toggle('active', !!val);
   }
   applyFiltersAndRender();
 }
@@ -791,6 +806,7 @@ function clearFilters() {
   document.getElementById('filter-durum').value = '';
   document.getElementById('filter-depo').value  = '';
   document.getElementById('filter-musteri-tipi').value = '';
+  document.getElementById('filter-ay').value = '';
 
   // Dropdown'ları sıfırla
   selectedUlkeler = new Set();
@@ -802,6 +818,8 @@ function clearFilters() {
   document.getElementById('dd-ulke-label').textContent  = 'Ülkeler';
   document.getElementById('dd-durum-label').textContent = 'Durumlar';
   document.getElementById('dd-depo-label').textContent  = 'Depolar';
+  document.getElementById('dd-ay-label').textContent    = 'Ay';
+  document.querySelectorAll('input[name="dd-ay-r"]')[0].checked = true;
   document.querySelectorAll('.custom-dd-btn').forEach(b => b.classList.remove('active'));
 
   sortColumn = 'ihracat_dosya_no';
