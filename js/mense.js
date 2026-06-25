@@ -2,9 +2,9 @@
 // Menşe Hesapla modülü — bağımsız, diğer akışları etkilemez.
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let menseRows               = null;
-let menseWorkingRows        = null;
-let secilenMenseTaslakId    = null;
+let menseRows = null;
+let menseWorkingRows = null;
+let secilenMenseTaslakId = null;
 let secilenMenseTaslakRefNo = null;
 
 // ── PANELİ BAŞLAT ─────────────────────────────────────────────────────────────
@@ -24,13 +24,69 @@ function initMensePanel() {
   const sb = document.getElementById('menseStatus');
   if (sb) { sb.className = 'status-box'; sb.innerHTML = ''; }
 
-  // Panel sıfırlanınca loaded class'ı temizle
   const dzReset = document.getElementById('menseDropZone');
   if (dzReset) dzReset.classList.remove('loaded');
 
-  // Kayıtlı taslakları yükle
   secilenMenseTaslakId = null;
   loadMenseTaslakListe();
+
+  // GTİP'ten veri geliyorsa dropzone'u gizle
+  const menseDropEl = document.getElementById('menseDropZone');
+  if (window._gtipRowsForMense && menseDropEl) {
+    menseDropEl.style.display = 'none';
+  } else if (menseDropEl) {
+    menseDropEl.style.display = '';
+  }
+  // ── GTİP'ten gelen Excel varsa otomatik yükle ──────────────────────────────
+  if (window._gtipRowsForMense) {
+    menseRows = window._gtipRowsForMense;
+    window._gtipRowsForMense = null;
+
+    const badge = document.getElementById('menseFileBadge');
+    if (badge) {
+      badge.textContent = '✓ ' + menseRows.length.toLocaleString('tr') + ' satır (GTİP\'ten aktarıldı)';
+      badge.style.display = 'inline-flex';
+    }
+    const dz = document.getElementById('menseDropZone');
+    if (dz) dz.classList.add('loaded');
+
+    buildMenseKgTable(menseRows);
+    document.getElementById('menseKgPanel').style.display = 'block';
+    document.getElementById('menseApplyBtn').style.display = 'block';
+    showMenseStatus('info', '<div class="stat">✓ Excel GTİP kontrolünden aktarıldı — grup kilolarını girin</div>');
+  }
+
+  // ── GTİP'ten gelen PDF varsa otomatik oku ─────────────────────────────────
+  if (window._mensePdfDataFromGtip) {
+    const buf = window._mensePdfDataFromGtip;
+    window._mensePdfDataFromGtip = null;
+    lastPdfData = buf;
+
+    const badge = document.getElementById('mensePdfBadge');
+    if (badge) { badge.textContent = '⏳ PDF okunuyor...'; badge.style.display = 'inline-flex'; }
+
+    // PDF parse
+    const b = new Uint8Array(buf);
+    let s = '';
+    for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+    fetch('/api/taslak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'parsePdf', pdf: btoa(s) })
+    }).then(r => r.json()).then(data => {
+      if (data.success && data.pdfFields) {
+        const pf = data.pdfFields;
+        const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
+        if (badge) badge.textContent = `✓ KAP: ${pf.kap || '—'} · Navlun: ${fmt(pf.navlun)} · Sigorta: ${fmt(pf.sigorta)}`;
+        if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
+        if (pf.netKg && pf.netKg > 0) window._pdfNetKg = pf.netKg;
+      } else {
+        if (badge) badge.textContent = '✓ PDF aktarıldı';
+      }
+    }).catch(() => {
+      if (badge) badge.textContent = '✓ PDF aktarıldı';
+    });
+  }
 
   // Drag-drop
   const dz = document.getElementById('menseDropZone');

@@ -66,6 +66,9 @@ function initGtipPanel() {
 
     gtipMasterRows = null;
     gtipFileName   = '';
+    gtipPdfData    = null;
+    const pdfBadge = document.getElementById('gtipPdfName');
+    if (pdfBadge) { pdfBadge.style.display = 'none'; pdfBadge.textContent = ''; }
 
     const fileBadge = document.getElementById('gtipFileName');
     if (fileBadge) { fileBadge.style.display = 'none'; fileBadge.textContent = ''; }
@@ -119,18 +122,43 @@ function exitGtipPanel() {
   }
 }
 
+// GTİP için PDF data — menşe taslağına aktarılacak
+let gtipPdfData = null;
+
+function handleGtipMultiFile(files) {
+  if (!files || !files.length) return;
+  let excelFile = null;
+  let pdfFile   = null;
+
+  for (const f of files) {
+    const ext = f.name.split('.').pop().toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') excelFile = f;
+    else if (ext === 'pdf') pdfFile = f;
+  }
+
+  // PDF varsa arka planda oku ve sakla
+  if (pdfFile) {
+    const pdfBadge = document.getElementById('gtipPdfName');
+    if (pdfBadge) { pdfBadge.textContent = '✓ ' + pdfFile.name; pdfBadge.style.display = 'inline-flex'; }
+    const rPdf = new FileReader();
+    rPdf.onload = e => { gtipPdfData = e.target.result; };
+    rPdf.readAsArrayBuffer(pdfFile);
+  }
+
+  if (!excelFile) {
+    showGtipStatus('error', '<div class="stat">⚠ Excel dosyası (.xlsx) seçmediniz</div>');
+    return;
+  }
+
+  handleGtipFile(excelFile);
+}
+
 function handleGtipFile(file) {
   try {
     if (!file) return;
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext !== 'xlsx' && ext !== 'xls') {
-      showGtipStatus('error', '<div class="stat">⚠ Sadece Excel dosyası yükleyin (.xlsx / .xls)</div>');
-      return;
-    }
     gtipFileName = file.name;
     const badge = document.getElementById('gtipFileName');
     if (badge) { badge.textContent = '✓ ' + file.name; badge.style.display = 'inline-flex'; }
-    // Dosya yüklenince drop zone'a loaded class ekle
     const dz = document.getElementById('gtipDropZone');
     if (dz) dz.classList.add('loaded');
 
@@ -210,6 +238,9 @@ async function runGtipCheck() {
          <div class="stat">Toplam: <span>${totalRows.toLocaleString('tr')} satır</span> · Doğru: <span>${okCount.toLocaleString('tr')}</span> · Yanlış: <span style="color:var(--error);">${invalid.length}</span>${empty.length ? ' · Boş: <span style="color:var(--gold);">'+empty.length+'</span>' : ''}</div>`);
       renderInvalidGtipList(invalid, empty);
     }
+
+    // ── Menşe sorusu — GTİP sonucundan bağımsız her zaman göster ────────────
+    showMenseSorusu();
   } catch(err) {
     console.error('runGtipCheck hatası:', err);
     showGtipStatus('error', '<div class="stat">⚠ Kontrol sırasında hata: ' + err.message + '</div>');
@@ -318,6 +349,87 @@ function showGtipStatus(type, html) {
   box.innerHTML = html;
 }
 
+// ── MENŞE SORUSU ─────────────────────────────────────────────────────────────
+function showMenseSorusu() {
+  // Varsa eskiyi kaldır
+  const eskiSoru = document.getElementById('gtip-mense-soru');
+  if (eskiSoru) eskiSoru.remove();
+
+  const panel = document.getElementById('stepGtip');
+  if (!panel) return;
+
+  const soru = document.createElement('div');
+  soru.id = 'gtip-mense-soru';
+  soru.style.cssText = `
+    margin-top:16px;padding:16px 20px;
+    background:var(--surface2);border:0.5px solid var(--border2);
+    border-radius:var(--radius-md);
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  `;
+  soru.innerHTML = `
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);">Menşe ayrımı yapılsın mı?</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px;">
+        TR / Yabancı ayrımı hesaplanır, taslağa aktarılır
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button onclick="gtipMenseHayir()"
+        style="padding:7px 16px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
+               background:transparent;color:var(--text2);font-family:var(--font);
+               font-size:12px;font-weight:500;cursor:pointer;">
+        Hayır
+      </button>
+      <button onclick="gtipMenseEvet()"
+        style="padding:7px 16px;border-radius:var(--radius-md);border:none;
+               background:var(--accent);color:#fff;font-family:var(--font);
+               font-size:12px;font-weight:600;cursor:pointer;">
+        Evet →
+      </button>
+    </div>
+  `;
+  panel.appendChild(soru);
+}
+
+function gtipMenseHayir() {
+  // Soruyu kaldır, GTİP sonucunda kal
+  const soru = document.getElementById('gtip-mense-soru');
+  if (soru) soru.remove();
+}
+
+function gtipMenseEvet() {
+  // Soruyu kaldır, Menşe panelini aç
+  const soru = document.getElementById('gtip-mense-soru');
+  if (soru) soru.remove();
+
+  // stepMense'yi GTİP panelinin altında göster
+  const gtipPanel = document.getElementById('stepGtip');
+  const mensePanel = document.getElementById('stepMense');
+  if (!gtipPanel || !mensePanel) return;
+
+  // Menşe panelini GTİP'in hemen altına yerleştir
+  if (mensePanel.parentNode !== gtipPanel.parentNode) {
+    gtipPanel.parentNode.insertBefore(mensePanel, gtipPanel.nextSibling);
+  }
+  mensePanel.style.display = 'block';
+
+  // Menşe paneline scroll et
+  setTimeout(() => {
+    mensePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  // PDF zaten yüklüyse global'e aktar — mense.js bunu kullanır
+  if (gtipPdfData) {
+    window._mensePdfDataFromGtip = gtipPdfData;
+  }
+  // Excel satırları da global'e aktar
+  if (gtipMasterRows) {
+    window._gtipRowsForMense = gtipMasterRows;
+  }
+
+  if (typeof initMensePanel === 'function') initMensePanel();
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -337,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dz.addEventListener('drop', e => {
       e.preventDefault();
       dz.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) handleGtipFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files.length) handleGtipMultiFile(e.dataTransfer.files);
     });
   } catch(err) {
     console.error('gtip.js init hatası:', err);

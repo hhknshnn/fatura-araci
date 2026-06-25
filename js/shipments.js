@@ -639,7 +639,7 @@ async function saveShipmentDetail() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (data.success) { closeShipmentDetail(); loadShipments(); }
+    if (data.success) { closeShipmentDetail(); allShipments = []; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
     else alert('Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
 
   } else {
@@ -671,7 +671,7 @@ async function saveShipmentDetail() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (data.success) { closeShipmentDetail(); loadShipments(); }
+    if (data.success) { closeShipmentDetail(); allShipments = []; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
     else alert('Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
   }
 }

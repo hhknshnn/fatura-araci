@@ -234,8 +234,6 @@ function buildTaslakUlkeGrid() {
         kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' || kod === 'abh' ? 'USD' : 'TRY');
 
     const curClass = cur === 'EUR' ? 'cur-eur' : cur === 'USD' ? 'cur-usd' : 'cur-try';
-    const tip = kod === 'cy' ? 'PL only' : 'INV + PL';
-
     const card = document.createElement('div');
     card.className = 'cc';
     card.id = 'taslak-ulke-' + kod;
@@ -251,7 +249,6 @@ function buildTaslakUlkeGrid() {
       </div>
       <div class="cc-footer">
         <span class="cc-currency ${curClass}">${cur}</span>
-        <span class="cc-type">${tip}</span>
       </div>`;
 
     card.addEventListener('click', () => selectTaslakUlke(kod));

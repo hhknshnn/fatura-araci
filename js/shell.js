@@ -23,6 +23,18 @@ function updateYilSelects() {
 // ── SHELL.JS ──────────────────────────────────────────────────────────────────
 // Sidebar navigasyon, wizard adım yönetimi ve topbar güncellemeleri.
 
+// ── NAV GROUP TOGGLE ──────────────────────────────────────────────────────────
+function toggleNavGroup(id) {
+  const body    = document.getElementById('ngb-' + id);
+  const chevron = document.getElementById('ngc-' + id);
+  const header  = document.getElementById('ngh-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  header.classList.toggle('open', !isOpen);
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
 // ── SIDEBAR TOGGLE — mini mod ─────────────────────────────────────────────────
 function toggleSidebar() {
   // Sidebar elementini al
@@ -45,10 +57,13 @@ function toggleSidebar() {
 
 // ── TÜM PANELLERİ GİZLE ──────────────────────────────────────────────────────
 function hideAllPanels() {
-  document.getElementById('contentArea').style.padding = '';
+  const contentArea = document.getElementById('contentArea');
+  contentArea.style.padding = '';
+  contentArea.classList.remove('fu-content-area');
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
-    'stepGecmis', 'stepUsers', 'stepDashboard', 'stepSevkiyatlar'].forEach(id => {
+    'stepGecmis', 'stepUsers', 'stepDashboard', 'stepSevkiyatlar',
+    'stepFaturaUret', 'stepMaliyetEvrak'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -80,6 +95,8 @@ function sidebarSelect(mod) {
     users: 'Kullanıcılar',
     dashboard: 'Dashboard',
     sevkiyatlar: 'Sevkiyatlar',
+    'fatura-uret': 'Fatura Üret',
+    'maliyet-evrak': 'Maliyet Evrak',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -135,6 +152,71 @@ function sidebarSelect(mod) {
         ⬆ İçe Aktar
       </button>`;
     if (typeof loadShipments === 'function') loadShipments();
+
+  } else if (mod === 'fatura-uret') {
+    document.getElementById('contentArea').classList.add('fu-content-area');
+    // Fatura Üret — sekme yapısı (Taslak, GTİP & Menşe, INV+PL, Ek Evrak)
+    let panel = document.getElementById('stepFaturaUret');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepFaturaUret';
+      panel.className = 'panel fu-shell';
+      panel.innerHTML = `
+        <div class="fu-header">
+          <div>
+            <div class="fu-kicker">Fatura operasyonları</div>
+            <div class="fu-title">Fatura Üret</div>
+            <div class="fu-subtitle">Taslak, GTİP, menşe, INV + PL ve ek evrak süreçlerini tek çalışma alanından yönetin.</div>
+          </div>
+        </div>
+        <div class="fu-tabs" role="tablist" aria-label="Fatura üret bölümleri">
+          <button class="fu-tab active" id="fu-tab-taslak" onclick="switchFaturaUretTab('taslak')" type="button">
+            <i class="ti ti-file-description" aria-hidden="true"></i><span>Taslak</span>
+          </button>
+          <button class="fu-tab" id="fu-tab-gtip" onclick="switchFaturaUretTab('gtip')" type="button">
+            <i class="ti ti-search" aria-hidden="true"></i><span>GTİP &amp; Menşe</span>
+          </button>
+          <button class="fu-tab" id="fu-tab-invpl" onclick="switchFaturaUretTab('invpl')" type="button">
+            <i class="ti ti-file-invoice" aria-hidden="true"></i><span>INV + PL</span>
+          </button>
+          <!-- <button class="fu-tab" id="fu-tab-evrak" onclick="switchFaturaUretTab('evrak')" type="button">
+            <i class="ti ti-paperclip" aria-hidden="true"></i><span>Ek Evrak</span>
+          </button> -->
+        </div>
+        <div class="fu-workspace">
+          <div id="fu-content-taslak" class="fu-tab-panel"></div>
+          <div id="fu-content-gtip" class="fu-tab-panel" style="display:none;"></div>
+          <div id="fu-content-invpl" class="fu-tab-panel" style="display:none;"></div>
+          <!-- <div id="fu-content-evrak" class="fu-tab-panel" style="display:none;"></div> -->
+        </div>
+      `;
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
+    // İlk açılışta Taslak sekmesini göster
+    switchFaturaUretTab('taslak');
+
+  } else if (mod === 'maliyet-evrak') {
+    // Maliyet Evrak — ileride doldurulacak
+    let panel = document.getElementById('stepMaliyetEvrak');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepMaliyetEvrak';
+      panel.className = 'panel';
+      panel.innerHTML = `
+        <div class="panel-label">Maliyet Evrak</div>
+        <div class="panel-title">Maliyet Evrak Yükle</div>
+        <div class="panel-desc">Beyanname, vergi ve gümrük PDF'lerini yükleyerek ilgili sevkiyatlara otomatik aktar.</div>
+        <div style="margin-top:32px;padding:32px;background:var(--surface2);border:1.5px dashed var(--border2);
+                    border-radius:var(--radius-md);text-align:center;color:var(--text3);">
+          <div style="font-size:32px;margin-bottom:12px;">📋</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;">Yakında</div>
+          <div style="font-size:13px;">Sırbistan, Kosova ve diğer ülke evrakları burada toplanacak.</div>
+        </div>
+      `;
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
   }
 }
 
@@ -231,6 +313,62 @@ function filterCountryList() {
   // Sonuç bulunamadı mesajı
   const nr = document.getElementById('countryNoResults');
   if (nr) nr.style.display = total === 0 ? 'block' : 'none';
+}
+
+// ── FATURA ÜRET — SEKME GEÇİŞİ ───────────────────────────────────────────────
+// Orijinal panelleri taşır — innerHTML kopyası değil, gerçek DOM elemanları
+function switchFaturaUretTab(tab) {
+  // Sekme butonlarını güncelle
+  ['taslak', 'gtip', 'invpl' /*, 'evrak' */].forEach(t => {
+    const btn = document.getElementById('fu-tab-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+
+  // Panelleri gizle/göster — orijinal DOM elemanlarını direkt kullan
+  const panelMap = {
+    taslak: ['stepTaslak'],
+    gtip:   ['stepGtip'],
+    invpl:  ['wizardSteps', 'step2'],
+    // evrak:  ['stepEvrak'],
+  };
+
+  // Önce hepsini gizle
+  Object.values(panelMap).flat().forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // Seçili sekmenin panellerini fu-content içine taşı ve göster
+  const container = document.getElementById('fu-content-' + tab);
+  if (!container) return;
+
+  // fu-content divlerini temizle (display none yeterli)
+  ['taslak','gtip','invpl','evrak'].forEach(t => {
+    const c = document.getElementById('fu-content-' + t);
+    if (c) c.style.display = t === tab ? 'block' : 'none';
+  });
+
+  const ids = panelMap[tab] || [];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    // Eleman zaten container içinde değilse taşı
+    if (el.parentNode !== container) container.appendChild(el);
+    // Görünürlük ayarla
+    if (id === 'wizardSteps') el.style.display = 'flex';
+    else if (id === 'step2')  el.style.display = 'flex';
+    else                       el.style.display = 'block';
+  });
+
+  // Init fonksiyonlarını çağır
+  if (tab === 'taslak' && typeof initTaslakPanel === 'function') {
+    setTimeout(initTaslakPanel, 0);
+  } else if (tab === 'gtip' && typeof initGtipPanel === 'function') {
+    setTimeout(initGtipPanel, 0);
+  }
+  // else if (tab === 'evrak' && typeof initEvrakPanel === 'function') {
+  //   setTimeout(initEvrakPanel, 0);
+  // }
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────

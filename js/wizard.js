@@ -133,7 +133,7 @@ function selectDepo(depo) {
 function selectCountry(c) {
   currentCountry = c;
 
-  document.querySelectorAll('.country-btn, .country-row, .cc').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.country-btn, .country-row, .cc, .cc2').forEach(btn => btn.classList.remove('active'));
   const el = document.getElementById('country-' + c);
   if (el) el.classList.add('active');
   if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
@@ -177,6 +177,57 @@ function selectCountry(c) {
   const dropZone = document.getElementById('dropZone');
   if (dropZone) dropZone.style.display = 'block';
 
+  // ── ÜLKE GRUPLARI: Seçilince diğerlerini gizle, "Değiştir" butonu ekle ──
+  const grupIds = ['cc2-kurumsal', 'cc2-franchise', 'cc2-toptan'];
+  const grupMap = {
+    rs: 'cc2-kurumsal', ba: 'cc2-kurumsal', ge: 'cc2-kurumsal',
+    xk: 'cc2-kurumsal', mk: 'cc2-kurumsal', be: 'cc2-kurumsal',
+    de: 'cc2-kurumsal', nl: 'cc2-kurumsal', kz: 'cc2-kurumsal',
+    cy: 'cc2-franchise', iq: 'cc2-franchise', ly: 'cc2-franchise',
+    lr: 'cc2-franchise', lb: 'cc2-franchise', uz: 'cc2-franchise', ru: 'cc2-franchise',
+    abh: 'cc2-toptan',
+  };
+  const aktifGrup = grupMap[c];
+  grupIds.forEach(gid => {
+    const gel = document.getElementById(gid);
+    if (!gel) return;
+    if (gid === aktifGrup) {
+      // Sadece seçili kartı göster, diğer kartları gizle
+      gel.querySelectorAll('.cc2').forEach(card => {
+        card.style.display = card.id === 'country-' + c ? '' : 'none';
+      });
+      // "Değiştir" butonu yoksa ekle
+      if (!gel.querySelector('.ulke-degistir-btn')) {
+        const btn = document.createElement('button');
+        btn.className = 'ulke-degistir-btn';
+        btn.innerHTML = '↩ Ülke değiştir';
+        btn.style.cssText = `
+          margin-top: 8px;
+          padding: 5px 12px;
+          border-radius: var(--radius-md);
+          border: 0.5px solid var(--border2);
+          background: transparent;
+          color: var(--text2);
+          font-family: var(--font);
+          font-size: 12px;
+          cursor: pointer;
+          transition: border-color 0.12s, color 0.12s;
+        `;
+        btn.onmouseenter = () => { btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)'; };
+        btn.onmouseleave = () => { btn.style.borderColor = 'var(--border2)'; btn.style.color = 'var(--text2)'; };
+        btn.onclick = () => resetUlkeSecimi();
+        gel.appendChild(btn);
+      }
+    } else {
+      // Diğer grupları tamamen gizle
+      gel.style.display = 'none';
+    }
+  });
+
+  // Arama kutusunu gizle
+  const searchCompact = document.querySelector('#step2 .search-compact');
+  if (searchCompact) searchCompact.style.display = 'none';
+
   // Kıbrıs özel: çoklu dosya modunda da dropZone görünür
   // pdfDropZone eski uyumluluk için gizli kalır — asıl dropZone her şeyi alır
   const pdfDZ = document.getElementById('pdfDropZone');
@@ -188,6 +239,39 @@ function selectCountry(c) {
   if (c === 'cy' && step2Next) {
     step2Next.style.display = cyExcelFiles.length > 0 ? 'block' : 'none';
   }
+}
+
+// ── ÜLKE SEÇİMİ SIFIRLA ──────────────────────────────────────────────────────
+function resetUlkeSecimi() {
+  currentCountry = null;
+
+  // Tüm grupları göster, tüm kartları geri getir
+  ['cc2-kurumsal', 'cc2-franchise', 'cc2-toptan'].forEach(gid => {
+    const gel = document.getElementById(gid);
+    if (!gel) return;
+    gel.style.display = '';
+    gel.querySelectorAll('.cc2').forEach(card => {
+      card.style.display = '';
+      card.classList.remove('active');
+    });
+    // Değiştir butonunu kaldır
+    const btn = gel.querySelector('.ulke-degistir-btn');
+    if (btn) btn.remove();
+  });
+
+  // Arama kutusunu göster
+  const searchCompact = document.querySelector('#step2 .search-compact');
+  if (searchCompact) searchCompact.style.display = '';
+
+  // Dropzone ve bilgi alanlarını gizle
+  const dropZone = document.getElementById('dropZone');
+  if (dropZone) { dropZone.style.display = 'none'; dropZone.classList.remove('loaded'); }
+  const dosyaSec = document.getElementById('dosyaNoSection');
+  if (dosyaSec) dosyaSec.style.display = 'none';
+  const step2Next = document.getElementById('step2Next');
+  if (step2Next) step2Next.style.display = 'none';
+
+  if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 }
 
 function setMode(m) {
