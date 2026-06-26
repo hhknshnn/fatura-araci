@@ -509,7 +509,7 @@ function renderShipments(list, fullList) {
 
   // Tablo — Varış sütunu yok
   wrapper.innerHTML = `
-    <table style="width:max-content;border-collapse:collapse;table-layout:fixed;">
+    <table style="width:max-content;min-width:100%;border-collapse:collapse;table-layout:fixed;">
       <thead style="position:sticky;top:0;z-index:5;">
         <tr style="background:#2d3f55;border-bottom:1.5px solid var(--border2);">
           <th style="padding:6px 8px;width:32px;border-right:1px solid rgba(255,255,255,0.08);">
@@ -531,7 +531,7 @@ function renderShipments(list, fullList) {
       </thead>
       <tbody id="shipments-tbody">
         ${list.length === 0
-          ? `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">Sevkiyat bulunamadı</td></tr>`
+          ? `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">Sevkiyat bulunamadı</td></tr>`
           : list.map((s, idx) => {
               const durumNorm = normalizeDurum(s.durum);
               const isAnt    = s.fatura_no?.startsWith('ANT');

@@ -899,10 +899,14 @@ def bulk_import_fr_shipments():
 
             yukleme_tarihi = row.get('yukleme_tarihi') or None
 
+            # TL faturalar için EUR'yu kur üzerinden hesapla
+            if not fatura_eur and fatura_tl and eur_kuru:
+                fatura_eur = round(fatura_tl / eur_kuru, 2)
+
             new_id = create_shipment({
                 'fatura_no':          fatura_no,
                 'ihracat_dosya_no':   str(row.get('ihracat_dosya_no', '') or ''),
-                'ulke':               'IRAK',
+                'ulke':               str(row.get('ulke', 'IRAK') or 'IRAK'),
                 'musteri_tipi':       'franchise',
                 'nakliye_firmasi':    str(row.get('nakliye_firmasi', '') or ''),
                 'plaka':              str(row.get('plaka', '') or ''),
@@ -910,7 +914,9 @@ def bulk_import_fr_shipments():
                 'gumruk_tarihi':      yukleme_tarihi,
                 'fatura_bedeli_tl':   fatura_tl,
                 'fatura_bedeli_eur':  fatura_eur,
+                'mal_bedeli_eur':     fatura_eur,
                 'eur_kuru':           eur_kuru,
+                'palet':              str(row.get('palet', '') or ''),
                 'durum':              'TESLİM EDİLDİ',
             })
             eklenen += 1
@@ -1281,7 +1287,7 @@ def parse_fr_fatura_pdf(pdf_bytes):
                 result['usd_kuru'] = kur_deger
 
         # ── Palet / Kap ──────────────────────────────────────────────────────
-        m = re.search(r'KAP(?:\s*ADETİ)?[:\s]*([\d]+(?:\s*\([^)]+\))?)', full, re.IGNORECASE)
+        m = re.search(r'\*?\s*KAP(?:\s*ADETİ)?[:\s]*([\d]+(?:\s*\([^)]+\))?)', full, re.IGNORECASE)
         if m:
             import math
             kap_str = m.group(1).strip()

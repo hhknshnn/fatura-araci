@@ -904,7 +904,7 @@ function buildFrPreviewTable() {
     color:var(--text);font-family:var(--font);font-size:11px;outline:none;`;
 
   const headers = [
-    'Dosya', 'Fatura No', 'Tip', 'Tarih', 'TL Tutar', 'USD Tutar', 'USD Kuru',
+    'Dosya', 'Fatura No', 'Tip', 'Tarih', 'Para Birimi', 'TL Tutar', 'EUR Tutar', 'USD Tutar', 'USD Kuru', 'EUR Kuru',
     'Navlun €', 'Sigorta €', 'Palet',
     'Dosya No', 'Nakliye', 'Plaka', 'Durum'
   ];
@@ -935,9 +935,12 @@ function buildFrPreviewTable() {
         </span>
       </td>
       <td style="${tdStyle}">${s.yukleme_tarihi || '—'}</td>
+      <td style="${tdStyle}">${s.para_birimi || '—'}</td>
       <td style="${tdStyle}">${fmt(s.fatura_bedeli_tl)}</td>
+      <td style="${tdStyle}">${fmt(s.fatura_bedeli_eur)}</td>
       <td style="${tdStyle}">${fmt(s.fatura_bedeli_usd)}</td>
       <td style="${tdStyle}">${s.usd_kuru ? parseFloat(s.usd_kuru).toFixed(4) : '—'}</td>
+      <td style="${tdStyle}">${s.eur_kuru ? parseFloat(s.eur_kuru).toFixed(4) : '—'}</td>
       <td style="${tdStyle}">
         <input type="number" step="0.01" value="${s.navlun_eur || ''}" placeholder="0"
           onchange="frSonuclar[${i}].navlun_eur = parseFloat(this.value)||0"
