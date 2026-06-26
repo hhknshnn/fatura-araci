@@ -92,6 +92,10 @@
             <i class="ti ti-file-upload" aria-hidden="true"></i>
             <span class="nav-label">Maliyet Evrak</span>
           </div>
+          <div class="nav-item" id="nav-landed-cost" onclick="sidebarSelect('landed-cost')">
+            <i class="ti ti-chart-bar" aria-hidden="true"></i>
+            <span class="nav-label">Landed Cost</span>
+          </div>
         </div>
 
         <div class="nav-group-header open" id="ngh-yurtdisi" onclick="toggleNavGroup('yurtdisi')">
@@ -313,7 +317,7 @@
           <!-- KPI Kartları -->
           <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;">
 
-            <div class="dash-kpi" style="animation-delay:0.05s;">
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard()" style="animation-delay:0.05s;cursor:pointer;">
               <div class="dash-kpi-accent" style="background:#2563EB;"></div>
               <div class="dash-kpi-icon" style="background:#EFF6FF;color:#2563EB;">
                 <i class="ti ti-ship" aria-hidden="true"></i>
@@ -324,7 +328,7 @@
                   zamanlar</span></div>
             </div>
 
-            <div class="dash-kpi" style="animation-delay:0.10s;">
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'YOLDA'})" style="animation-delay:0.10s;cursor:pointer;">
               <div class="dash-kpi-accent" style="background:#F59E0B;"></div>
               <div class="dash-kpi-icon" style="background:#FFFBEB;color:#F59E0B;">
                 <i class="ti ti-clock" aria-hidden="true"></i>
@@ -335,7 +339,7 @@
                   sevkiyat</span></div>
             </div>
 
-            <div class="dash-kpi" style="animation-delay:0.15s;">
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'Varış Gümrük'})" style="animation-delay:0.15s;cursor:pointer;">
               <div class="dash-kpi-accent" style="background:#06B6D4;"></div>
               <div class="dash-kpi-icon" style="background:#ECFEFF;color:#06B6D4;">
                 <i class="ti ti-building-warehouse" aria-hidden="true"></i>
@@ -346,7 +350,7 @@
               </div>
             </div>
 
-            <div class="dash-kpi" style="animation-delay:0.20s;">
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'TESLİM EDİLDİ'})" style="animation-delay:0.20s;cursor:pointer;">
               <div class="dash-kpi-accent" style="background:#22C55E;"></div>
               <div class="dash-kpi-icon" style="background:#F0FDF4;color:#22C55E;">
                 <i class="ti ti-circle-check" aria-hidden="true"></i>
@@ -357,7 +361,7 @@
                   style="background:#F0FDF4;color:#16A34A;">Tamamlanan</span></div>
             </div>
 
-            <div class="dash-kpi" style="animation-delay:0.25s;">
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard()" style="animation-delay:0.25s;cursor:pointer;">
               <div class="dash-kpi-accent" style="background:#8B5CF6;"></div>
               <div class="dash-kpi-icon" style="background:#F5F3FF;color:#8B5CF6;">
                 <i class="ti ti-currency-euro" aria-hidden="true"></i>
@@ -386,9 +390,9 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
 
             <div class="dash-card" style="animation-delay:0.30s;">
-              <div class="dash-card-title">Durum dağılımı</div>
-              <div class="dash-card-sub">Tüm sevkiyatlar</div>
-              <div id="dash-donut"></div>
+              <div class="dash-card-title">Maliyet kırılımı</div>
+              <div class="dash-card-sub">Kurumsal ülkeler, KDV hariç</div>
+              <div id="dash-cost-summary"></div>
             </div>
 
             <div class="dash-card" style="animation-delay:0.35s;">
@@ -1540,6 +1544,7 @@
   <script src="js/users.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/shipments.js"></script>
+  <script src="js/landed-cost.js"></script>
   <script src="js/import.js"></script>
 
   <!-- ── İÇE AKTAR MODAL ───────────────────────────────────────────────── -->

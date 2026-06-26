@@ -63,7 +63,7 @@ function hideAllPanels() {
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
     'stepGecmis', 'stepUsers', 'stepDashboard', 'stepSevkiyatlar',
-    'stepFaturaUret', 'stepMaliyetEvrak'].forEach(id => {
+    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -97,6 +97,7 @@ function sidebarSelect(mod) {
     sevkiyatlar: 'Sevkiyatlar',
     'fatura-uret': 'Fatura Üret',
     'maliyet-evrak': 'Maliyet Evrak',
+    'landed-cost': 'Landed Cost',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -217,6 +218,16 @@ function sidebarSelect(mod) {
       document.getElementById('contentArea').appendChild(panel);
     }
     panel.style.display = 'block';
+  } else if (mod === 'landed-cost') {
+    let panel = document.getElementById('stepLandedCost');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepLandedCost';
+      panel.className = 'panel';
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
+    if (typeof initLandedCostPanel === 'function') initLandedCostPanel();
   }
 }
 

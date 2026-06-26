@@ -8,6 +8,7 @@ import traceback
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
 from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments
+from api.landed_cost import landed_cost_get, landed_cost_export
 from api.kur import get_tcmb_kurlar
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -341,6 +342,20 @@ def api_shipments_export():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return shipments_export()
+
+
+@app.route('/api/landed-cost', methods=['GET', 'OPTIONS'])
+def api_landed_cost():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return landed_cost_get()
+
+
+@app.route('/api/landed-cost/export', methods=['GET', 'OPTIONS'])
+def api_landed_cost_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return landed_cost_export()
 
 @app.route('/api/taslak-store/kaydet', methods=['POST', 'OPTIONS'])
 def api_taslak_store_kaydet():

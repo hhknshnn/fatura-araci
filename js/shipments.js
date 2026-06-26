@@ -144,6 +144,7 @@ function initColResize() {
 
 let allShipments    = [];
 let seciliSatirlar  = new Set(); // çoklu silme için seçili id'ler
+let dashboardSeferFilter = '';
 
 // ── SIRALAMA STATE ────────────────────────────────────────────────────────────
 let sortColumn = null;   // hangi sütun: 'ihracat_dosya_no', 'fatura_no', vb.
@@ -211,6 +212,8 @@ function applyFiltersAndRender() {
   if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
   if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
   if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
+  if (dashboardSeferFilter === 'tek') filtered = filtered.filter(s => !s.sefer_id);
+  if (dashboardSeferFilter === 'gruplu') filtered = filtered.filter(s => !!s.sefer_id);
 
   filteredList = sortShipments(filtered);
   currentPage  = 1;
@@ -340,6 +343,7 @@ async function loadShipments(ulke = '', durum = '') {
     sortColumn   = 'ihracat_dosya_no';
     sortDir      = 'desc';
 
+    applyPendingDashboardShipmentFilter();
     applyFiltersAndRender();
     if (!document.getElementById('fake-scrollbar')) initStickyScroll();
   } catch (e) {
@@ -911,26 +915,63 @@ function onUlkeChange() {
   applyFiltersAndRender();
 }
 
-function clearFilters() {
+function resetShipmentFilterControls() {
   document.getElementById('filter-ulke').value  = '';
   document.getElementById('filter-durum').value = '';
   document.getElementById('filter-depo').value  = '';
   document.getElementById('filter-musteri-tipi').value = '';
   document.getElementById('filter-ay').value = '';
+  dashboardSeferFilter = '';
 
-  // Dropdown'ları sıfırla
   selectedUlkeler = new Set();
   document.querySelectorAll('#dd-ulke-menu input[type=checkbox]').forEach(cb => cb.checked = false);
   document.querySelectorAll('input[name="dd-tip-r"]')[0].checked   = true;
   document.querySelectorAll('input[name="dd-durum-r"]')[0].checked = true;
   document.querySelectorAll('input[name="dd-depo-r"]')[0].checked  = true;
+  document.querySelectorAll('input[name="dd-ay-r"]')[0].checked    = true;
+
   document.getElementById('dd-tip-label').textContent   = 'Tipler';
   document.getElementById('dd-ulke-label').textContent  = 'Ülkeler';
   document.getElementById('dd-durum-label').textContent = 'Durumlar';
   document.getElementById('dd-depo-label').textContent  = 'Depolar';
   document.getElementById('dd-ay-label').textContent    = 'Ay';
-  document.querySelectorAll('input[name="dd-ay-r"]')[0].checked = true;
   document.querySelectorAll('.custom-dd-btn').forEach(b => b.classList.remove('active'));
+}
+
+function setRadioFilter(name, value) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+    input.checked = input.value === value;
+  });
+}
+
+function applyPendingDashboardShipmentFilter() {
+  const filter = window.pendingDashboardShipmentFilter;
+  resetShipmentFilterControls();
+  window.pendingDashboardShipmentFilter = null;
+  const title = document.getElementById('topbarTitle');
+  if (title) title.textContent = 'Sevkiyatlar';
+  if (!filter) return;
+
+  if (filter.durum) {
+    document.getElementById('filter-durum').value = filter.durum;
+    document.getElementById('dd-durum-label').textContent = filter.durum;
+    document.querySelector('#dd-durum .custom-dd-btn')?.classList.add('active');
+    setRadioFilter('dd-durum-r', filter.durum);
+    if (title) title.textContent = `Sevkiyatlar · ${filter.durum}`;
+  }
+
+  if (filter.seferTipi) {
+    dashboardSeferFilter = filter.seferTipi;
+    if (title) title.textContent = filter.seferTipi === 'tek'
+      ? 'Sevkiyatlar · Tek Araç'
+      : 'Sevkiyatlar · Gruplu';
+  }
+}
+
+function clearFilters() {
+  resetShipmentFilterControls();
+  const title = document.getElementById('topbarTitle');
+  if (title) title.textContent = 'Sevkiyatlar';
 
   sortColumn = 'ihracat_dosya_no';
   sortDir    = 'desc';
