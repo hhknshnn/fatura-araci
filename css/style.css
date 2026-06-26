@@ -266,6 +266,25 @@ body {
 
 .sidebar.mini .nav-label { display: none; }
 
+.sidebar.mini .nav-group-header {
+  height: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sidebar.mini .nav-group-label,
+.sidebar.mini .nav-group-chevron,
+.sidebar.mini .nav-soon-badge {
+  display: none;
+}
+
+.sidebar.mini .nav-divider {
+  margin: 8px 0;
+}
+
 /* Tooltip */
 .sidebar.mini .nav-item::after {
   content: attr(data-label);

@@ -2,6 +2,11 @@
 // Sevkiyatlar sayfası — listeleme, filtreleme, güncelleme
 
 // ── SÜTUN GENİŞLİKLERİ ───────────────────────────────────────────────────────
+// ── SAYFALAMA STATE ───────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
+let currentPage = 1;
+let filteredList = [];
+
 const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','yukleme_tarihi','durum'];
 const COL_DEFAULTS = { ihracat_dosya_no:110, fatura_no:130, palet:60, _depo:60, ulke:90, nakliye_firmasi:120, plaka:100, sefer_id:80, fatura_bedeli_eur:110, yukleme_tarihi:90, durum:110 };
 
@@ -198,51 +203,7 @@ function applyFiltersAndRender() {
   const musteriTipi = document.getElementById('filter-musteri-tipi')?.value || '';
   const ay          = document.getElementById('filter-ay')?.value            || '';
 
-  const sorted = sortShipments(allShipments);
-
-  // Sıralama değiştiyse tam yeniden çiz
-  const tbody = document.getElementById('shipments-tbody');
-  if (tbody && tbody.children.length > 0 && tbody.children[0].dataset.id) {
-    const currentSort = tbody.dataset.sortKey || '';
-    const newSort = sortColumn + '_' + sortDir;
-
-    if (currentSort !== newSort) {
-      // Sıralama değişti — tam render
-      let filtered = allShipments;
-      if (selectedUlkeler && selectedUlkeler.size > 0)
-        filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
-      if (durum)       filtered = filtered.filter(s => normalizeDurum(s.durum) === durum);
-      if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
-      if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
-      if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
-      renderShipments(sortShipments(filtered));
-      document.getElementById('shipments-tbody').dataset.sortKey = newSort;
-      return;
-    }
-
-    // Sadece filtre — show/hide yeterli
-    const rows = tbody.querySelectorAll('tr[data-id]');
-    let visible = 0;
-    rows.forEach(tr => {
-      const id = parseInt(tr.dataset.id);
-      const s  = allShipments.find(x => x.id === id);
-      if (!s) { tr.style.display = 'none'; return; }
-
-      const pass =
-        (!selectedUlkeler || selectedUlkeler.size === 0 || selectedUlkeler.has(s.ulke?.toUpperCase())) &&
-        (!durum       || normalizeDurum(s.durum) === durum) &&
-        (!depo        || s.fatura_no?.startsWith(depo)) &&
-        (!musteriTipi || s.musteri_tipi === musteriTipi) &&
-        (!ay          || (s.yukleme_tarihi || '').slice(5, 7) === ay);
-
-      tr.style.display = pass ? '' : 'none';
-      if (pass) visible++;
-    });
-    updateOzetFromVisible(visible);
-    return;
-  }
-
-  // İlk render — tam çiz
+  // Filtrelenmiş listeyi her zaman allShipments'tan sıfırdan hesapla
   let filtered = allShipments;
   if (selectedUlkeler && selectedUlkeler.size > 0)
     filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
@@ -251,7 +212,9 @@ function applyFiltersAndRender() {
   if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
   if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
 
-  renderShipments(sortShipments(filtered));
+  filteredList = sortShipments(filtered);
+  currentPage  = 1;
+  renderPage();
 }
 
 function updateOzetFromVisible(count) {
@@ -333,8 +296,24 @@ async function loadShipments(ulke = '', durum = '') {
   if (wrapper) {
     wrapper.style.overflowX = 'auto';
     wrapper.style.overflowY = 'auto';
-    wrapper.style.maxHeight = 'calc(100vh - 172px)';
     wrapper.style.background = 'var(--surface2)';
+    // Yüksekliği DOM ölçümüyle hesapla — pagination render sonrası çağrılır
+    function setWrapperHeight() {
+      const panel = document.getElementById('stepSevkiyatlar');
+      if (!panel) return;
+      const panelTop  = panel.getBoundingClientRect().top;
+      const ozet      = document.getElementById('shipments-ozet');
+      const pg        = document.getElementById('shipments-pagination');
+      const ozetH     = ozet  ? ozet.offsetHeight  : 42;
+      const pgH       = pg    ? pg.offsetHeight     : 52;
+      // wrapper = viewport yüksekliği - panelin başlangıcı - özet - pagination - küçük boşluk
+      const h = window.innerHeight - panelTop - ozetH - pgH - 12;
+      wrapper.style.maxHeight = Math.max(200, h) + 'px';
+    }
+    wrapper._adjustHeight = setWrapperHeight;
+    // İlk render sonrası ve resize'da çağır
+    setTimeout(setWrapperHeight, 100);
+    window.addEventListener('resize', setWrapperHeight);
   }
 
   if (!document.getElementById('shipments-ozet')) {
@@ -356,18 +335,10 @@ async function loadShipments(ulke = '', durum = '') {
     if (!data.success) return;
 
     allShipments = data.shipments;
-    sortColumn = 'ihracat_dosya_no';
-    sortDir = 'desc';
-
-    // Sayfa ilk yüklenişinde Kurumsal default seçili
-    if (!document.getElementById('filter-musteri-tipi').value) {
-      document.getElementById('filter-musteri-tipi').value = 'kurumsal';
-      document.querySelectorAll('input[name="dd-tip-r"]').forEach(r => {
-        r.checked = r.value === 'kurumsal';
-      });
-      document.getElementById('dd-tip-label').textContent = 'Kurumsal';
-      document.querySelector('#dd-tip .custom-dd-btn')?.classList.add('active');
-    }
+    filteredList = [];
+    currentPage  = 1;
+    sortColumn   = 'ihracat_dosya_no';
+    sortDir      = 'desc';
 
     applyFiltersAndRender();
     if (!document.getElementById('fake-scrollbar')) initStickyScroll();
@@ -376,14 +347,129 @@ async function loadShipments(ulke = '', durum = '') {
   }
 }
 
-function renderShipments(list) {
+// ── SAYFA RENDER ─────────────────────────────────────────────────────────────
+function renderPage() {
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageList = filteredList.slice(start, start + PAGE_SIZE);
+  renderShipments(pageList, filteredList);
+  renderPagination(totalPages);
+  // Pagination DOM'a eklendikten sonra yüksekliği hesapla
+  const wrapper = document.getElementById('shipments-table-wrapper');
+  if (wrapper?._adjustHeight) setTimeout(wrapper._adjustHeight, 0);
+}
+
+function renderPagination(totalPages) {
+  let pg = document.getElementById('shipments-pagination');
+  if (!pg) {
+    pg = document.createElement('div');
+    pg.id = 'shipments-pagination';
+    pg.style.cssText = `
+      display:flex;align-items:center;justify-content:center;gap:6px;
+      padding:10px 16px;background:var(--surface);
+      border-top:0.5px solid var(--border2);flex-wrap:wrap;
+    `;
+    const wrapper = document.getElementById('shipments-table-wrapper');
+    wrapper?.parentNode?.insertBefore(pg, wrapper.nextSibling);
+  }
+
+  const total = filteredList.length;
+  const start = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const end   = Math.min(currentPage * PAGE_SIZE, total);
+
+  const navBtn = (label, onclick, active = false, disabled = false) => `
+    <button onclick="${disabled ? '' : onclick}"
+      style="width:34px;height:34px;border-radius:10px;
+             border:0.5px solid ${active ? 'var(--accent)' : 'transparent'};
+             background:${active ? 'var(--accent)' : disabled ? 'transparent' : 'var(--surface)'};
+             color:${active ? '#fff' : disabled ? 'var(--text3)' : 'var(--text2)'};
+             font-family:var(--font);font-size:13px;font-weight:${active ? '600' : '400'};
+             cursor:${disabled ? 'default' : 'pointer'};
+             opacity:${disabled ? '0.35' : '1'};
+             display:flex;align-items:center;justify-content:center;
+             box-shadow:${active ? '0 2px 6px rgba(24, 95, 165, 0.20)' : 'none'};
+             transition:background 0.12s,border-color 0.12s,color 0.12s,box-shadow 0.12s;
+             flex-shrink:0;"
+      ${disabled ? 'disabled' : ''}
+      onmouseover="${!active && !disabled ? "this.style.background='var(--accent-dim)';this.style.color='var(--accent)'" : ''}"
+      onmouseout="${!active && !disabled ? "this.style.background='var(--surface)';this.style.color='var(--text2)'" : ''}">
+      ${label}
+    </button>`;
+
+  const dot = `<span style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);">...</span>`;
+  const emptySlot = `<span style="width:34px;height:34px;visibility:hidden;"></span>`;
+
+  function getPageSlots() {
+    if (totalPages <= 7) {
+      const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+      const leftPad = Math.floor((7 - pages.length) / 2);
+      const rightPad = 7 - pages.length - leftPad;
+      return [
+        ...Array(leftPad).fill(null),
+        ...pages,
+        ...Array(rightPad).fill(null),
+      ];
+    }
+
+    if (currentPage <= 4) return [1, 2, 3, 4, 5, 'dots', totalPages];
+    if (currentPage >= totalPages - 3) {
+      return [1, 'dots', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, 'dots', currentPage - 1, currentPage, currentPage + 1, 'dots', totalPages];
+  }
+
+  const pageButtons = getPageSlots().map(slot => {
+    if (slot === null) return emptySlot;
+    if (slot === 'dots') return dot;
+    return navBtn(slot, `goPageNum(${slot})`, slot === currentPage);
+  }).join('');
+
+  pg.innerHTML = `
+    <div style="display:grid;grid-template-columns:minmax(110px,1fr) auto minmax(110px,1fr);align-items:center;gap:14px;width:100%;padding:0 4px;">
+      <span style="font-size:12px;color:var(--text3);white-space:nowrap;min-width:110px;text-align:right;">
+        ${total} kayıt · ${start}–${end}
+      </span>
+      <div style="display:flex;align-items:center;gap:4px;padding:4px;
+                  border:0.5px solid var(--border2);border-radius:14px;
+                  background:var(--surface2);box-shadow:0 1px 2px rgba(15, 23, 42, 0.04);">
+        ${navBtn('‹', 'goPageDelta(-1)', false, currentPage === 1)}
+        <div style="width:262px;display:grid;grid-template-columns:repeat(7,34px);align-items:center;justify-content:center;gap:4px;flex-shrink:0;">
+          ${pageButtons}
+        </div>
+        ${navBtn('›', 'goPageDelta(1)', false, currentPage === totalPages)}
+      </div>
+      <span style="font-size:12px;color:var(--text3);white-space:nowrap;min-width:110px;">
+        Sayfa ${currentPage}/${totalPages}
+      </span>
+    </div>
+  `;
+}
+
+function goPageNum(n) {
+  currentPage = n;
+  renderPage();
+  // Tablonun başına scroll
+  document.getElementById('shipments-table-wrapper')?.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function goPageDelta(d) {
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  currentPage = Math.max(1, Math.min(totalPages, currentPage + d));
+  renderPage();
+  document.getElementById('shipments-table-wrapper')?.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function renderShipments(list, fullList) {
+  // Özet: her zaman tüm filtrelenmiş listeden hesapla
+  const summaryList = fullList || list;
   const wrapper = document.getElementById('shipments-table-wrapper');
   if (!wrapper) return;
 
-  // Özet şerit — sefer bazlı say (grupluları 1 say)
+  // Özet şerit — her zaman tüm filtrelenmiş listeden hesapla (sayfalama etkilemez)
   const grupTemsilciOzet = new Set();
   let toplam = 0;
-  list.forEach(item => {
+  summaryList.forEach(item => {
     if (!item.sefer_id) {
       toplam++;
     } else if (!grupTemsilciOzet.has(item.sefer_id)) {
@@ -391,10 +477,10 @@ function renderShipments(list) {
       toplam++;
     }
   });
-  const faturaEur = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
-  const faturaTl  = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
-  const navlunEur = list.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
-  const sigortaEur = list.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
+  const faturaEur  = summaryList.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
+  const faturaTl   = summaryList.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
+  const navlunEur  = summaryList.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
+  const sigortaEur = summaryList.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
   const fmt   = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
   const fmtTl = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
 
@@ -639,7 +725,7 @@ async function saveShipmentDetail() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (data.success) { closeShipmentDetail(); allShipments = []; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
+    if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
     else alert('Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
 
   } else {
@@ -671,7 +757,7 @@ async function saveShipmentDetail() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (data.success) { closeShipmentDetail(); allShipments = []; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
+    if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
     else alert('Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
   }
 }
@@ -679,18 +765,13 @@ async function saveShipmentDetail() {
 async function downloadMaliyetRaporu() {
   const token = sessionStorage.getItem('fa_auth_token');
 
-  // Ekranda görünen (filtrelenmiş) satırların id listesini topla
-  const tbody = document.getElementById('shipments-tbody');
-  const visibleIds = tbody
-    ? [...tbody.querySelectorAll('tr[data-id]')]
-        .filter(r => r.style.display !== 'none')
-        .map(r => parseInt(r.dataset.id))
-    : [];
+  // Tüm filtrelenmiş listeyi kullan (sadece mevcut sayfa değil)
+  const allFilteredIds = filteredList.map(s => s.id);
 
   let url = '/api/shipments/export';
   const params = [];
-  if (visibleIds.length > 0)
-    params.push(`ids=${visibleIds.join(',')}`);
+  if (allFilteredIds.length > 0)
+    params.push(`ids=${allFilteredIds.join(',')}`);
   if (params.length) url += '?' + params.join('&');
 
   try {
@@ -749,7 +830,7 @@ async function deleteShipment() {
     body: JSON.stringify({ id: parseInt(id) }),
   });
   const data = await res.json();
-  if (data.success) { closeShipmentDetail(); loadShipments(); }
+  if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; loadShipments(); }
   else alert('Silme hatası: ' + (data.error || 'Bilinmeyen hata'));
 }
 
