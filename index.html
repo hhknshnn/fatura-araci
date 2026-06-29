@@ -813,7 +813,7 @@
                 <span style="font-size:20px;flex-shrink:0;">📄</span>
                 <div style="flex:1;min-width:0;">
                   <div id="vergi-pdf-status" style="font-size:12px;color:var(--text3);">
-                    PDF'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage otomatik dolar
+                    PDF'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage Fee & Other Costs EUR otomatik dolar
                   </div>
                 </div>
               </div>
@@ -837,7 +837,9 @@
                   placeholder="0"></div>
               <div class="detail-field"><label>Araç Bekleme</label><input id="edit-bekleme" type="number"
                   placeholder="0"></div>
-              <div class="detail-field"><label>Brokerage Fee EUR</label><input id="edit-brokerage" type="number"
+              <div class="detail-field"><label>Brokerage Fee & Other Costs EUR</label><input id="edit-brokerage" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Other Costs EUR</label><input id="edit-other-costs" type="number"
                   placeholder="0"></div>
               <div class="detail-field"><label>Gümrük Vergisi EUR</label><input id="edit-gumruk-v" type="number"
                   placeholder="0"></div>
@@ -1460,6 +1462,39 @@
           <button class="btn-primary visible" id="evrakIndir" onclick="indirEvrak()"
             style="display:none;margin-top:14px;">⬇ PDF İndir</button>
         </div> -->
+
+        <!-- ── MALİYET EVRAK ─────────────────────────────────────────────── -->
+        <div class="panel" id="stepMaliyetEvrak" style="display:none;padding:24px;">
+
+          <!-- Sırbistan Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/rs.png" alt="RS"> Sırbistan — Gümrük & Brokerage PDF
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Gümrük vergisi, KDV veya spediter faturasını yükleyin — sevkiyata otomatik eşleşir.</div>
+            <div id="me-rs-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleRsPdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-rs-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="me-rs-input" accept=".pdf" style="display:none;" onchange="meHandleRsPdf(this.files[0])">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="me-rs-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
+              </div>
+            </div>
+            <div id="me-rs-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
+          </div>
+
+          <style>
+            #me-rs-drop:hover, #me-rs-drop.vergi-drag-over {
+              border-color: var(--accent);
+              background: var(--accent-dim);
+            }
+          </style>
+        </div>
 
         <!-- ── SON İŞLEMLER ───────────────────────────────────────────────── -->
         <div class="panel" id="stepGecmis" style="display:none;">

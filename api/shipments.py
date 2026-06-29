@@ -36,7 +36,7 @@ def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
                varis_tarihi, gumrukleme_bitis, created_at,
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
-               toplam_maliyet_eur, musteri_tipi, sefer_id, palet
+               toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet
         FROM shipments
         WHERE 1=1
     '''
@@ -151,7 +151,8 @@ def update_shipment(shipment_id, data):
         float(data.get('arac_bekleme', 0) or 0) +
         float(data.get('brokerage_eur', 0) or 0) +
         float(data.get('gumruk_vergisi_eur', 0) or 0) +
-        float(data.get('kdv_eur', 0) or 0)
+        float(data.get('kdv_eur', 0) or 0) +
+        float(data.get('other_costs_eur', 0) or 0)
     )
 
     cur.execute('''
@@ -171,6 +172,7 @@ def update_shipment(shipment_id, data):
             brokerage_eur         = %s,
             gumruk_vergisi_eur    = %s,
             kdv_eur               = %s,
+            other_costs_eur       = %s,
             toplam_maliyet_eur    = %s,
             varis_tarihi          = %s,
             gumrukleme_bitis      = %s,
@@ -193,6 +195,7 @@ def update_shipment(shipment_id, data):
         data.get('brokerage_eur', 0),
         data.get('gumruk_vergisi_eur', 0),
         data.get('kdv_eur', 0),
+        data.get('other_costs_eur', 0),
         toplam,
         data.get('varis_tarihi') or None,
         data.get('gumrukleme_bitis') or None,
@@ -330,7 +333,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
         'İhracat Beyanname TL', 'İhracat Beyanname EUR',
-        'Araç Bekleme', 'Brokerage EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
+        'Araç Bekleme', 'Brokerage Fee & Other Costs EUR', 'Other Costs EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
         'Durum',
     ]
 
@@ -378,9 +381,10 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         c(21, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
         c(22, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
         c(23, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(24, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(25, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(26, s.get('durum', ''))
+        c(24, float(s.get('other_costs_eur', 0) or 0),       EUR_FMT)
+        c(25, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(26, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(27, s.get('durum', ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -449,9 +453,10 @@ def _row_to_dict(row):
         'gumruk_vergisi_eur':    float(row[23] or 0),
         'kdv_eur':               float(row[24] or 0),
         'toplam_maliyet_eur':    float(row[25] or 0),
-        'musteri_tipi':          row[26] if len(row) > 26 else 'kurumsal',
-        'sefer_id':              row[27] if len(row) > 27 else None,
-        'palet':                 row[28] if len(row) > 28 else None,
+        'other_costs_eur':       float(row[26] or 0) if len(row) > 26 else 0.0,
+        'musteri_tipi':          row[27] if len(row) > 27 else 'kurumsal',
+        'sefer_id':              row[28] if len(row) > 28 else None,
+        'palet':                 row[29] if len(row) > 29 else None,
     }
 
 
@@ -490,6 +495,13 @@ def shipments_put():
     sid  = body.get('id')
     if not sid:
         return jsonify({'success': False, 'error': 'id gerekli'}), 400
+    cost_fields = {
+        'ihracat_beyanname_eur', 'arac_bekleme', 'brokerage_eur',
+        'gumruk_vergisi_eur', 'kdv_eur', 'other_costs_eur',
+    }
+    if set(body.keys()).issubset(cost_fields | {'id'}):
+        update_shipment_cost_fields(int(sid), body)
+        return jsonify({'success': True})
     update_shipment(int(sid), body)
     return jsonify({'success': True})
 
@@ -1079,6 +1091,310 @@ def parse_rs_vergi_pdf(pdf_bytes):
 
     except Exception as e:
         print(f'RS vergi PDF parse hatası: {e}')
+
+    return result
+
+
+def update_shipment_cost_fields(shipment_id, data):
+    allowed = {
+        'ihracat_beyanname_eur', 'arac_bekleme', 'brokerage_eur',
+        'gumruk_vergisi_eur', 'kdv_eur', 'other_costs_eur',
+    }
+    fields = {}
+    for key in allowed:
+        if key in data:
+            try:
+                fields[key] = float(data.get(key) or 0)
+            except (TypeError, ValueError):
+                fields[key] = 0.0
+
+    if not fields:
+        return
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT ihracat_beyanname_eur, arac_bekleme, brokerage_eur,
+               gumruk_vergisi_eur, kdv_eur, other_costs_eur
+        FROM shipments
+        WHERE id = %s
+    ''', (shipment_id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        raise ValueError('Sevkiyat bulunamadı')
+
+    totals = {
+        'ihracat_beyanname_eur': float(row[0] or 0),
+        'arac_bekleme':          float(row[1] or 0),
+        'brokerage_eur':         float(row[2] or 0),
+        'gumruk_vergisi_eur':    float(row[3] or 0),
+        'kdv_eur':               float(row[4] or 0),
+        'other_costs_eur':       float(row[5] or 0),
+    }
+    totals.update(fields)
+    toplam = sum(totals.values())
+
+    set_clause = ', '.join(f'{k} = %s' for k in fields)
+    values = list(fields.values()) + [toplam, shipment_id]
+    cur.execute(f'''
+        UPDATE shipments
+        SET {set_clause}, toplam_maliyet_eur = %s
+        WHERE id = %s
+    ''', values)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def _apply_kz_avr_kalemler(result, kalemler):
+    brokerage_kalemler = {1, 2, 4}
+    for no, item in sorted(kalemler.items()):
+        tutar = float(item.get('tutar') or 0)
+        if tutar <= 0:
+            continue
+        result['kalemler'].append({'no': no, 'ad': item.get('ad') or f'Kalem {no}', 'tutar': tutar})
+        if no in brokerage_kalemler:
+            result['brokerage_kzt'] += tutar
+        else:
+            result['other_costs_kzt'] += tutar
+
+
+def _set_kz_avr_eur_values(result):
+    import json
+    import urllib.request
+
+    try:
+        url = 'https://api.exchangerate-api.com/v4/latest/EUR'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            rates = json.loads(resp.read()).get('rates', {})
+        kzt_per_eur = float(rates.get('KZT', 0) or 0)
+        result['kzt_per_eur'] = round(kzt_per_eur, 4)
+        if kzt_per_eur > 0:
+            result['brokerage_eur'] = round(result['brokerage_kzt'] / kzt_per_eur, 2)
+            result['other_costs_eur'] = round(result['other_costs_kzt'] / kzt_per_eur, 2)
+    except Exception as e:
+        print(f'[KZ] Kur hatası: {e}')
+
+
+def parse_kz_avr_image(image_bytes):
+    """
+    KZ AVR tablo görselinden 7 kalem tutarını okur.
+    Цена = Сумма (adet=1) olduğu için sağ sütundaki eşleşen çiftleri yakalar.
+    Итого ve KDV satırları otomatik filtrelenir.
+    """
+    result = {
+        'brokerage_kzt':   0.0,
+        'other_costs_kzt': 0.0,
+        'brokerage_eur':   0.0,
+        'other_costs_eur': 0.0,
+        'kzt_per_eur':     0.0,
+        'kalemler':        [],
+    }
+
+    BROKERAGE_KALEMLER = {1, 2, 4}
+
+    def parse_kzt(s):
+        # "165 000,00" veya "165000,00" → float
+        s = str(s).strip()
+        s = s.replace('\xa0', ' ').replace('\u202f', ' ')
+        # Boşluklu binlik ayraç: "165 000,00" → "165000,00"
+        s = re.sub(r'(\d)\s+(\d)', r'\1\2', s)
+        s = re.sub(r'[^\d,.]', '', s)
+        if ',' in s and '.' in s:
+            if s.rfind(',') > s.rfind('.'):
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                s = s.replace(',', '')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
+    try:
+        import pytesseract
+        from PIL import Image, ImageOps, ImageFilter
+
+        img = Image.open(io.BytesIO(image_bytes)).convert('L')
+        w, h = img.size
+
+        # Kontrastı artır, 2x büyüt
+        img = ImageOps.autocontrast(img)
+        img = img.resize((w * 2, h * 2), Image.LANCZOS)
+
+        # Sadece Цена sütununu al (sağdan ikinci sütun, ~%55-78 arası)
+        right = img.crop((int(img.width * 0.55), 0, int(img.width * 0.78), img.height))
+
+        # OCR — boşluk dahil sayı karakterleri
+        config = '--psm 6 -c tessedit_char_whitelist=0123456789., '
+        text = pytesseract.image_to_string(right, lang='eng', config=config)
+        print(f'[KZ IMG] Sağ sütun OCR:\n{text[:400]}')
+
+        # Tüm sayıları satır satır çek
+        # Her satırda 2 sayı var: Цена ve Сумма (eşit olduğu için biri yeterli)
+        all_values = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # Boşluklu binlik ayraç düzelt: "165 000,00" → "165000,00"
+            line = re.sub(r'(\d)\s+(\d)', r'\1\2', line)
+            # Satırdaki tüm sayıları bul
+            nums = re.findall(r'\d+[.,]\d{2}', line)
+            parsed = [parse_kzt(n) for n in nums]
+            parsed = [v for v in parsed if v >= 1000]  # Kol-vo "1,000" gibi küçükleri çıkar
+            if parsed:
+                all_values.append(parsed)
+
+        print(f'[KZ IMG] Satır değerleri: {all_values}')
+
+        # Her satırdan ilk değeri al (Цена sütunu)
+        # Итого toplamını bul — diğerlerinin toplamına eşit olan değer
+        flat = [row[0] for row in all_values if row]
+        print(f'[KZ IMG] Düz liste: {flat}')
+
+        if not flat:
+            result['_hata'] = 'Hiç sayı okunamadı'
+            return result
+
+        # Итого'yu tespit et: en büyük değer veya diğerlerinin toplamı olan değer
+        itogo = None
+        for i, v in enumerate(flat):
+            others = flat[:i] + flat[i+1:]
+            if others and abs(sum(others) - v) < 1.0:
+                itogo = v
+                break
+
+        # Итого bulunamazsa en büyük değer muhtemelen Итого
+        if itogo is None and len(flat) > 7:
+            itogo = max(flat)
+
+        # Итого ve KDV'yi çıkar, kalan kalemler
+        kalem_values = [v for v in flat if itogo is None or abs(v - itogo) > 1.0]
+
+        # KDV genellikle son büyük değer — toplamın ~%16'sı civarı
+        # Eğer hâlâ 7'den fazla varsa Итого sonrasını çıkar
+        if len(kalem_values) > 7:
+            # En büyük kalan değer muhtemelen KDV toplamı
+            kdv_candidate = max(kalem_values)
+            if len([v for v in kalem_values if v != kdv_candidate]) == 7:
+                kalem_values = [v for v in kalem_values if v != kdv_candidate]
+
+        print(f'[KZ IMG] Kalem değerleri ({len(kalem_values)}): {kalem_values}')
+
+        # 7'den az varsa uyar
+        if len(kalem_values) < 7:
+            result['_hata'] = f'AVR tablosundaki 7 kalem okunamadı. Okunan değerler: {kalem_values}'
+
+        # Kalem sözlüğü oluştur
+        kalemler = {}
+        for i, v in enumerate(kalem_values[:7]):
+            kalemler[i + 1] = {'ad': f'Kalem {i + 1}', 'tutar': v}
+
+        _apply_kz_avr_kalemler(result, kalemler)
+        _set_kz_avr_eur_values(result)
+
+    except Exception as e:
+        print(f'[KZ IMG] Parse hatası: {e}')
+        import traceback
+        traceback.print_exc()
+        result['_hata'] = str(e)
+
+    return result
+
+
+def parse_kz_avr_pdf(pdf_bytes):
+    """
+    Kazakistan AVR PDF'inden Итого satırını okur.
+    Tüm tutarı brokerage_eur olarak döner.
+    """
+    import urllib.request, json as _json
+
+    result = {
+        'brokerage_kzt':   0.0,
+        'other_costs_kzt': 0.0,
+        'brokerage_eur':   0.0,
+        'other_costs_eur': 0.0,
+        'kzt_per_eur':     0.0,
+        'kalemler':        [],
+    }
+
+    def parse_kzt(s):
+        s = str(s).strip().replace('\xa0', '').replace('\u202f', '').replace(' ', '')
+        s = re.sub(r'[^\d,.]', '', s)
+        if ',' in s and '.' in s:
+            s = s.replace('.', '').replace(',', '.') if s.rfind(',') > s.rfind('.') else s.replace(',', '')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
+    try:
+        # Önce pdfplumber dene, boşsa OCR yap
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        if len(text) < 50:  # Taranmış PDF — OCR gerekli
+            try:
+                from pdf2image import convert_from_bytes
+                import pytesseract
+                # Sadece son sayfa — Итого orada, dpi düşük
+                images = convert_from_bytes(pdf_bytes, dpi=100, last_page=2, first_page=2)
+                if not images:
+                    images = convert_from_bytes(pdf_bytes, dpi=100, last_page=1)
+                # Sadece sayfa alt yarısı — Итого hep altta
+                img = images[0]
+                w, h = img.size
+                img = img.crop((0, int(h * 0.6), w, h))
+                text = pytesseract.image_to_string(img, lang='rus')
+                text = re.sub(r'\s+', ' ', text)
+                print(f'[KZ PDF] OCR text preview: {text[:300]}')
+            except Exception as ocr_err:
+                print(f'[KZ PDF] OCR hatası: {ocr_err}')
+        else:
+            print(f'[KZ PDF] pdfplumber text preview: {text[:300]}')
+
+        # Итого satırını yakala — Kiril veya bozuk encoding dahil
+        m = re.search(r'(?:Итого|Итого|ИТОГО|\u0418\u0442\u043e\u0433\u043e)[:\s]+([\d\s]+[,.][\d]{2})', text)
+        if not m:
+            # Fallback: "x 702 062,00" formatı — tablodaki son büyük sayıyı al
+            numbers = re.findall(r'(\d{1,3}(?:\s\d{3})*[,.]\d{2})', text)
+            big = [parse_kzt(n) for n in numbers if parse_kzt(n) >= 50000]
+            if not big:
+                raise ValueError('Итого satırı bulunamadı')
+            itogo = max(big)
+        else:
+            itogo = parse_kzt(m.group(1))
+        print(f'[KZ PDF] Итого: {itogo}')
+
+        result['brokerage_kzt'] = itogo
+        result['kalemler'] = [{'no': 1, 'ad': 'Итого', 'tutar': itogo}]
+
+        # KZT/EUR kuru
+        try:
+            url = 'https://api.exchangerate-api.com/v4/latest/EUR'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                rates = _json.loads(resp.read()).get('rates', {})
+            kzt_per_eur = float(rates.get('KZT', 0) or 0)
+            result['kzt_per_eur'] = round(kzt_per_eur, 4)
+            if kzt_per_eur > 0:
+                result['brokerage_eur'] = round(itogo / kzt_per_eur, 2)
+        except Exception as e:
+            print(f'[KZ] Kur hatası: {e}')
+
+    except Exception as e:
+        print(f'[KZ PDF] Parse hatası: {e}')
+        import traceback
+        traceback.print_exc()
+        result['_hata'] = str(e)
 
     return result
 

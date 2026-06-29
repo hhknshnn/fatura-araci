@@ -42,7 +42,8 @@ def _cost_parts(rows):
     operasyon = sum(
         _to_float(r.get('ihracat_beyanname_eur')) +
         _to_float(r.get('arac_bekleme')) +
-        _to_float(r.get('brokerage_eur'))
+        _to_float(r.get('brokerage_eur')) +
+        _to_float(r.get('other_costs_eur'))
         for r in rows
     )
     navlun = sum(_to_float(r.get('navlun_eur')) for r in rows)
@@ -99,7 +100,7 @@ def _query_rows():
         SELECT id, ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
                fatura_bedeli_eur, navlun_eur, sigorta_eur, yukleme_tarihi,
                ihracat_beyanname_eur, arac_bekleme, brokerage_eur,
-               gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id, durum
+               other_costs_eur, gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id, durum
         FROM shipments
         WHERE 1=1
     '''
@@ -223,6 +224,8 @@ def _build_payload(rows, pending_rows=None):
             'depo': _depo_from_fatura(row.get('fatura_no')),
             'yukleme_tarihi': str(row.get('yukleme_tarihi') or ''),
             'sefer_id': row.get('sefer_id'),
+            'brokerage_eur': _to_float(row.get('brokerage_eur')),
+            'other_costs_eur': _to_float(row.get('other_costs_eur')),
             **costs,
         })
 
@@ -324,6 +327,8 @@ def landed_cost_export():
         ('Landed Cost EUR', 'landed_cost_eur'),
         ('Oran', 'oran'),
         ('Operasyon EUR', 'operasyon_eur'),
+        ('Brokerage Fee & Other Costs EUR', 'brokerage_eur'),
+        ('Other Costs EUR', 'other_costs_eur'),
         ('Navlun EUR', 'navlun_eur'),
         ('Vergi EUR', 'vergi_eur'),
         ('Sigorta EUR', 'sigorta_eur'),
@@ -339,7 +344,7 @@ def landed_cost_export():
         ('Durum', 'durum'),
         ('Grup', 'sefer_id'),
         ('Fatura EUR', 'fatura_eur'),
-        ('Brokerage EUR', 'brokerage_eur'),
+        ('Brokerage Fee & Other Costs EUR', 'brokerage_eur'),
     ], payload['pending']['detail'])
 
     buf = io.BytesIO()

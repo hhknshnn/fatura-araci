@@ -7,7 +7,7 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image
 from api.landed_cost import landed_cost_get, landed_cost_export
 from api.kur import get_tcmb_kurlar
 
@@ -543,6 +543,38 @@ def api_bulk_update_palet():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/shipments/parse-kz-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_kz_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64   = body.get('pdf', '')
+        image_b64 = body.get('image', '')
+        if image_b64:
+            result = parse_kz_avr_image(base64.b64decode(image_b64))
+        elif pdf_b64:
+            result = parse_kz_avr_pdf(base64.b64decode(pdf_b64))
+        else:
+            return jsonify({'success': False, 'error': 'PDF veya görsel boş'}), 400
+        if result.get('_hata') or not result.get('brokerage_kzt'):
+            return jsonify({
+                'success': False,
+                'error': result.get('_hata') or 'Итого satırı okunamadı.',
+            }), 422
+
+        return jsonify({
+            'success':         True,
+            'brokerage_kzt':   result['brokerage_kzt'],
+            'other_costs_kzt': result['other_costs_kzt'],
+            'brokerage_eur':   result['brokerage_eur'],
+            'other_costs_eur': result['other_costs_eur'],
+            'kzt_per_eur':     result['kzt_per_eur'],
+            'kalemler':        result['kalemler'],
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
 
 @app.route('/api/shipments/parse-fr-pdf', methods=['POST', 'OPTIONS'])
 def api_parse_fr_pdf():

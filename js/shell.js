@@ -198,22 +198,45 @@ function sidebarSelect(mod) {
     switchFaturaUretTab('taslak');
 
   } else if (mod === 'maliyet-evrak') {
-    // Maliyet Evrak — ileride doldurulacak
     let panel = document.getElementById('stepMaliyetEvrak');
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'stepMaliyetEvrak';
       panel.className = 'panel';
+      panel.style.cssText = 'padding:24px;';
       panel.innerHTML = `
-        <div class="panel-label">Maliyet Evrak</div>
-        <div class="panel-title">Maliyet Evrak Yükle</div>
-        <div class="panel-desc">Beyanname, vergi ve gümrük PDF'lerini yükleyerek ilgili sevkiyatlara otomatik aktar.</div>
-        <div style="margin-top:32px;padding:32px;background:var(--surface2);border:1.5px dashed var(--border2);
-                    border-radius:var(--radius-md);text-align:center;color:var(--text3);">
-          <div style="font-size:32px;margin-bottom:12px;">📋</div>
-          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;">Yakında</div>
-          <div style="font-size:13px;">Sırbistan, Kosova ve diğer ülke evrakları burada toplanacak.</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Maliyet Evrak</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;">Maliyet Evrak Yükle</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:24px;">Beyanname, vergi ve gümrük PDF'lerini yükleyerek ilgili sevkiyatlara otomatik aktar.</div>
+
+        <!-- Sırbistan Bölümü -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+            <img src="https://flagcdn.com/20x15/rs.png" alt="RS"> Sırbistan — Gümrük & Brokerage PDF
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Gümrük vergisi, KDV veya spediter faturasını yükleyin — sevkiyata otomatik eşleşir.</div>
+          <div id="me-rs-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+            ondragleave="this.classList.remove('vergi-drag-over')"
+            ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleRsPdf(event.dataTransfer.files[0])"
+            onclick="document.getElementById('me-rs-input').click()"
+            style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                   background:var(--surface2);border:1.5px dashed var(--border2);
+                   border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+            <input type="file" id="me-rs-input" accept=".pdf" style="display:none;" onchange="meHandleRsPdf(this.files[0])">
+            <span style="font-size:20px;flex-shrink:0;">📄</span>
+            <div style="flex:1;min-width:0;">
+              <div id="me-rs-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
+            </div>
+          </div>
+          <div id="me-rs-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
         </div>
+
+        <style>
+          #me-rs-drop:hover, #me-rs-drop.vergi-drag-over {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+          }
+        </style>
       `;
       document.getElementById('contentArea').appendChild(panel);
     }

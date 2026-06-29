@@ -341,7 +341,7 @@ function renderLcPending(pending) {
         <div class="lc-pending-head" style="margin-bottom:0;">
           <div>
             <div class="lc-pending-title">Bekleyen kayıt bilgisi alınamadı</div>
-            <div class="lc-pending-sub">API yanıtında pending alanı yok. Sunucu eski kodla çalışıyor olabilir; backend yeniden başlatılınca brokerage fee EUR boş/0 olan kurumsal sevkiyatlar burada görünecek.</div>
+            <div class="lc-pending-sub">API yanıtında pending alanı yok. Sunucu eski kodla çalışıyor olabilir; backend yeniden başlatılınca Brokerage Fee & Other Costs EUR boş/0 olan kurumsal sevkiyatlar burada görünecek.</div>
           </div>
           <div class="lc-pending-badge">kontrol gerekli</div>
         </div>
@@ -359,7 +359,7 @@ function renderLcPending(pending) {
         <div class="lc-pending-head" style="margin-bottom:0;">
           <div>
             <div class="lc-pending-title" style="color:#166534;">Bekleyen landed cost kaydı yok</div>
-            <div class="lc-pending-sub" style="color:#15803D;">Seçili filtrelerde brokerage fee EUR eksik olan kurumsal sevkiyat bulunmuyor.</div>
+            <div class="lc-pending-sub" style="color:#15803D;">Seçili filtrelerde Brokerage Fee & Other Costs EUR eksik olan kurumsal sevkiyat bulunmuyor.</div>
           </div>
           <div class="lc-pending-badge" style="background:#DCFCE7;color:#166534;">0 bekleyen</div>
         </div>
@@ -389,7 +389,7 @@ function renderLcPending(pending) {
       <div class="lc-pending-head">
         <div>
           <div class="lc-pending-title">Landed Cost hesabına dahil edilmeyenler</div>
-          <div class="lc-pending-sub">Brokerage Fee EUR boş ya da 0 olduğu için bu kurumsal sevkiyatlar ana hesaplardan çıkarıldı.</div>
+          <div class="lc-pending-sub">Brokerage Fee & Other Costs EUR boş ya da 0 olduğu için bu kurumsal sevkiyatlar ana hesaplardan çıkarıldı.</div>
         </div>
         <div class="lc-pending-badge">${count} fatura / ${summary.sefer_sayisi || 0} sefer</div>
       </div>

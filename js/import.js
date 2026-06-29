@@ -55,7 +55,7 @@ const KOLON_ETIKETLER = {
   arac_bekleme:          'Araç Bekleme',
   ihracat_beyanname_tl:  'İhracat Beyanname TL',
   ihracat_beyanname_eur: 'İhracat Beyanname EUR',
-  brokerage_eur:         'Brokerage EUR',
+  brokerage_eur:         'Brokerage Fee & Other Costs EUR',
   gumruk_vergisi_eur:    'Gümrük Vergisi EUR',
   kdv_eur:               'KDV EUR',
   toplam_maliyet_eur:    'Toplam Maliyet EUR',

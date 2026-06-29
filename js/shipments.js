@@ -631,6 +631,7 @@ async function openShipmentDetail(id) {
   document.getElementById('edit-beyanname-eur').value = s.ihracat_beyanname_eur || '';
   document.getElementById('edit-bekleme').value       = s.arac_bekleme || '';
   document.getElementById('edit-brokerage').value     = s.brokerage_eur || '';
+  document.getElementById('edit-other-costs').value   = s.other_costs_eur || '';
   document.getElementById('edit-gumruk-v').value      = s.gumruk_vergisi_eur || '';
   document.getElementById('edit-kdv').value           = s.kdv_eur || '';
   document.getElementById('edit-fatura-tl').value     = s.fatura_bedeli_tl || '';
@@ -684,7 +685,7 @@ async function openShipmentDetail(id) {
   // Her popup açılışında vergi PDF status ve input'u sıfırla
   const vergiStatus = document.getElementById('vergi-pdf-status');
   if (vergiStatus) {
-    vergiStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage otomatik dolar';
+    vergiStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage Fee & Other Costs EUR otomatik dolar';
     vergiStatus.style.color = 'var(--text3)';
   }
   const vergiInput = document.getElementById('vergi-pdf-input');
@@ -752,6 +753,7 @@ async function saveShipmentDetail() {
       ihracat_beyanname_eur: parseFloat(document.getElementById('edit-beyanname-eur').value) || 0,
       arac_bekleme:          parseFloat(document.getElementById('edit-bekleme').value)        || 0,
       brokerage_eur:         parseFloat(document.getElementById('edit-brokerage').value)      || 0,
+      other_costs_eur:       parseFloat(document.getElementById('edit-other-costs').value)    || 0,
       gumruk_vergisi_eur:    parseFloat(document.getElementById('edit-gumruk-v').value)       || 0,
       kdv_eur:               parseFloat(document.getElementById('edit-kdv').value)            || 0,
     };
@@ -1417,10 +1419,55 @@ async function handleVergiPdf(file) {
 
       statusEl.style.color = 'var(--success)';
       statusEl.textContent =
-        `✓ Brokerage: ${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} € | ` +
+        `✓ Brokerage Fee & Other Costs EUR: ${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} € | ` +
         `Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD`;
     }
 
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+  }
+}
+
+// Sırbistan PDF — mevcut parse-vergi-pdf endpoint'ini kullanır
+async function meHandleRsPdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-rs-status');
+  const resultEl = document.getElementById('me-rs-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  try {
+    const data = await parseVergiPdf(file);
+    const fmt = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = `✓ ${file.name} okundu`;
+
+    resultEl.style.display = 'block';
+    if (data.tip === 'vergi') {
+      resultEl.innerHTML = `
+        <div style="color:var(--success);">✓ Gümrük Vergisi faturası</div>
+        <div style="margin-top:6px;font-size:12px;">
+          Gümrük: <b>${fmt(data.rsd.carina)} RSD → ${fmt(data.eur.gumruk_vergisi)} €</b> &nbsp;|&nbsp;
+          KDV: <b>${fmt(data.rsd.pdv)} RSD → ${fmt(data.eur.kdv)} €</b><br>
+          <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text3);">
+          ℹ Sevkiyata uygulamak için ilgili sevkiyatı açıp PDF'i oradan yükleyin.
+        </div>`;
+    } else if (data.tip === 'brokerage') {
+      resultEl.innerHTML = `
+        <div style="color:var(--success);">✓ Spediter (Brokerage Fee & Other Costs EUR) faturası</div>
+        <div style="margin-top:6px;font-size:12px;">
+          Brokerage Fee & Other Costs EUR: <b>${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} €</b><br>
+          <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text3);">
+          ℹ Sevkiyata uygulamak için ilgili sevkiyatı açıp PDF'i oradan yükleyin.
+        </div>`;
+    }
   } catch (err) {
     statusEl.style.color = 'var(--error)';
     statusEl.textContent = '⚠ ' + err.message;
