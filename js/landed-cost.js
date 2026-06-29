@@ -2,7 +2,7 @@
 // Kurumsal ülkeler için KDV hariç landed cost analizi ve raporu
 
 const LC_COUNTRIES = ['ALMANYA', 'BELÇİKA', 'BOSNA', 'GÜRCİSTAN', 'HOLLANDA', 'KAZAKİSTAN', 'KOSOVA', 'MAKEDONYA', 'SIRBİSTAN'];
-let landedCostState = { data: null };
+let landedCostState = { data: null, pendingExpanded: false };
 
 function lcFormatEur(value) {
   const val = Number(value || 0);
@@ -47,6 +47,9 @@ function initLandedCostPanel() {
         .lc-pending-title { font-size:13px; font-weight:750; color:#9A3412; }
         .lc-pending-sub { font-size:11.5px; color:#C2410C; margin-top:3px; }
         .lc-pending-badge { white-space:nowrap; border-radius:999px; background:#FFEDD5; color:#9A3412; padding:5px 10px; font-size:11px; font-weight:750; }
+        .lc-pending-more { display:flex; align-items:center; gap:8px; margin-top:10px; }
+        .lc-pending-toggle { border:0.5px solid #FDBA74; border-radius:999px; background:#fff; color:#C2410C; padding:7px 11px; font-size:11.5px; font-weight:750; cursor:pointer; }
+        .lc-pending-toggle:hover { background:#FFEDD5; }
         .lc-status-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
         .lc-status-pill { border:0.5px solid #FDBA74; border-radius:999px; background:#fff; color:#9A3412; padding:5px 9px; font-size:11px; font-weight:650; }
         .lc-chart-row { display:grid; grid-template-columns:92px minmax(0,1fr) 72px; gap:9px; align-items:center; margin-bottom:10px; }
@@ -54,6 +57,12 @@ function initLandedCostPanel() {
         .lc-track { height:9px; border-radius:999px; background:#F1F5F9; overflow:hidden; }
         .lc-fill { height:100%; border-radius:999px; background:#2563EB; }
         .lc-chart-val { font-size:11px; color:#64748B; font-weight:700; text-align:right; }
+        .lc-country-mix { border-top:0.5px solid #E2E8F0; margin-top:16px; padding-top:14px; }
+        .lc-country-mix-title { font-size:11px; font-weight:750; color:#64748B; margin-bottom:10px; text-transform:uppercase; letter-spacing:.04em; }
+        .lc-country-mix-row { display:grid; grid-template-columns:92px minmax(0,1fr) 58px; gap:9px; align-items:center; margin-bottom:10px; }
+        .lc-stacked { height:16px; border-radius:999px; background:#F1F5F9; overflow:hidden; display:flex; }
+        .lc-stacked-part { height:100%; min-width:3px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; font-weight:800; line-height:1; }
+        .lc-stacked-part.light { color:#1F2937; }
         .lc-table { width:100%; border-collapse:collapse; font-size:12px; }
         .lc-table th { text-align:left; color:#64748B; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:9px 8px; border-bottom:0.5px solid #E2E8F0; }
         .lc-table td { padding:9px 8px; border-bottom:0.5px solid #EEF2F7; color:#334155; }
@@ -96,6 +105,7 @@ function initLandedCostPanel() {
             <div class="lc-card-title">Maliyet Kalemi Dağılımı</div>
             <div class="lc-card-sub">Operasyon, navlun, vergi, sigorta</div>
             <div id="lc-cost-mix"></div>
+            <div id="lc-country-mix"></div>
           </div>
         </div>
         <div class="lc-grid">
@@ -198,6 +208,7 @@ function renderLandedCost(data) {
   renderLcBarChart('lc-country-chart', countries.slice(0, 9).map(c => ({
     label: c.ulke, value: c.landed_cost_eur, display: lcFormatEur(c.landed_cost_eur), color: '#2563EB',
   })));
+  renderLcCountryMix(countries);
   renderLcBarChart('lc-ratio-chart', countries.slice().sort((a, b) => b.oran - a.oran).slice(0, 8).map(c => ({
     label: c.ulke, value: c.oran, display: '%' + Math.round(c.oran || 0), color: '#F59E0B',
   })));
@@ -245,6 +256,45 @@ function renderLcMix(items) {
         <div class="lc-chart-val">${lcFormatEur(item.value)}</div>
       </div>
     `).join('')}
+  `;
+}
+
+function renderLcCountryMix(countries) {
+  const el = document.getElementById('lc-country-mix');
+  if (!el) return;
+  const rows = countries.filter(c => Number(c.landed_cost_eur || 0) > 0).slice(0, 9);
+  if (!rows.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const parts = [
+    { key: 'operasyon_eur', color: '#2563EB' },
+    { key: 'navlun_eur', color: '#F59E0B', className: 'light' },
+    { key: 'vergi_eur', color: '#EF4444' },
+    { key: 'sigorta_eur', color: '#06B6D4' },
+  ];
+  el.innerHTML = `
+    <div class="lc-country-mix">
+      <div class="lc-country-mix-title">Ülke Bazlı Maliyet Dağılımı</div>
+      ${rows.map(country => {
+        const total = Math.max(Number(country.landed_cost_eur || 0), 1);
+        return `
+          <div class="lc-country-mix-row">
+            <div class="lc-chart-label">${country.ulke || '-'}</div>
+            <div class="lc-stacked">
+              ${parts.map(part => {
+                const value = Number(country[part.key] || 0);
+                if (value <= 0) return '';
+                const pct = (value / total) * 100;
+                const label = pct >= 7 ? `%${Math.round(pct)}` : '';
+                return `<div class="lc-stacked-part ${part.className || ''}" style="width:${pct}%;background:${part.color};">${label}</div>`;
+              }).join('')}
+            </div>
+            <div class="lc-chart-val">${lcFormatEur(country.landed_cost_eur)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
   `;
 }
 
@@ -321,9 +371,17 @@ function renderLcPending(pending) {
   const statusPills = (summary.by_status || []).map(item => `
     <span class="lc-status-pill">${item.durum}: ${item.sayi}</span>
   `).join('');
-  const shownRows = rows.slice(0, 8);
-  const moreText = rows.length > shownRows.length
-    ? `<div style="font-size:11px;color:#C2410C;margin-top:8px;">+${rows.length - shownRows.length} kayıt daha Excel raporundaki Bekleyenler sayfasında.</div>`
+  const hasMore = rows.length > 8;
+  const shownRows = landedCostState.pendingExpanded ? rows : rows.slice(0, 8);
+  const moreText = hasMore
+    ? `
+      <div class="lc-pending-more">
+        <button class="lc-pending-toggle" onclick="toggleLcPendingRows()">
+          ${landedCostState.pendingExpanded ? 'Daha az göster' : `+${rows.length - 8} kaydı daha göster`}
+        </button>
+        ${landedCostState.pendingExpanded ? `<span style="font-size:11px;color:#C2410C;">${rows.length} kaydın tamamı gösteriliyor.</span>` : ''}
+      </div>
+    `
     : '';
 
   el.innerHTML = `
@@ -361,6 +419,11 @@ function renderLcPending(pending) {
       ${moreText}
     </div>
   `;
+}
+
+function toggleLcPendingRows() {
+  landedCostState.pendingExpanded = !landedCostState.pendingExpanded;
+  if (landedCostState.data) renderLandedCost(landedCostState.data);
 }
 
 async function downloadLandedCostReport() {

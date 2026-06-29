@@ -1,4 +1,5 @@
 import io
+import re
 
 from flask import jsonify, request, send_file
 
@@ -24,6 +25,11 @@ def _norm(value):
 
 def _depo_from_fatura(fatura_no):
     return 'ANT' if str(fatura_no or '').startswith('ANT') else 'IHR'
+
+
+def _natural_sort_key(value):
+    parts = re.split(r'(\d+)', str(value or ''))
+    return [int(part) if part.isdigit() else part.lower() for part in parts]
 
 
 def _is_kurumsal(row):
@@ -150,6 +156,7 @@ def _pending_payload(rows):
             'fatura_eur': _to_float(row.get('fatura_bedeli_eur')),
             'sefer_id': row.get('sefer_id'),
         })
+    detail.sort(key=lambda item: _natural_sort_key(item.get('ihracat_dosya_no')), reverse=True)
 
     return {
         'summary': {
