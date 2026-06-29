@@ -42,6 +42,13 @@ function initLandedCostPanel() {
         .lc-card { border:0.5px solid var(--border2); border-radius:12px; background:var(--surface); padding:16px; min-height:220px; }
         .lc-card-title { font-size:13px; font-weight:750; color:#0F172A; margin-bottom:2px; }
         .lc-card-sub { font-size:11px; color:#94A3B8; margin-bottom:14px; }
+        .lc-pending-card { border:0.5px solid #FED7AA; border-radius:12px; background:#FFF7ED; padding:14px 16px; }
+        .lc-pending-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:10px; }
+        .lc-pending-title { font-size:13px; font-weight:750; color:#9A3412; }
+        .lc-pending-sub { font-size:11.5px; color:#C2410C; margin-top:3px; }
+        .lc-pending-badge { white-space:nowrap; border-radius:999px; background:#FFEDD5; color:#9A3412; padding:5px 10px; font-size:11px; font-weight:750; }
+        .lc-status-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+        .lc-status-pill { border:0.5px solid #FDBA74; border-radius:999px; background:#fff; color:#9A3412; padding:5px 9px; font-size:11px; font-weight:650; }
         .lc-chart-row { display:grid; grid-template-columns:92px minmax(0,1fr) 72px; gap:9px; align-items:center; margin-bottom:10px; }
         .lc-chart-label { font-size:11.5px; color:#475569; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .lc-track { height:9px; border-radius:999px; background:#F1F5F9; overflow:hidden; }
@@ -78,6 +85,7 @@ function initLandedCostPanel() {
           <div class="lc-country-pills" id="lc-country-pills"></div>
         </div>
         <div class="lc-kpis" id="lc-kpis"></div>
+        <div id="lc-pending-panel"></div>
         <div class="lc-grid">
           <div class="lc-card">
             <div class="lc-card-title">Ülkelere Göre Landed Cost</div>
@@ -156,6 +164,7 @@ async function loadLandedCost() {
   const params = getLandedCostParams();
   const token = sessionStorage.getItem('fa_auth_token');
   const res = await fetch('/api/landed-cost?' + params.toString(), {
+    cache: 'no-store',
     headers: { 'Authorization': `Bearer ${token}` },
   });
   const data = await res.json();
@@ -166,6 +175,7 @@ async function loadLandedCost() {
 
 function renderLandedCost(data) {
   const summary = data.summary || {};
+  const pending = Object.prototype.hasOwnProperty.call(data, 'pending') ? data.pending : null;
   const countries = data.countries || [];
   const months = data.months || [];
   const costItems = [
@@ -196,6 +206,7 @@ function renderLandedCost(data) {
   })));
   renderLcMix(costItems);
   renderLcCountryTable(countries);
+  renderLcPending(pending);
 }
 
 function renderLcBarChart(id, rows) {
@@ -267,6 +278,88 @@ function renderLcCountryTable(countries) {
         `).join('')}
       </tbody>
     </table>
+  `;
+}
+
+function renderLcPending(pending) {
+  const el = document.getElementById('lc-pending-panel');
+  if (!el) return;
+
+  if (!pending) {
+    el.innerHTML = `
+      <div class="lc-pending-card">
+        <div class="lc-pending-head" style="margin-bottom:0;">
+          <div>
+            <div class="lc-pending-title">Bekleyen kayıt bilgisi alınamadı</div>
+            <div class="lc-pending-sub">API yanıtında pending alanı yok. Sunucu eski kodla çalışıyor olabilir; backend yeniden başlatılınca brokerage fee EUR boş/0 olan kurumsal sevkiyatlar burada görünecek.</div>
+          </div>
+          <div class="lc-pending-badge">kontrol gerekli</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const summary = pending.summary || {};
+  const rows = pending.detail || [];
+  const count = summary.fatura_sayisi || 0;
+  if (!count) {
+    el.innerHTML = `
+      <div class="lc-pending-card" style="border-color:#BBF7D0;background:#F0FDF4;">
+        <div class="lc-pending-head" style="margin-bottom:0;">
+          <div>
+            <div class="lc-pending-title" style="color:#166534;">Bekleyen landed cost kaydı yok</div>
+            <div class="lc-pending-sub" style="color:#15803D;">Seçili filtrelerde brokerage fee EUR eksik olan kurumsal sevkiyat bulunmuyor.</div>
+          </div>
+          <div class="lc-pending-badge" style="background:#DCFCE7;color:#166534;">0 bekleyen</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const statusPills = (summary.by_status || []).map(item => `
+    <span class="lc-status-pill">${item.durum}: ${item.sayi}</span>
+  `).join('');
+  const shownRows = rows.slice(0, 8);
+  const moreText = rows.length > shownRows.length
+    ? `<div style="font-size:11px;color:#C2410C;margin-top:8px;">+${rows.length - shownRows.length} kayıt daha Excel raporundaki Bekleyenler sayfasında.</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="lc-pending-card">
+      <div class="lc-pending-head">
+        <div>
+          <div class="lc-pending-title">Landed Cost hesabına dahil edilmeyenler</div>
+          <div class="lc-pending-sub">Brokerage Fee EUR boş ya da 0 olduğu için bu kurumsal sevkiyatlar ana hesaplardan çıkarıldı.</div>
+        </div>
+        <div class="lc-pending-badge">${count} fatura / ${summary.sefer_sayisi || 0} sefer</div>
+      </div>
+      <div class="lc-status-pills">${statusPills}</div>
+      <div style="overflow-x:auto;">
+        <table class="lc-table">
+          <thead>
+            <tr>
+              <th>Fatura</th><th>Dosya</th><th>Ülke</th><th>Depo</th><th>Yükleme</th><th>Durum</th><th>Fatura EUR</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${shownRows.map(row => `
+              <tr>
+                <td><b>${row.fatura_no || '-'}</b></td>
+                <td>${row.ihracat_dosya_no || '-'}</td>
+                <td>${row.ulke || '-'}</td>
+                <td>${row.depo || '-'}</td>
+                <td>${row.yukleme_tarihi || '-'}</td>
+                <td>${row.durum || '-'}</td>
+                <td>${lcFormatFullEur(row.fatura_eur)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${moreText}
+    </div>
   `;
 }
 

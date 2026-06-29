@@ -65,6 +65,21 @@ def _sefer_count(rows):
     return singles + len(groups)
 
 
+def _has_landed_cost_ready(row):
+    return _to_float(row.get('brokerage_eur')) > 0
+
+
+def _split_landed_cost_rows(rows):
+    ready = []
+    pending = []
+    for row in rows:
+        if _has_landed_cost_ready(row):
+            ready.append(row)
+        else:
+            pending.append(row)
+    return ready, pending
+
+
 def _query_rows():
     countries = [c.strip().upper() for c in request.args.get('countries', '').split(',') if c.strip()]
     date_from = request.args.get('date_from')
@@ -78,7 +93,7 @@ def _query_rows():
         SELECT id, ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
                fatura_bedeli_eur, navlun_eur, sigorta_eur, yukleme_tarihi,
                ihracat_beyanname_eur, arac_bekleme, brokerage_eur,
-               gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id
+               gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id, durum
         FROM shipments
         WHERE 1=1
     '''
@@ -113,7 +128,49 @@ def _query_rows():
     return filtered
 
 
-def _build_payload(rows):
+def _pending_payload(rows):
+    by_status = {}
+    by_country = {}
+    detail = []
+
+    for row in rows:
+        status = row.get('durum') or 'Belirsiz'
+        country = row.get('ulke') or 'Belirsiz'
+        by_status[status] = by_status.get(status, 0) + 1
+        by_country[country] = by_country.get(country, 0) + 1
+        detail.append({
+            'id': row.get('id'),
+            'ihracat_dosya_no': row.get('ihracat_dosya_no'),
+            'fatura_no': row.get('fatura_no'),
+            'ulke': country,
+            'depo': _depo_from_fatura(row.get('fatura_no')),
+            'yukleme_tarihi': str(row.get('yukleme_tarihi') or ''),
+            'durum': status,
+            'brokerage_eur': _to_float(row.get('brokerage_eur')),
+            'fatura_eur': _to_float(row.get('fatura_bedeli_eur')),
+            'sefer_id': row.get('sefer_id'),
+        })
+
+    return {
+        'summary': {
+            'fatura_sayisi': len(rows),
+            'sefer_sayisi': _sefer_count(rows),
+            'fatura_eur': sum(_to_float(r.get('fatura_bedeli_eur')) for r in rows),
+            'by_status': [
+                {'durum': status, 'sayi': count}
+                for status, count in sorted(by_status.items(), key=lambda item: item[0])
+            ],
+            'by_country': [
+                {'ulke': country, 'sayi': count}
+                for country, count in sorted(by_country.items(), key=lambda item: item[0])
+            ],
+        },
+        'detail': detail,
+    }
+
+
+def _build_payload(rows, pending_rows=None):
+    pending_rows = pending_rows or []
     summary = _cost_parts(rows)
     summary['fatura_sayisi'] = len(rows)
     summary['sefer_sayisi'] = _sefer_count(rows)
@@ -167,6 +224,7 @@ def _build_payload(rows):
         'countries': countries,
         'months': months,
         'detail': detail,
+        'pending': _pending_payload(pending_rows),
         'cost_labels': {
             'operasyon_eur': 'Operasyon',
             'navlun_eur': 'Navlun',
@@ -177,13 +235,13 @@ def _build_payload(rows):
 
 
 def landed_cost_get():
-    rows = _query_rows()
-    return jsonify({'success': True, **_build_payload(rows)})
+    ready_rows, pending_rows = _split_landed_cost_rows(_query_rows())
+    return jsonify({'success': True, **_build_payload(ready_rows, pending_rows)})
 
 
 def landed_cost_export():
-    rows = _query_rows()
-    payload = _build_payload(rows)
+    ready_rows, pending_rows = _split_landed_cost_rows(_query_rows())
+    payload = _build_payload(ready_rows, pending_rows)
 
     try:
         import openpyxl
@@ -263,6 +321,19 @@ def landed_cost_export():
         ('Vergi EUR', 'vergi_eur'),
         ('Sigorta EUR', 'sigorta_eur'),
     ], payload['detail'])
+
+    ws = wb.create_sheet('Bekleyenler')
+    write_table(ws, [
+        ('Dosya No', 'ihracat_dosya_no'),
+        ('Fatura No', 'fatura_no'),
+        ('Ülke', 'ulke'),
+        ('Depo', 'depo'),
+        ('Yükleme', 'yukleme_tarihi'),
+        ('Durum', 'durum'),
+        ('Grup', 'sefer_id'),
+        ('Fatura EUR', 'fatura_eur'),
+        ('Brokerage EUR', 'brokerage_eur'),
+    ], payload['pending']['detail'])
 
     buf = io.BytesIO()
     wb.save(buf)
