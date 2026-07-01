@@ -101,8 +101,8 @@ const TASLAK_ULKELER = {
     label: 'Kazakistan', flag: 'kz', grup: 'kurumsal',
     template: 'templates/taslak_kz.xlsx',
     alanlar: [
-      { id: 'navlun', label: 'Freight (USD)', tip: 'number', placeholder: 'örn: 3100,00' },
-      { id: 'sigorta', label: 'Insurance (USD)', tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'navlun', label: 'Freight (TL)', tip: 'number', placeholder: 'örn: 102186,04' },
+      { id: 'sigorta', label: 'Insurance (TL)', tip: 'number', placeholder: 'örn: 371,59' },
       { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 33 (22 Palet + 11 Koli)' },
       { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },

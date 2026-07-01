@@ -753,6 +753,12 @@
                     placeholder="0"></div>
                 <div class="detail-field"><label>EUR Kuru</label><input id="new-kur" type="number" placeholder="0">
                 </div>
+                <div class="detail-field"><label>Navlun USD</label><input id="new-navlun-usd" type="number" placeholder="0">
+                </div>
+                <div class="detail-field"><label>Sigorta USD</label><input id="new-sigorta-usd" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>USD Kuru</label><input id="new-usd-kur" type="number" placeholder="0">
+                </div>
               </div>
             </div>
             <div class="detail-section-label">Fatura Bilgileri</div>
@@ -768,6 +774,12 @@
               <div class="detail-field"><label>Sigorta EUR</label><input id="edit-sigorta" type="number"
                   placeholder="0"></div>
               <div class="detail-field"><label>EUR Kuru</label><input id="edit-kur" type="number" placeholder="0">
+              </div>
+              <div class="detail-field"><label>Navlun USD</label><input id="edit-navlun-usd" type="number" placeholder="0">
+              </div>
+              <div class="detail-field"><label>Sigorta USD</label><input id="edit-sigorta-usd" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>USD Kuru</label><input id="edit-usd-kur" type="number" placeholder="0">
               </div>
             </div>
             <div class="detail-section-label">Genel Bilgiler</div>
@@ -1488,8 +1500,51 @@
             <div id="me-rs-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
           </div>
 
+          <!-- ══════ GEÇİCİ: USD BACKFILL (KZ/GE) — iş bitince kaldır ══════ -->
+          <div id="usd-backfill-section" style="margin-bottom:24px;padding-top:20px;border-top:1px dashed var(--border2);">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">
+              🚧 USD Backfill (Geçici) — Kazakistan / Gürcistan
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Storage'da PDF'i silinmiş eski KZ/GE sevkiyatları için orijinal fatura PDF'ini yükleyip Navlun USD / Sigorta USD / USD Kuru alanlarını dolduruyor.
+            </div>
+            <button onclick="loadUsdBackfillList()"
+              style="margin-bottom:10px;padding:6px 14px;border-radius:var(--radius-md);border:0.5px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;">
+              🔄 Eksik Listesini Yükle
+            </button>
+            <div id="usd-backfill-list" style="margin-bottom:14px;"></div>
+            <div id="usd-backfill-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleUsdBackfillFiles(event.dataTransfer.files)"
+              onclick="document.getElementById('usd-backfill-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="usd-backfill-input" accept=".pdf" multiple style="display:none;"
+                onchange="handleUsdBackfillFiles(this.files)">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="usd-backfill-status" style="font-size:12px;color:var(--text3);">
+                  Bir veya birden fazla PDF sürükleyin veya tıklayın — dosya adına göre otomatik eşleşir
+                </div>
+              </div>
+            </div>
+            <div id="usd-backfill-results" style="margin-top:10px;"></div>
+
+            <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border2);">
+              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;">
+                📊 veya Excel ile toplu gir (fatura_no, navlun_usd, sigorta_usd sütunları)
+              </div>
+              <input type="file" id="usd-backfill-excel-input" accept=".xlsx,.xls"
+                onchange="handleUsdBackfillExcel(this.files[0])"
+                style="font-size:12px;">
+              <div id="usd-backfill-excel-status" style="font-size:12px;color:var(--text3);margin-top:8px;"></div>
+            </div>
+          </div>
+
           <style>
-            #me-rs-drop:hover, #me-rs-drop.vergi-drag-over {
+            #me-rs-drop:hover, #me-rs-drop.vergi-drag-over,
+            #usd-backfill-dropzone:hover, #usd-backfill-dropzone.vergi-drag-over {
               border-color: var(--accent);
               background: var(--accent-dim);
             }
@@ -1579,6 +1634,7 @@
   <script src="js/users.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/shipments.js"></script>
+  <script src="js/usd-backfill.js"></script>
   <script src="js/landed-cost.js"></script>
   <script src="js/import.js"></script>
 

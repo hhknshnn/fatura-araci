@@ -120,6 +120,24 @@ def _extract_pdf_amount(text, patterns):
     return 0.0
 
 
+def _extract_amount_near_keywords(text, keywords, window=140):
+    money_re = re.compile(
+        r'(?:TRY|TL|₺)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2,4})|[0-9]+[.,][0-9]{2,4})\s*(?:TRY|TL|₺)?',
+        re.IGNORECASE,
+    )
+    for keyword in keywords:
+        for match in re.finditer(keyword, text, re.IGNORECASE):
+            snippet = text[match.start():match.end() + window]
+            amounts = [
+                _parse_pdf_amount(m.group(1))
+                for m in money_re.finditer(snippet)
+            ]
+            amounts = [n for n in amounts if n > 0]
+            if amounts:
+                return amounts[0]
+    return 0.0
+
+
 def _extract_pdf_packages(text):
     patterns = [
         r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
@@ -140,33 +158,48 @@ def parse_pdf(pdf_bytes):
     """
     PDF'ten navlun, sigorta, kur ve kap bilgisini çıkarır.
     Dönen dict: {'navlun': float, 'sigorta': float, 'kur': float, 'kap': str}
-    Navlun ve sigorta her zaman TRY cinsindendir.
+    Navlun ve sigorta PDF'te yazdığı tutar olarak döner; para birimi ülke akışında yorumlanır.
     """
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0, 'kap': ''}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            # Son 2 sayfaya bak — bilgiler genellikle orada
-            page_texts = [
-                _normalize_pdf_text(page.extract_text() or '')
-                for page in pdf.pages[-2:]
-            ]
-            text = ' '.join(t for t in page_texts if t).strip()
-            if not text:
-                return result
+            page_count = len(pdf.pages)
+            preferred_indexes = list(range(max(0, page_count - 2), page_count))
+            remaining_indexes = [i for i in range(page_count) if i not in preferred_indexes]
 
-            result['navlun'] = _extract_pdf_amount(text, [
-                r'\bNAVLUN\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
-            result['sigorta'] = _extract_pdf_amount(text, [
-                r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
-            # Kur: "* KUR BİLGİSİ: TRY 52,5814" formatı
-            result['kur'] = _extract_pdf_amount(text, [
-                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
-            ])
-            result['kap'] = _extract_pdf_packages(text)
+            for indexes in (preferred_indexes, remaining_indexes):
+                texts = []
+                for i in indexes:
+                    texts.append(_normalize_pdf_text(pdf.pages[i].extract_text() or ''))
+                text = ' '.join(t for t in texts if t).strip()
+                if not text:
+                    continue
+                if result['navlun'] <= 0:
+                    result['navlun'] = _extract_pdf_amount(text, [
+                        r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                        r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    ]) or _extract_amount_near_keywords(text, [
+                        r'\bNAVLUN\b',
+                        r'\bFREIGHT\b',
+                        r'\bTA[SŞ]IMA\b',
+                    ])
+                if result['sigorta'] <= 0:
+                    result['sigorta'] = _extract_pdf_amount(text, [
+                        r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                        r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    ]) or _extract_amount_near_keywords(text, [
+                        r'\bS[İI]GORTA\b',
+                        r'\bSIGORTA\b',
+                        r'\bINSURANCE\b',
+                    ])
+                if result['kur'] <= 0:
+                    result['kur'] = _extract_pdf_amount(text, [
+                        r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+                    ])
+                if not result['kap']:
+                    result['kap'] = _extract_pdf_packages(text)
+                if result['navlun'] > 0 and result['sigorta'] > 0:
+                    break
     except Exception:
         pass
     return result

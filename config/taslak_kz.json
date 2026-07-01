@@ -6,12 +6,12 @@
     "navlun": {
       "hucre": "D3",
       "tip": "sayi",
-      "label": "Freight (USD)"
+      "label": "Freight (TL)"
     },
     "sigorta": {
       "hucre": "D4",
       "tip": "sayi",
-      "label": "Insurance (USD)"
+      "label": "Insurance (TL)"
     },
     "kap": {
       "hucre": "D5",

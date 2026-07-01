@@ -541,6 +541,7 @@ function renderShipments(list, fullList) {
               const rowBg = idx % 2 === 1 ? 'var(--surface2)' : 'var(--surface)';
               return `
                 <tr data-id="${s.id}" style="border-bottom:1px solid var(--border2);cursor:pointer;background:${rowBg};transition:background 0.1s;"
+                    onclick="openShipmentDetail(${s.id})"
                     onmouseover="this.style.background='var(--accent-dim)'"
                     onmouseout="this.style.background='${rowBg}'">
                   <td style="padding:5px 8px;width:32px;border-right:1px solid var(--border2);" onclick="event.stopPropagation()">
@@ -549,19 +550,19 @@ function renderShipments(list, fullList) {
                       onclick="toggleSatirSec(event, ${s.id})"
                       style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
                   </td>
-                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.ihracat_dosya_no || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.fatura_no || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.palet || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${depoTag}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.ulke || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.nakliye_firmasi || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.plaka || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;width:70px;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">
+                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${s.ihracat_dosya_no || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);">${s.fatura_no || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);">${s.palet || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;border-right:1px solid var(--border2);">${depoTag}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);">${s.ulke || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);">${s.nakliye_firmasi || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);">${s.plaka || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;width:70px;border-right:1px solid var(--border2);">
                     ${s.sefer_id ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:11px;">-</span>'}
                   </td>
-                  <td style="padding:5px 8px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);" onclick="openShipmentDetail(${s.id})">${s.yukleme_tarihi || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;" onclick="openShipmentDetail(${s.id})">
+                  <td style="padding:5px 8px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${formatEUR(s.fatura_bedeli_eur)}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);">${s.yukleme_tarihi || '-'}</td>
+                  <td style="padding:5px 8px;white-space:nowrap;">
                     <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
                 </tr>`;
@@ -602,6 +603,37 @@ function formatTL(val) {
   return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
 }
 
+function needsFreightRepair(s) {
+  const ulke = String(s?.ulke || '').toUpperCase();
+  const navlun = parseFloat(s?.navlun_eur) || 0;
+  const sigorta = parseFloat(s?.sigorta_eur) || 0;
+  if (ulke === 'BOSNA') return navlun === 0 && sigorta === 0;
+  if (ulke === 'GÜRCİSTAN' || ulke === 'GURCISTAN') {
+    return navlun > 0 && navlun < 100 && sigorta >= 0 && sigorta < 1;
+  }
+  return false;
+}
+
+async function repairShipmentFreightIfNeeded(shipment, token) {
+  if (!needsFreightRepair(shipment)) return shipment;
+  try {
+    const res = await fetch('/api/shipments/repair-freight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ id: shipment.id, fatura_no: shipment.fatura_no }),
+    });
+    const data = await res.json();
+    if (data.success && data.shipment) {
+      allShipments = [];
+      filteredList = [];
+      return data.shipment;
+    }
+  } catch (e) {
+    console.warn('Navlun/sigorta onarım hatası:', e);
+  }
+  return shipment;
+}
+
 async function openShipmentDetail(id) {
   const token = sessionStorage.getItem('fa_auth_token');
   const res = await fetch(`/api/shipments?id=${id}`, {
@@ -610,7 +642,20 @@ async function openShipmentDetail(id) {
   const data = await res.json();
   if (!data.success) return;
 
-  const s = data.shipment;
+  renderShipmentDetail(data.shipment);
+
+  repairShipmentFreightIfNeeded(data.shipment, token).then(repaired => {
+    if (!repaired || repaired === data.shipment) return;
+    const activeId = document.getElementById('detail-id')?.value;
+    if (String(activeId) !== String(id)) return;
+    renderShipmentDetail(repaired);
+    const tbody = document.getElementById('shipments-tbody');
+    if (tbody) tbody.innerHTML = '';
+    if (typeof loadShipments === 'function') loadShipments();
+  });
+}
+
+function renderShipmentDetail(s) {
   const panel   = document.getElementById('shipment-detail-panel');
   const overlay = document.getElementById('shipment-overlay');
   if (!panel || !overlay) return;
@@ -640,6 +685,9 @@ async function openShipmentDetail(id) {
   document.getElementById('edit-navlun').value        = s.navlun_eur || '';
   document.getElementById('edit-sigorta').value       = s.sigorta_eur || '';
   document.getElementById('edit-kur').value           = s.eur_kuru || '';
+  document.getElementById('edit-navlun-usd').value    = s.navlun_usd || '';
+  document.getElementById('edit-sigorta-usd').value   = s.sigorta_usd || '';
+  document.getElementById('edit-usd-kur').value       = s.usd_kuru || '';
   document.getElementById('edit-yukleme').value       = formatDateInput(s.yukleme_tarihi);
   document.getElementById('edit-gumruk-tarihi').value = formatDateInput(s.gumruk_tarihi);
   document.getElementById('edit-varis').value         = formatDateInput(s.varis_tarihi);
@@ -723,6 +771,9 @@ async function saveShipmentDetail() {
       navlun_eur:        parseFloat(document.getElementById('new-navlun').value)      || 0,
       sigorta_eur:       parseFloat(document.getElementById('new-sigorta').value)     || 0,
       eur_kuru:          parseFloat(document.getElementById('new-kur').value)         || 0,
+      navlun_usd:        parseFloat(document.getElementById('new-navlun-usd').value)  || 0,
+      sigorta_usd:       parseFloat(document.getElementById('new-sigorta-usd').value) || 0,
+      usd_kuru:          parseFloat(document.getElementById('new-usd-kur').value)     || 0,
     };
     const res  = await fetch('/api/shipments', {
       method: 'POST',
@@ -749,6 +800,9 @@ async function saveShipmentDetail() {
       navlun_eur:            parseFloat(document.getElementById('edit-navlun').value)      || 0,
       sigorta_eur:           parseFloat(document.getElementById('edit-sigorta').value)     || 0,
       eur_kuru:              parseFloat(document.getElementById('edit-kur').value)         || 0,
+      navlun_usd:            parseFloat(document.getElementById('edit-navlun-usd').value)  || 0,
+      sigorta_usd:           parseFloat(document.getElementById('edit-sigorta-usd').value) || 0,
+      usd_kuru:              parseFloat(document.getElementById('edit-usd-kur').value)     || 0,
       ihracat_beyanname_tl:  parseFloat(document.getElementById('edit-beyanname-tl').value)  || 0,
       ihracat_beyanname_eur: parseFloat(document.getElementById('edit-beyanname-eur').value) || 0,
       arac_bekleme:          parseFloat(document.getElementById('edit-bekleme').value)        || 0,

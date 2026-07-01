@@ -525,6 +525,8 @@ def generate_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     destination   = 'Bosnia and Herzegovina'
     incoterm      = 'CIP'
     packages_str  = str((pdf_fields or {}).get('kap', '') or '')
+    freight_value   = parse_num((pdf_fields or {}).get('navlun', 0))
+    insurance_value = parse_num((pdf_fields or {}).get('sigorta', 0))
 
     brut_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)[0]
     net_list  = get_net_list(brut_list, hedef_net, depo_tipi)
@@ -565,26 +567,12 @@ def generate_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                 dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
 
     last_inv = DS + len(df)
-    gr_row   = last_inv + 1
-    ws_inv.row_dimensions[gr_row].height = 28
-
-    INV_UNIT_COL  = 7
-    INV_TOTAL_COL = 8
-    tc = get_column_letter(INV_TOTAL_COL)
-
-    c = ws_inv.cell(row=gr_row, column=INV_UNIT_COL, value='GRAND TOTAL TRY')
-    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
-    c.fill = PatternFill('solid', fgColor=GOLD)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = brd()
-
-    c = ws_inv.cell(row=gr_row, column=INV_TOTAL_COL,
-                    value=f'=SUM({tc}{DS+1}:{tc}{last_inv})')
-    c.font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
-    c.fill = PatternFill('solid', fgColor=GOLD)
-    c.alignment = Alignment(horizontal='right', vertical='center')
-    c.number_format = '#,##0.00 "TRY"'
-    c.border = brd()
+    gr_row = _footer_try(
+        ws_inv, last_inv, inv_total_col=8,
+        inv_fmt=TRY_FMT, grand_total_label='GRAND TOTAL TRY',
+        freight_value=freight_value, insurance_value=insurance_value,
+        has_freight=True, label_col=7,
+    )
 
     set_print(ws_inv, f'A1:H{gr_row}')
 

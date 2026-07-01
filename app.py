@@ -7,9 +7,10 @@ import traceback
 
 import pandas as pd
 from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
 from api.landed_cost import landed_cost_get, landed_cost_export
 from api.kur import get_tcmb_kurlar
+from api.usd_backfill import usd_backfill_list, usd_backfill_upload  # GEÇİCİ
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -283,7 +284,52 @@ def api_shipments():
     if request.method == 'DELETE':
         return shipments_delete()
     return shipments_post()
-    
+
+@app.route('/api/shipments/repair-freight', methods=['POST', 'OPTIONS'])
+def api_shipments_repair_freight():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        return repair_shipment_freight()
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+@app.route('/api/shipments/repair-usd', methods=['POST', 'OPTIONS'])
+def api_shipments_repair_usd():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json() or {}
+        from api.shipments import repair_shipment_usd
+        return repair_shipment_usd(sid=body.get('id'), fatura_no=body.get('fatura_no', ''))
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/shipments/bulk-repair-usd', methods=['POST', 'OPTIONS'])
+def api_shipments_bulk_repair_usd():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        from api.shipments import bulk_repair_usd
+        onarilan, atlanan, hatalar = bulk_repair_usd()
+        return jsonify({'success': True, 'onarilan': onarilan, 'atlanan': atlanan, 'hatalar': hatalar})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/shipments/bulk-repair-freight-kzge', methods=['POST', 'OPTIONS'])
+def api_shipments_bulk_repair_freight_kzge():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        from api.shipments import bulk_repair_freight_kz_ge
+        onarilan, atlanan, hatalar = bulk_repair_freight_kz_ge()
+        return jsonify({'success': True, 'onarilan': onarilan, 'atlanan': atlanan, 'hatalar': hatalar})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+        
 @app.route('/api/shipments/bulk-import', methods=['POST', 'OPTIONS'])
 def api_shipments_bulk_import():
     if request.method == 'OPTIONS':
@@ -606,6 +652,26 @@ def api_shipments_group():
         return jsonify({'success': False, 'error': 'id listesi boş'}), 400
     sefer_id = group_shipments(ids)
     return jsonify({'success': True, 'sefer_id': sefer_id})
+
+# GEÇİCİ — USD backfill route'ları
+@app.route('/api/usd-backfill/list', methods=['GET', 'OPTIONS'])
+def api_usd_backfill_list():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return usd_backfill_list()
+
+@app.route('/api/usd-backfill/upload', methods=['POST', 'OPTIONS'])
+def api_usd_backfill_upload():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return usd_backfill_upload()
+
+@app.route('/api/usd-backfill/manual-excel', methods=['POST', 'OPTIONS'])
+def api_usd_backfill_manual_excel():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    from api.usd_backfill import usd_backfill_manual_excel_route
+    return usd_backfill_manual_excel_route()
 
 @app.route('/api/shipments/ungroup', methods=['POST', 'OPTIONS'])
 def api_shipments_ungroup():

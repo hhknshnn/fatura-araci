@@ -713,9 +713,12 @@ async function downloadRS() {
       // ── KUR HESAPLAMA — tamamen countries.json config'e göre ──────────────
       const countryCfg = window.COUNTRIES_CACHE?.[currentCountry] || {};
       const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi || 'api_eur';
-      const countryCurrency = countryCfg.currency || 'TRY';
+      const navlunSigortaParaBirimi = (
+        countryCfg.navlunSigortaParaBirimi ||
+        (sevkiyatKurKaynagi === 'pdf_eur' && countryCfg.currency === 'TRY' ? 'EUR' : 'TRY')
+      ).toUpperCase();
 
-      // PDF'ten gelen kur: EUR faturada TRY/EUR, USD faturada TRY/USD
+      // PDF'ten gelen kur ülkeye göre TRY/EUR veya bilgi amaçlı farklı bir kur olabilir.
       const pdfKur = data.pdfFields?.kur || 0;
 
       // API kurları
@@ -728,37 +731,79 @@ async function downloadRS() {
       let navlun_eur = 0;
       let sigorta_eur = 0;
       let eur_kuru = 0;
+      let fatura_bedeli_tl = 0;
 
       const mal_toplam_ham = workingRows.reduce(
         (s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0), 0);
+      const navlun_pdf = parseNum(data.pdfFields?.navlun || 0);
+      const sigorta_pdf = parseNum(data.pdfFields?.sigorta || 0);
 
-      if (sevkiyatKurKaynagi === 'api_usd_to_eur' || countryCurrency === 'USD') {
+      // ── USD TARAFI — PDF'in kuru hangi para birimindeyse o kullanılır,
+      // karşı para birimi her zaman API'den gelir ──────────────────────────
+      const pdfKurParaBirimi = (countryCfg.pdfKurParaBirimi || 'EUR').toUpperCase();
+      const usd_kuru = pdfKurParaBirimi === 'USD'
+        ? (pdfKur > 0 ? pdfKur : apiTryUsd)
+        : apiTryUsd;
+      const navlun_usd  = usd_kuru > 0 ? navlun_pdf  / usd_kuru : 0;
+      const sigorta_usd = usd_kuru > 0 ? sigorta_pdf / usd_kuru : 0;
+
+      const navlunSigortaToEur = (kur) => {
+        if (navlunSigortaParaBirimi === 'EUR') {
+          return {
+            navlun: navlun_pdf,
+            sigorta: sigorta_pdf,
+            tl: (navlun_pdf + sigorta_pdf) * (kur || 0),
+          };
+        }
+        if (navlunSigortaParaBirimi === 'USD') {
+          return {
+            navlun: apiUsdPerEur > 0 ? navlun_pdf / apiUsdPerEur : 0,
+            sigorta: apiUsdPerEur > 0 ? sigorta_pdf / apiUsdPerEur : 0,
+            tl: (navlun_pdf + sigorta_pdf) * (apiTryUsd || 0),
+          };
+        }
+        return {
+          navlun: kur > 0 ? navlun_pdf / kur : 0,
+          sigorta: kur > 0 ? sigorta_pdf / kur : 0,
+          tl: navlun_pdf + sigorta_pdf,
+        };
+      };
+
+      if (sevkiyatKurKaynagi === 'api_usd_to_eur') {
         // USD fatura: PDF'te TRY/USD kuru varsa onu kullan, yoksa API
         const tryUsdKuru = pdfKur > 0 ? pdfKur : apiTryUsd;
         eur_kuru = apiEurKuru;
         const mal_toplam_tl = mal_toplam_ham * tryUsdKuru;
         mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_tl / eur_kuru : 0;
-        navlun_eur = 0;
-        sigorta_eur = 0;
-        fatura_bedeli_eur = mal_bedeli_eur;
+        const freight = navlunSigortaToEur(eur_kuru);
+        navlun_eur = freight.navlun;
+        sigorta_eur = freight.sigorta;
+        fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
+        fatura_bedeli_tl = mal_toplam_tl + freight.tl;
 
-      } else if (sevkiyatKurKaynagi === 'pdf_eur' || countryCurrency === 'EUR') {
+      } else if (sevkiyatKurKaynagi === 'pdf_eur') {
         // EUR fatura: PDF'te TRY/EUR kuru varsa onu kullan, yoksa API
         eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
         // Excel Fiyat TRY cinsinden, EUR'ya çevir
         mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_ham / eur_kuru : 0;
-        navlun_eur = parseFloat(data.pdfFields?.navlun || 0) / (eur_kuru || 1);
-        sigorta_eur = parseFloat(data.pdfFields?.sigorta || 0) / (eur_kuru || 1);
+        const freight = navlunSigortaToEur(eur_kuru);
+        navlun_eur = freight.navlun;
+        sigorta_eur = freight.sigorta;
+        fatura_bedeli_tl = mal_toplam_ham + freight.tl;
         fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
 
       } else {
-        // TRY bazlı (api_eur veya pdf_eur + currency TRY)
-        eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
+        // TRY bazlı: PDF'teki Kur Bilgisi satırı farklı amaçlı olabilir; sadece API TRY/EUR kullan.
+        eur_kuru = apiEurKuru;
         if (eur_kuru > 0) {
           mal_bedeli_eur = mal_toplam_ham / eur_kuru;
-          navlun_eur = parseFloat(data.pdfFields?.navlun || 0) / eur_kuru;
-          sigorta_eur = parseFloat(data.pdfFields?.sigorta || 0) / eur_kuru;
+          const freight = navlunSigortaToEur(eur_kuru);
+          navlun_eur = freight.navlun;
+          sigorta_eur = freight.sigorta;
           fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
+          fatura_bedeli_tl = mal_toplam_ham + freight.tl;
+        } else {
+          fatura_bedeli_tl = mal_toplam_ham;
         }
       }
 
@@ -782,11 +827,14 @@ async function downloadRS() {
           ulke: ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
           durum: 'YOLDA',
           fatura_bedeli_eur: Math.round(fatura_bedeli_eur * 100) / 100,
-          fatura_bedeli_tl:  Math.round(fatura_bedeli_eur * (eur_kuru > 0 ? eur_kuru : apiEurKuru) * 100) / 100,
-          mal_bedeli_eur:    Math.round((fatura_bedeli_eur - navlun_eur - sigorta_eur) * 100) / 100,
+          fatura_bedeli_tl:  Math.round(fatura_bedeli_tl * 100) / 100,
+          mal_bedeli_eur:    Math.round(mal_bedeli_eur * 100) / 100,
           navlun_eur: Math.round(navlun_eur * 100) / 100,
           sigorta_eur: Math.round(sigorta_eur * 100) / 100,
           eur_kuru: Math.round(eur_kuru * 10000) / 10000,
+          navlun_usd: Math.round(navlun_usd * 100) / 100,
+          sigorta_usd: Math.round(sigorta_usd * 100) / 100,
+          usd_kuru: Math.round(usd_kuru * 10000) / 10000,
           plaka: document.getElementById('plakaInput')?.value?.trim() || '',
           nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
           yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',

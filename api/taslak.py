@@ -31,23 +31,59 @@ def _extract_pdf_amount(text, patterns):
             return _parse_pdf_amount(m.group(1))
     return 0.0
 
+def _extract_amount_near_keywords(text, keywords, window=140):
+    money_re = re.compile(
+        r'(?:TRY|TL|₺)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2,4})|[0-9]+[.,][0-9]{2,4})\s*(?:TRY|TL|₺)?',
+        re.IGNORECASE,
+    )
+    for keyword in keywords:
+        for match in re.finditer(keyword, text, re.IGNORECASE):
+            snippet = text[match.start():match.end() + window]
+            amounts = [
+                _extract_pdf_amount(m.group(1), [r'([\d.,]+)'])
+                for m in money_re.finditer(snippet)
+            ]
+            amounts = [n for n in amounts if n > 0]
+            if amounts:
+                return amounts[0]
+    return 0.0
+
 def parse_pdf_fields(pdf_bytes):
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0, 'kur': 0.0}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            # Bilgiler son sayfalarda — sadece son 2 sayfayı oku
-            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages[-2:]]
-            text = ' '.join(part for part in page_texts if part).strip()
+            all_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages]
+            texts_to_try = [
+                ' '.join(part for part in all_texts[-2:] if part).strip(),
+                ' '.join(part for part in all_texts if part).strip(),
+            ]
+            text = ''
+            for candidate_text in texts_to_try:
+                if not candidate_text:
+                    continue
+                text = candidate_text
+                if result['navlun'] <= 0:
+                    result['navlun'] = _extract_pdf_amount(text, [
+                        r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                        r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    ]) or _extract_amount_near_keywords(text, [
+                        r'\bNAVLUN\b',
+                        r'\bFREIGHT\b',
+                        r'\bTA[SŞ]IMA\b',
+                    ])
+                if result['sigorta'] <= 0:
+                    result['sigorta'] = _extract_pdf_amount(text, [
+                        r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                        r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    ]) or _extract_amount_near_keywords(text, [
+                        r'\bS[İI]GORTA\b',
+                        r'\bSIGORTA\b',
+                        r'\bINSURANCE\b',
+                    ])
+                if result['navlun'] > 0 and result['sigorta'] > 0:
+                    break
             if not text:
                 return result
-            result['navlun'] = _extract_pdf_amount(text, [
-                r'\bNAVLUN\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
-            result['sigorta'] = _extract_pdf_amount(text, [
-                r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
             # Kap sayısı
             kap_patterns = [
                 r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',

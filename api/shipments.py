@@ -2,12 +2,15 @@
 # Sevkiyat kayıtları — PostgreSQL tabanlı
 
 import io
+import json
+import os
 import re
 import time
 import pdfplumber
 from flask import request, jsonify, send_file
 from api.db import get_conn
 from api.auth import get_session_from_headers
+from api.invoice.helpers import parse_pdf
 
 # Ülke adı → müşteri tipi eşlemesi
 ULKE_MUSTERI_TIPI = {
@@ -36,7 +39,8 @@ def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
                varis_tarihi, gumrukleme_bitis, created_at,
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
-               toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet
+               toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet,
+               navlun_usd, sigorta_usd, usd_kuru
         FROM shipments
         WHERE 1=1
     '''
@@ -111,8 +115,9 @@ def create_shipment(data):
             ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
             fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
             eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
-            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi, palet
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi, palet,
+            navlun_usd, sigorta_usd, usd_kuru
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         RETURNING id
     ''', (
         data.get('ihracat_dosya_no', ''),
@@ -133,6 +138,9 @@ def create_shipment(data):
         _normalize_durum(durum_default),
         musteri_tipi,
         data.get('palet') or None,
+        data.get('navlun_usd', 0),
+        data.get('sigorta_usd', 0),
+        data.get('usd_kuru', 0),
     ))
     new_id = cur.fetchone()[0]
     conn.commit()
@@ -145,6 +153,17 @@ def create_shipment(data):
 def update_shipment(shipment_id, data):
     conn = get_conn()
     cur  = conn.cursor()
+
+    # USD alanları formdan gelmiyorsa mevcut DB değerini koru (veri kaybını önler)
+    if not {'navlun_usd', 'sigorta_usd', 'usd_kuru'} & set(data.keys()):
+        cur.execute('SELECT navlun_usd, sigorta_usd, usd_kuru FROM shipments WHERE id = %s', (shipment_id,))
+        existing = cur.fetchone() or (0, 0, 0)
+    else:
+        existing = (0, 0, 0)
+
+    navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
+    sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
+    usd_kuru    = data.get('usd_kuru',    existing[2]) or 0
 
     toplam = (
         float(data.get('ihracat_beyanname_eur', 0) or 0) +
@@ -166,6 +185,9 @@ def update_shipment(shipment_id, data):
             navlun_eur            = %s,
             sigorta_eur           = %s,
             eur_kuru              = %s,
+            navlun_usd            = %s,
+            sigorta_usd           = %s,
+            usd_kuru              = %s,
             ihracat_beyanname_tl  = %s,
             ihracat_beyanname_eur = %s,
             arac_bekleme          = %s,
@@ -189,6 +211,9 @@ def update_shipment(shipment_id, data):
         data.get('navlun_eur', 0),
         data.get('sigorta_eur', 0),
         data.get('eur_kuru', 0),
+        navlun_usd,
+        sigorta_usd,
+        usd_kuru,
         data.get('ihracat_beyanname_tl', 0),
         data.get('ihracat_beyanname_eur', 0),
         data.get('arac_bekleme', 0),
@@ -331,6 +356,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         'Nakliye Firması', 'Plaka', 'Grup', 'Palet',
         'Fatura Bedeli TL', 'Fatura Bedeli EUR', 'Mal Bedeli EUR',
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
+        'Navlun USD', 'Sigorta USD', 'USD Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
         'İhracat Beyanname TL', 'İhracat Beyanname EUR',
         'Araç Bekleme', 'Brokerage Fee & Other Costs EUR', 'Other Costs EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
@@ -347,6 +373,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
 
     TL_FMT  = '#,##0.00 ₺'
     EUR_FMT = '#,##0.00 €'
+    USD_FMT = '#,##0.00 $'
     NUM_FMT = '#,##0.0000'
 
     for row_idx, s in enumerate(rows, start=2):
@@ -373,18 +400,21 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         c(13, float(s.get('navlun_eur', 0) or 0),        EUR_FMT)
         c(14, float(s.get('sigorta_eur', 0) or 0),       EUR_FMT)
         c(15, float(s.get('eur_kuru', 0) or 0),          NUM_FMT)
-        c(16, s.get('yukleme_tarihi', ''))
-        c(17, s.get('gumruk_tarihi', ''))
-        c(18, s.get('varis_tarihi', ''))
-        c(19, s.get('gumrukleme_bitis', ''))
-        c(20, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
-        c(21, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
-        c(22, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
-        c(23, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(24, float(s.get('other_costs_eur', 0) or 0),       EUR_FMT)
-        c(25, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(26, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(27, s.get('durum', ''))
+        c(16, float(s.get('navlun_usd', 0) or 0),        USD_FMT)
+        c(17, float(s.get('sigorta_usd', 0) or 0),       USD_FMT)
+        c(18, float(s.get('usd_kuru', 0) or 0),          NUM_FMT)
+        c(19, s.get('yukleme_tarihi', ''))
+        c(20, s.get('gumruk_tarihi', ''))
+        c(21, s.get('varis_tarihi', ''))
+        c(22, s.get('gumrukleme_bitis', ''))
+        c(23, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
+        c(24, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
+        c(25, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(26, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(27, float(s.get('other_costs_eur', 0) or 0),       EUR_FMT)
+        c(28, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(29, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(30, s.get('durum', ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -457,6 +487,9 @@ def _row_to_dict(row):
         'musteri_tipi':          row[27] if len(row) > 27 else 'kurumsal',
         'sefer_id':              row[28] if len(row) > 28 else None,
         'palet':                 row[29] if len(row) > 29 else None,
+        'navlun_usd':            float(row[30] or 0) if len(row) > 30 else 0.0,
+        'sigorta_usd':           float(row[31] or 0) if len(row) > 31 else 0.0,
+        'usd_kuru':              float(row[32] or 0) if len(row) > 32 else 0.0,
     }
 
 
@@ -505,6 +538,280 @@ def shipments_put():
     update_shipment(int(sid), body)
     return jsonify({'success': True})
 
+
+def repair_shipment_freight():
+    body = request.get_json() or {}
+    sid = body.get('id')
+    fatura_no = body.get('fatura_no', '')
+    if not sid and not fatura_no:
+        return jsonify({'success': False, 'error': 'id veya fatura_no gerekli'})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if sid:
+            cur.execute('''
+                SELECT id, fatura_no, mal_bedeli_eur, eur_kuru, fatura_bedeli_tl, ulke
+                FROM shipments
+                WHERE id = %s
+            ''', (int(sid),))
+        else:
+            cur.execute('''
+                SELECT id, fatura_no, mal_bedeli_eur, eur_kuru, fatura_bedeli_tl, ulke
+                FROM shipments
+                WHERE fatura_no = %s
+            ''', (fatura_no,))
+        shipment = cur.fetchone()
+        if not shipment:
+            return jsonify({'success': False, 'error': 'Sevkiyat bulunamadı'})
+
+        shipment_id, shipment_fatura_no, mal_bedeli_eur, eur_kuru, fatura_bedeli_tl, ulke = shipment
+        cur.execute('''
+            SELECT file_paths
+            FROM storage_records
+            WHERE fatura_no = %s
+            ORDER BY tarih DESC
+        ''', (shipment_fatura_no,))
+
+        pdf_path = ''
+        for (file_paths,) in cur.fetchall():
+            if isinstance(file_paths, str):
+                try:
+                    file_paths = json.loads(file_paths)
+                except Exception:
+                    file_paths = {}
+            if isinstance(file_paths, dict):
+                candidate = file_paths.get('pdf') or ''
+            else:
+                candidate = ''
+            if candidate and os.path.exists(candidate):
+                pdf_path = candidate
+                break
+
+        if not pdf_path:
+            return jsonify({'success': False, 'error': 'Bu fatura için storage PDF bulunamadı'})
+
+        with open(pdf_path, 'rb') as f:
+            pdf_fields = parse_pdf(f.read())
+
+        navlun_pdf = float(pdf_fields.get('navlun') or 0)
+        sigorta_pdf = float(pdf_fields.get('sigorta') or 0)
+        eur_kuru = float(eur_kuru or 0)
+        if eur_kuru <= 0:
+            return jsonify({'success': False, 'error': 'EUR kuru 0 olduğu için çevrim yapılamadı'})
+        if navlun_pdf <= 0 and sigorta_pdf <= 0:
+            return jsonify({'success': False, 'error': 'PDF içinde navlun/sigorta tutarı bulunamadı', 'pdfFields': pdf_fields})
+
+        ulke_norm = str(ulke or '').strip().upper()
+        pdf_freight_is_eur = ulke_norm in {'BOSNA', 'SIRBİSTAN'}
+        kz_ge = ulke_norm in {'KAZAKİSTAN', 'GÜRCİSTAN'}
+
+        if pdf_freight_is_eur:
+            navlun_eur = navlun_pdf
+            sigorta_eur = sigorta_pdf
+            freight_tl = (navlun_eur + sigorta_eur) * eur_kuru
+        else:
+            navlun_eur = navlun_pdf / eur_kuru
+            sigorta_eur = sigorta_pdf / eur_kuru
+            freight_tl = navlun_pdf + sigorta_pdf
+
+        mal_bedeli_eur = float(mal_bedeli_eur or 0)
+
+        if kz_ge:
+            # KZ/GE: mal_bedeli_eur import anında navlun+sigorta DAHİL tam
+            # fatura tutarından türetildiği için freight bir kez daha
+            # eklenmez (önceki double-count buradaydı).
+            fatura_bedeli_eur = mal_bedeli_eur
+            fatura_bedeli_tl  = round(mal_bedeli_eur * eur_kuru, 2)
+        else:
+            fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur
+            fatura_bedeli_tl  = (mal_bedeli_eur * eur_kuru) + freight_tl
+
+        cur.execute('''
+            UPDATE shipments
+            SET navlun_eur = %s,
+                sigorta_eur = %s,
+                fatura_bedeli_eur = %s,
+                fatura_bedeli_tl = %s
+            WHERE id = %s
+        ''', (
+            round(navlun_eur, 2),
+            round(sigorta_eur, 2),
+            round(fatura_bedeli_eur, 2),
+            round(fatura_bedeli_tl, 2),
+            shipment_id,
+        ))
+        conn.commit()
+
+        return jsonify({
+            'success': True,
+            'shipment': get_shipment(shipment_id),
+            'pdfFields': pdf_fields,
+        })
+    finally:
+        cur.close()
+        conn.close()
+
+
+def bulk_repair_freight_kz_ge():
+    """
+    Tüm KAZAKİSTAN ve GÜRCİSTAN sevkiyatlarını tarar, storage'daki orijinal
+    PDF'ten navlun/sigorta/fatura_bedeli alanlarını double-count olmadan
+    yeniden hesaplar.
+    Döner: (onarilan, atlanan, hatalar)
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT id FROM shipments
+        WHERE upper(ulke) IN ('KAZAKİSTAN', 'GÜRCİSTAN')
+        ORDER BY id
+    ''')
+    ids = [r[0] for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+
+    onarilan, atlanan, hatalar = 0, 0, []
+    for sid in ids:
+        try:
+            resp = repair_shipment_freight(sid=sid)
+            data = resp.get_json()
+            if data.get('success'):
+                onarilan += 1
+            else:
+                atlanan += 1
+                hatalar.append(f'id {sid}: {data.get("error")}')
+        except Exception as e:
+            atlanan += 1
+            hatalar.append(f'id {sid}: {str(e)}')
+
+    return onarilan, atlanan, hatalar
+
+
+def repair_shipment_usd(sid=None, fatura_no=None):
+    """
+    KZ/GE sevkiyatları için USD navlun/sigorta/kur alanlarını
+    storage'daki orijinal PDF'ten yeniden hesaplar.
+    """
+    from api.kur import get_tcmb_kurlar
+
+    if not sid and not fatura_no:
+        return jsonify({'success': False, 'error': 'id veya fatura_no gerekli'})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if sid:
+            cur.execute('SELECT id, fatura_no, ulke FROM shipments WHERE id = %s', (int(sid),))
+        else:
+            cur.execute('SELECT id, fatura_no, ulke FROM shipments WHERE fatura_no = %s', (fatura_no,))
+        shipment = cur.fetchone()
+        if not shipment:
+            return jsonify({'success': False, 'error': 'Sevkiyat bulunamadı'})
+
+        shipment_id, shipment_fatura_no, ulke = shipment
+        ulke_norm = str(ulke or '').strip().upper()
+
+        # Sadece KZ/GE — PDF kuru USD olan ülkeler
+        if ulke_norm not in {'KAZAKİSTAN', 'GÜRCİSTAN'}:
+            return jsonify({'success': False, 'error': f'{ulke_norm} için USD onarımı gerekmiyor'})
+
+        cur.execute('''
+            SELECT file_paths FROM storage_records
+            WHERE fatura_no = %s ORDER BY tarih DESC
+        ''', (shipment_fatura_no,))
+
+        pdf_path = ''
+        for (file_paths,) in cur.fetchall():
+            if isinstance(file_paths, str):
+                try:
+                    file_paths = json.loads(file_paths)
+                except Exception:
+                    file_paths = {}
+            candidate = file_paths.get('pdf') if isinstance(file_paths, dict) else ''
+            if candidate and os.path.exists(candidate):
+                pdf_path = candidate
+                break
+
+        if not pdf_path:
+            return jsonify({'success': False, 'error': 'Bu fatura için storage PDF bulunamadı'})
+
+        with open(pdf_path, 'rb') as f:
+            pdf_fields = parse_pdf(f.read())
+
+        navlun_pdf  = float(pdf_fields.get('navlun') or 0)
+        sigorta_pdf = float(pdf_fields.get('sigorta') or 0)
+        pdf_kur     = float(pdf_fields.get('kur') or 0)
+
+        if navlun_pdf <= 0 and sigorta_pdf <= 0:
+            return jsonify({'success': False, 'error': 'PDF içinde navlun/sigorta tutarı bulunamadı', 'pdfFields': pdf_fields})
+
+        kurlar = get_tcmb_kurlar()
+        api_eur_kuru   = float(kurlar.get('TRY', 0) or 0)   # TRY/EUR
+        api_usd_per_eur = float(kurlar.get('USD', 0) or 1)  # 1 EUR = X USD
+        api_try_usd = (api_eur_kuru / api_usd_per_eur) if api_usd_per_eur else 0  # TRY/USD
+
+        usd_kuru = pdf_kur if pdf_kur > 0 else api_try_usd
+        if usd_kuru <= 0:
+            return jsonify({'success': False, 'error': 'USD kuru hesaplanamadı'})
+
+        navlun_usd  = navlun_pdf  / usd_kuru
+        sigorta_usd = sigorta_pdf / usd_kuru
+
+        cur.execute('''
+            UPDATE shipments
+            SET navlun_usd = %s, sigorta_usd = %s, usd_kuru = %s
+            WHERE id = %s
+        ''', (
+            round(navlun_usd, 2),
+            round(sigorta_usd, 2),
+            round(usd_kuru, 4),
+            shipment_id,
+        ))
+        conn.commit()
+
+        return jsonify({
+            'success': True,
+            'shipment': get_shipment(shipment_id),
+            'pdfFields': pdf_fields,
+        })
+    finally:
+        cur.close()
+        conn.close()
+
+
+def bulk_repair_usd():
+    """
+    Tüm KZ/GE sevkiyatlarını tarar, usd_kuru = 0 olanları onarır.
+    Döner: (onarilan, atlanan, hatalar)
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT id FROM shipments
+        WHERE upper(ulke) IN ('KAZAKİSTAN', 'GÜRCİSTAN')
+          AND (usd_kuru IS NULL OR usd_kuru = 0)
+        ORDER BY id
+    ''')
+    ids = [r[0] for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+
+    onarilan, atlanan, hatalar = 0, 0, []
+    for sid in ids:
+        try:
+            resp = repair_shipment_usd(sid=sid)
+            data = resp.get_json()
+            if data.get('success'):
+                onarilan += 1
+            else:
+                atlanan += 1
+                hatalar.append(f'id {sid}: {data.get("error")}')
+        except Exception as e:
+            atlanan += 1
+            hatalar.append(f'id {sid}: {str(e)}')
+
+    return onarilan, atlanan, hatalar
 
 def shipments_delete():
     body = request.get_json() or {}

@@ -63,6 +63,11 @@ def init_db():
         )
     ''')
 
+    # ── USD navlun/sigorta kolonları (v2026-07) ──────────────────────────
+    cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS navlun_usd NUMERIC DEFAULT 0')
+    cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS sigorta_usd NUMERIC DEFAULT 0')
+    cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS usd_kuru NUMERIC DEFAULT 0')
+
     conn.commit()
     cur.close()
     conn.close()
