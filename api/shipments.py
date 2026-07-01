@@ -539,10 +539,10 @@ def shipments_put():
     return jsonify({'success': True})
 
 
-def repair_shipment_freight():
+def repair_shipment_freight(sid=None, fatura_no=None):
     body = request.get_json() or {}
-    sid = body.get('id')
-    fatura_no = body.get('fatura_no', '')
+    sid = sid or body.get('id')
+    fatura_no = fatura_no or body.get('fatura_no', '')
     if not sid and not fatura_no:
         return jsonify({'success': False, 'error': 'id veya fatura_no gerekli'})
 
@@ -603,7 +603,7 @@ def repair_shipment_freight():
             return jsonify({'success': False, 'error': 'PDF içinde navlun/sigorta tutarı bulunamadı', 'pdfFields': pdf_fields})
 
         ulke_norm = str(ulke or '').strip().upper()
-        pdf_freight_is_eur = ulke_norm in {'BOSNA', 'SIRBİSTAN'}
+        pdf_freight_is_eur = False  # Türk e-faturasında navlun/sigorta her zaman TRY
         kz_ge = ulke_norm in {'KAZAKİSTAN', 'GÜRCİSTAN'}
 
         if pdf_freight_is_eur:
@@ -615,26 +615,41 @@ def repair_shipment_freight():
             sigorta_eur = sigorta_pdf / eur_kuru
             freight_tl = navlun_pdf + sigorta_pdf
 
-        mal_bedeli_eur = float(mal_bedeli_eur or 0)
-
         if kz_ge:
-            # KZ/GE: mal_bedeli_eur import anında navlun+sigorta DAHİL tam
-            # fatura tutarından türetildiği için freight bir kez daha
-            # eklenmez (önceki double-count buradaydı).
-            fatura_bedeli_eur = mal_bedeli_eur
-            fatura_bedeli_tl  = round(mal_bedeli_eur * eur_kuru, 2)
-        else:
+            # KZ/GE PDF'lerinde fatura_bedeli_tl GRAND TOTAL'dir:
+            # ürün TL + navlun TL + sigorta TL. Üç EUR kolon da PDF'teki
+            # kendi TL tutarının API EUR kuruna bölünmesiyle bulunur.
+            fatura_bedeli_tl = float(fatura_bedeli_tl or 0)
+            mal_bedeli_tl = fatura_bedeli_tl - freight_tl
+            if mal_bedeli_tl < 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'PDF navlun/sigorta toplamı fatura TL tutarından büyük',
+                    'pdfFields': pdf_fields,
+                })
+            mal_bedeli_eur = mal_bedeli_tl / eur_kuru
             fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur
-            fatura_bedeli_tl  = (mal_bedeli_eur * eur_kuru) + freight_tl
+        else:
+            # PDF'teki TL tutarı direkt Fatura Bedeli TL — tüm kurumsal ülkeler
+            pdf_fatura_tl_val = float(pdf_fields.get('fatura_tl') or 0)
+            mal_bedeli_eur    = float(mal_bedeli_eur or 0)
+            if pdf_fatura_tl_val > 0:
+                fatura_bedeli_tl = pdf_fatura_tl_val
+            else:
+                fatura_bedeli_tl = float(mal_bedeli_eur or 0) * eur_kuru
+            fatura_bedeli_eur = fatura_bedeli_tl / eur_kuru if eur_kuru > 0 else 0
+            mal_bedeli_eur    = fatura_bedeli_eur - navlun_eur - sigorta_eur
 
         cur.execute('''
             UPDATE shipments
-            SET navlun_eur = %s,
+            SET mal_bedeli_eur = %s,
+                navlun_eur = %s,
                 sigorta_eur = %s,
                 fatura_bedeli_eur = %s,
                 fatura_bedeli_tl = %s
             WHERE id = %s
         ''', (
+            round(mal_bedeli_eur, 2),
             round(navlun_eur, 2),
             round(sigorta_eur, 2),
             round(fatura_bedeli_eur, 2),
@@ -712,10 +727,6 @@ def repair_shipment_usd(sid=None, fatura_no=None):
         shipment_id, shipment_fatura_no, ulke = shipment
         ulke_norm = str(ulke or '').strip().upper()
 
-        # Sadece KZ/GE — PDF kuru USD olan ülkeler
-        if ulke_norm not in {'KAZAKİSTAN', 'GÜRCİSTAN'}:
-            return jsonify({'success': False, 'error': f'{ulke_norm} için USD onarımı gerekmiyor'})
-
         cur.execute('''
             SELECT file_paths FROM storage_records
             WHERE fatura_no = %s ORDER BY tarih DESC
@@ -751,7 +762,9 @@ def repair_shipment_usd(sid=None, fatura_no=None):
         api_usd_per_eur = float(kurlar.get('USD', 0) or 1)  # 1 EUR = X USD
         api_try_usd = (api_eur_kuru / api_usd_per_eur) if api_usd_per_eur else 0  # TRY/USD
 
-        usd_kuru = pdf_kur if pdf_kur > 0 else api_try_usd
+        # KZ/GE: PDF kuru zaten TRY/USD — diğer ülkelerde API TRY/USD kullan
+        kz_ge = ulke_norm in {'KAZAKİSTAN', 'GÜRCİSTAN'}
+        usd_kuru = (pdf_kur if pdf_kur > 0 else api_try_usd) if kz_ge else api_try_usd
         if usd_kuru <= 0:
             return jsonify({'success': False, 'error': 'USD kuru hesaplanamadı'})
 
@@ -789,8 +802,7 @@ def bulk_repair_usd():
     cur = conn.cursor()
     cur.execute('''
         SELECT id FROM shipments
-        WHERE upper(ulke) IN ('KAZAKİSTAN', 'GÜRCİSTAN')
-          AND (usd_kuru IS NULL OR usd_kuru = 0)
+        WHERE (usd_kuru IS NULL OR usd_kuru = 0)
         ORDER BY id
     ''')
     ids = [r[0] for r in cur.fetchall()]
@@ -886,8 +898,12 @@ def bulk_update_shipments(rows):
                 hatalar.append(f'Satır {i+1}: fatura_no boş, atlandı.')
                 continue
 
-            # Kayıt var mı kontrol et, musteri_tipi ve eur_kuru'yu da al
-            cur.execute('SELECT id, musteri_tipi, eur_kuru FROM shipments WHERE fatura_no = %s', (fatura_no,))
+            # Kayıt var mı kontrol et, musteri_tipi, kur ve mevcut navlun/sigortayı da al
+            cur.execute('''
+                SELECT id, musteri_tipi, eur_kuru, ulke, navlun_eur, sigorta_eur
+                FROM shipments
+                WHERE fatura_no = %s
+            ''', (fatura_no,))
             existing = cur.fetchone()
             if not existing:
                 atlanan += 1
@@ -895,6 +911,9 @@ def bulk_update_shipments(rows):
                 continue
             db_musteri_tipi = existing[1] or ''
             db_eur_kuru = float(existing[2]) if existing[2] else 0
+            db_ulke = str(existing[3] or '').strip().upper()
+            db_navlun_eur = float(existing[4] or 0)
+            db_sigorta_eur = float(existing[5] or 0)
 
             # Sadece gönderilen alanları güncelle (None olanları atla)
             fields = {}
@@ -937,12 +956,20 @@ def bulk_update_shipments(rows):
                 if 'durum' not in fields or not fields.get('durum'):
                     fields['durum'] = 'TESLİM EDİLDİ'
 
-            # fatura_bedeli_tl güncellendiyse EUR otomatik hesapla
+            # fatura_bedeli_tl güncellendiyse EUR otomatik hesapla.
+            # KZ/GE'de fatura TL grand total'dir; mal bedeli grand total'den
+            # navlun/sigorta düşüldükten sonra kalan TL'nin kur karşılığıdır.
             if 'fatura_bedeli_tl' in fields and fields['fatura_bedeli_tl']:
                 if db_eur_kuru > 0:
                     tl = float(fields['fatura_bedeli_tl'])
-                    fields['fatura_bedeli_eur'] = round(tl / db_eur_kuru, 4)
-                    fields['mal_bedeli_eur'] = round(tl / db_eur_kuru, 4)
+                    fatura_eur = tl / db_eur_kuru
+                    fields['fatura_bedeli_eur'] = round(fatura_eur, 4)
+                    if db_ulke in {'KAZAKİSTAN', 'GÜRCİSTAN'}:
+                        navlun_eur = float(fields.get('navlun_eur', db_navlun_eur) or 0)
+                        sigorta_eur = float(fields.get('sigorta_eur', db_sigorta_eur) or 0)
+                        fields['mal_bedeli_eur'] = round(max(fatura_eur - navlun_eur - sigorta_eur, 0), 4)
+                    else:
+                        fields['mal_bedeli_eur'] = round(fatura_eur, 4)
 
             if not fields:
                 atlanan += 1

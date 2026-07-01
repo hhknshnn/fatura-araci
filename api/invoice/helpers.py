@@ -156,11 +156,11 @@ def _extract_pdf_packages(text):
 
 def parse_pdf(pdf_bytes):
     """
-    PDF'ten navlun, sigorta, kur ve kap bilgisini çıkarır.
-    Dönen dict: {'navlun': float, 'sigorta': float, 'kur': float, 'kap': str}
+    PDF'ten navlun, sigorta, kur, kap ve toplam TL bilgisini çıkarır.
+    Dönen dict: {'navlun': float, 'sigorta': float, 'kur': float, 'kap': str, 'fatura_tl': float}
     Navlun ve sigorta PDF'te yazdığı tutar olarak döner; para birimi ülke akışında yorumlanır.
     """
-    result = {'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0, 'kap': ''}
+    result = {'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0, 'kap': '', 'fatura_tl': 0.0}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             page_count = len(pdf.pages)
@@ -195,6 +195,14 @@ def parse_pdf(pdf_bytes):
                 if result['kur'] <= 0:
                     result['kur'] = _extract_pdf_amount(text, [
                         r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+                    ])
+                if result['fatura_tl'] <= 0:
+                    result['fatura_tl'] = _extract_pdf_amount(text, [
+                        r'\b[ÖO]DENECEK\s+TUTAR\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bMAL\s+H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bGENEL\s+TOPLAM\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bNet\s+Tutar\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
                     ])
                 if not result['kap']:
                     result['kap'] = _extract_pdf_packages(text)

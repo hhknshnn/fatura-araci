@@ -20,6 +20,25 @@ let cyMasterRows = [];
 let groupWeights = {};
 let exceptionSkus = {};
 
+function calcShipmentGoodsTotal(rows, country) {
+  if (!Array.isArray(rows)) return 0;
+
+  if (country === 'ba') {
+    const netTutarTotal = rows.reduce((s, r) => s + parseNum(r['Net Tutar (D)'] || 0), 0);
+    if (netTutarTotal > 0) return netTutarTotal;
+
+    return rows.reduce(
+      (s, r) => s + parseNum(r['Fiyat (D)'] || 0) * parseNum(r['Miktar'] || 0),
+      0
+    );
+  }
+
+  return rows.reduce(
+    (s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0),
+    0
+  );
+}
+
 // ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 async function loadSharedConfig() {
   try {
@@ -733,10 +752,15 @@ async function downloadRS() {
       let eur_kuru = 0;
       let fatura_bedeli_tl = 0;
 
-      const mal_toplam_ham = workingRows.reduce(
-        (s, r) => s + parseNum(r['Fiyat'] || 0) * parseNum(r['Miktar'] || 0), 0);
+      const mal_toplam_ham = calcShipmentGoodsTotal(workingRows, currentCountry);
       const navlun_pdf = parseNum(data.pdfFields?.navlun || 0);
       const sigorta_pdf = parseNum(data.pdfFields?.sigorta || 0);
+      const pdf_fatura_tl = parseNum(
+        data.pdfFields?.fatura_tl ||
+        data.pdfFields?.faturaTl ||
+        data.pdfFields?.fatura_bedeli_tl ||
+        0
+      );
 
       // ── USD TARAFI — PDF'in kuru hangi para birimindeyse o kullanılır,
       // karşı para birimi her zaman API'den gelir ──────────────────────────
@@ -782,15 +806,14 @@ async function downloadRS() {
         fatura_bedeli_tl = mal_toplam_tl + freight.tl;
 
       } else if (sevkiyatKurKaynagi === 'pdf_eur') {
-        // EUR fatura: PDF'te TRY/EUR kuru varsa onu kullan, yoksa API
         eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
-        // Excel Fiyat TRY cinsinden, EUR'ya çevir
-        mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_ham / eur_kuru : 0;
         const freight = navlunSigortaToEur(eur_kuru);
         navlun_eur = freight.navlun;
         sigorta_eur = freight.sigorta;
-        fatura_bedeli_tl = mal_toplam_ham + freight.tl;
-        fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
+        // PDF'teki TL tutarı direkt Fatura Bedeli TL — tüm kurumsal ülkeler
+        fatura_bedeli_tl  = pdf_fatura_tl > 0 ? pdf_fatura_tl : mal_toplam_ham;
+        fatura_bedeli_eur = eur_kuru > 0 ? fatura_bedeli_tl / eur_kuru : 0;
+        mal_bedeli_eur    = fatura_bedeli_eur - navlun_eur - sigorta_eur;
 
       } else {
         // TRY bazlı: PDF'teki Kur Bilgisi satırı farklı amaçlı olabilir; sadece API TRY/EUR kullan.
@@ -805,6 +828,16 @@ async function downloadRS() {
         } else {
           fatura_bedeli_tl = mal_toplam_ham;
         }
+      }
+
+      if (['kz', 'ge'].includes(currentCountry) && pdf_fatura_tl > 0 && eur_kuru > 0) {
+        const freight = navlunSigortaToEur(eur_kuru);
+        const mal_bedeli_tl = Math.max(pdf_fatura_tl - freight.tl, 0);
+        navlun_eur = freight.navlun;
+        sigorta_eur = freight.sigorta;
+        mal_bedeli_eur = mal_bedeli_tl / eur_kuru;
+        fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
+        fatura_bedeli_tl = pdf_fatura_tl;
       }
 
       // Ülke adını DB formatına çevir
