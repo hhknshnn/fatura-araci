@@ -10,7 +10,6 @@ from flask import Flask, after_this_request, jsonify, request, send_file, send_f
 from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
 from api.landed_cost import landed_cost_get, landed_cost_export
 from api.kur import get_tcmb_kurlar
-from api.usd_backfill import usd_backfill_list, usd_backfill_upload  # GEÇİCİ
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -24,7 +23,8 @@ from api.auth import auth_get, auth_post
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
-from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
+from api.nebim import nebim_delivery_get, nebim_delivery_put
 
 def read_port():
     try:
@@ -65,7 +65,8 @@ def static_files(filename):
     top = filename.split('/')[0]
     if top in STATIC_DIRS:
         return send_from_directory(BASE_DIR, filename)
-    return jsonify({'error': 'Not found'}), 404
+    # Bilinmeyen frontend rotaları için SPA entry point
+    return send_file(os.path.join(BASE_DIR, 'index.html'))
 
 
 # ── /api/generate ─────────────────────────────────────────────────────────────
@@ -390,6 +391,15 @@ def api_shipments_export():
     return shipments_export()
 
 
+@app.route('/api/nebim-delivery', methods=['GET', 'PUT', 'OPTIONS'])
+def api_nebim_delivery():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'PUT':
+        return nebim_delivery_put()
+    return nebim_delivery_get()
+
+
 @app.route('/api/landed-cost', methods=['GET', 'OPTIONS'])
 def api_landed_cost():
     if request.method == 'OPTIONS':
@@ -480,6 +490,144 @@ def api_parse_vergi_pdf():
 
         else:
             return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. Gümrük veya spediter faturası yükleyin.'}), 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+@app.route('/api/shipments/parse-ge-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_ge_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+
+        # Anlık GEL/EUR kuru çek
+        import urllib.request as _urllib
+        url = 'https://api.exchangerate-api.com/v4/latest/EUR'
+        req = _urllib.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with _urllib.urlopen(req, timeout=5) as resp:
+            rates = json.loads(resp.read()).get('rates', {})
+        gel_per_eur = float(rates.get('GEL', 0))
+
+        def to_eur(gel):
+            if not gel_per_eur:
+                return 0.0
+            return round(gel / gel_per_eur, 2)
+
+        # PDF tipini belirle
+        import pdfplumber as _pdfplumber, io as _io
+        with _pdfplumber.open(_io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+
+        # Gebrüder Weiss broker faturası
+        if 'საბროკერო' in text or 'Gebr' in text or 'ინვოისი' in text:
+            broker = parse_ge_broker_pdf(pdf_bytes)
+            return jsonify({
+                'success':  True,
+                'tip':      'broker',
+                'gel':      {'brokerage': broker['brokerage']},
+                'eur':      {'brokerage': to_eur(broker['brokerage'])},
+                'kur':      {'gel_per_eur': gel_per_eur},
+            })
+
+        # İthalat beyannamesi (IM)
+        elif 'შემოსავლების სამსახური' in text or 'სულ ჯამი' in text:
+            im = parse_ge_im_pdf(pdf_bytes)
+            return jsonify({
+                'success':  True,
+                'tip':      'im',
+                'gel':      {'kdv': im['kdv'], 'vergi': im['vergi'], 'toplam': im['toplam']},
+                'eur':      {'kdv': to_eur(im['kdv']), 'vergi': to_eur(im['vergi'])},
+                'kur':      {'gel_per_eur': gel_per_eur},
+            })
+
+        else:
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. GW broker faturası veya IM beyannamesi yükleyin.'}), 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+@app.route('/api/shipments/parse-ko-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_ko_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+        ko = parse_ko_pdf(pdf_bytes)
+
+        if not ko['vergi'] and not ko['kdv']:
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. Kosova gümrük ödeme emri (Urdhërpagesë) yükleyin.'}), 400
+
+        return jsonify({
+            'success': True,
+            'eur':     {'vergi': ko['vergi'], 'kdv': ko['kdv'], 'toplam': ko['toplam']},
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+@app.route('/api/shipments/parse-de-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_de_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+        de = parse_de_vergi_pdf(pdf_bytes)
+
+        if not any(de.values()):
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. Almanya gümrük faturası (Rechnung/Vorauskassa) yükleyin.'}), 400
+
+        return jsonify({
+            'success': True,
+            'eur':     {
+                'gumruk_vergisi': de['gumruk_vergisi'],
+                'kdv':            de['kdv'],
+                'brokerage':      de['brokerage'],
+                'other_costs':    de['other_costs'],
+            },
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
+
+@app.route('/api/shipments/parse-nl-pdf', methods=['POST', 'OPTIONS'])
+def api_parse_nl_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+        nl = parse_nl_broker_pdf(pdf_bytes)
+
+        if not any(nl.values()):
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. NedLine Logistics gümrük/broker faturası yükleyin.'}), 400
+
+        return jsonify({
+            'success': True,
+            'eur':     {
+                'brokerage': nl['brokerage'],
+                'vergi':     nl['vergi'],
+            },
+        })
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()}), 500
@@ -598,6 +746,44 @@ def api_parse_kz_pdf():
         body    = request.get_json(force=True)
         pdf_b64   = body.get('pdf', '')
         image_b64 = body.get('image', '')
+
+        # Gümrük beyannamesi mi (ДЕКЛАРАЦИЯ НА ТОВАРЫ), yoksa AVR/broker faturası mı — PDF ise ayırt et
+        if pdf_b64 and not image_b64:
+            import pdfplumber as _pdfplumber
+            pdf_bytes = base64.b64decode(pdf_b64)
+            try:
+                with _pdfplumber.open(io.BytesIO(pdf_bytes)) as _pdf:
+                    _check_text = _pdf.pages[0].extract_text() or ''
+            except Exception:
+                _check_text = ''
+
+            if 'ДЕКЛАРАЦИЯ НА ТОВАРЫ' in _check_text or 'ПОДРОБНОСТИ ПОДСЧЕТА' in _check_text:
+                b = parse_kz_beyanname_pdf(pdf_bytes)
+                if not b['vergi'] and not b['kdv']:
+                    return jsonify({'success': False, 'error': 'Beyanname okunamadı. "В ПОДРОБНОСТИ ПОДСЧЕТА" bölümü bulunamadı.'}), 422
+
+                kzt_per_eur = 0.0
+                try:
+                    import urllib.request as _urllib
+                    url = 'https://api.exchangerate-api.com/v4/latest/EUR'
+                    req = _urllib.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with _urllib.urlopen(req, timeout=5) as resp:
+                        rates = json.loads(resp.read()).get('rates', {})
+                    kzt_per_eur = float(rates.get('KZT', 0) or 0)
+                except Exception as kur_err:
+                    print(f'[KZ beyanname] Kur hatası: {kur_err}')
+
+                def to_eur(kzt):
+                    return round(kzt / kzt_per_eur, 2) if kzt_per_eur else 0.0
+
+                return jsonify({
+                    'success': True,
+                    'tip':     'beyanname',
+                    'kzt':     {'vergi': b['vergi'], 'kdv': b['kdv']},
+                    'eur':     {'vergi': to_eur(b['vergi']), 'kdv': to_eur(b['kdv'])},
+                    'kur':     {'kzt_per_eur': kzt_per_eur},
+                })
+
         if image_b64:
             result = parse_kz_avr_image(base64.b64decode(image_b64))
         elif pdf_b64:
@@ -653,25 +839,6 @@ def api_shipments_group():
     sefer_id = group_shipments(ids)
     return jsonify({'success': True, 'sefer_id': sefer_id})
 
-# GEÇİCİ — USD backfill route'ları
-@app.route('/api/usd-backfill/list', methods=['GET', 'OPTIONS'])
-def api_usd_backfill_list():
-    if request.method == 'OPTIONS':
-        return app.make_default_options_response()
-    return usd_backfill_list()
-
-@app.route('/api/usd-backfill/upload', methods=['POST', 'OPTIONS'])
-def api_usd_backfill_upload():
-    if request.method == 'OPTIONS':
-        return app.make_default_options_response()
-    return usd_backfill_upload()
-
-@app.route('/api/usd-backfill/manual-excel', methods=['POST', 'OPTIONS'])
-def api_usd_backfill_manual_excel():
-    if request.method == 'OPTIONS':
-        return app.make_default_options_response()
-    from api.usd_backfill import usd_backfill_manual_excel_route
-    return usd_backfill_manual_excel_route()
 
 @app.route('/api/shipments/ungroup', methods=['POST', 'OPTIONS'])
 def api_shipments_ungroup():

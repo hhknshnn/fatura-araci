@@ -63,7 +63,7 @@ function hideAllPanels() {
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
     'stepGecmis', 'stepUsers', 'stepDashboard', 'stepSevkiyatlar',
-    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost'].forEach(id => {
+    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -72,6 +72,13 @@ function hideAllPanels() {
 
 // ── SIDEBAR NAVİGASYON ────────────────────────────────────────────────────────
 function sidebarSelect(mod) {
+  if (mod === 'nebim-delivery' && typeof initNebimDeliveryPanel === 'function') {
+    initNebimDeliveryPanel();
+    const newPath = '/' + mod;
+    if (location.pathname !== newPath) history.pushState(null, '', newPath);
+    return;
+  }
+
   // Tüm nav-item'lardan active'i kaldır
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -98,6 +105,7 @@ function sidebarSelect(mod) {
     'fatura-uret': 'Fatura Üret',
     'maliyet-evrak': 'Maliyet Evrak',
     'landed-cost': 'Landed Cost',
+    'nebim-delivery': 'Nebim İrsaliye',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -105,6 +113,7 @@ function sidebarSelect(mod) {
   document.getElementById('topbarRight').innerHTML = '';
 
   if (mod === 'sonrasi') {
+    if (typeof resetSonrasiWizard === 'function') resetSonrasiWizard();
     document.getElementById('wizardSteps').style.display = 'flex';
     document.getElementById('step2').style.display = 'flex';
     updateWizardDots(1);
@@ -145,13 +154,6 @@ function sidebarSelect(mod) {
   } else if (mod === 'sevkiyatlar') {
     document.getElementById('stepSevkiyatlar').style.display = 'block';
     document.getElementById('contentArea').style.padding = '0';
-    document.getElementById('topbarRight').innerHTML = `
-      <button onclick="openImportModal()"
-        style="height:30px;padding:0 12px;border-radius:var(--radius-md);border:none;
-               background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;
-               font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
-        ⬆ İçe Aktar
-      </button>`;
     if (typeof loadShipments === 'function') loadShipments();
 
   } else if (mod === 'fatura-uret') {
@@ -198,49 +200,76 @@ function sidebarSelect(mod) {
     switchFaturaUretTab('taslak');
 
   } else if (mod === 'maliyet-evrak') {
-    let panel = document.getElementById('stepMaliyetEvrak');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'stepMaliyetEvrak';
-      panel.className = 'panel';
-      panel.style.cssText = 'padding:24px;';
-      panel.innerHTML = `
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Maliyet Evrak</div>
-        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;">Maliyet Evrak Yükle</div>
-        <div style="font-size:13px;color:var(--text3);margin-bottom:24px;">Beyanname, vergi ve gümrük PDF'lerini yükleyerek ilgili sevkiyatlara otomatik aktar.</div>
-
-        <!-- Sırbistan Bölümü -->
-        <div style="margin-bottom:24px;">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-            <img src="https://flagcdn.com/20x15/rs.png" alt="RS"> Sırbistan — Gümrük & Brokerage PDF
-          </div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Gümrük vergisi, KDV veya spediter faturasını yükleyin — sevkiyata otomatik eşleşir.</div>
-          <div id="me-rs-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
-            ondragleave="this.classList.remove('vergi-drag-over')"
-            ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleRsPdf(event.dataTransfer.files[0])"
-            onclick="document.getElementById('me-rs-input').click()"
-            style="display:flex;align-items:center;gap:12px;padding:14px 16px;
-                   background:var(--surface2);border:1.5px dashed var(--border2);
-                   border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
-            <input type="file" id="me-rs-input" accept=".pdf" style="display:none;" onchange="meHandleRsPdf(this.files[0])">
-            <span style="font-size:20px;flex-shrink:0;">📄</span>
-            <div style="flex:1;min-width:0;">
-              <div id="me-rs-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
-            </div>
-          </div>
-          <div id="me-rs-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
-        </div>
-
-        <style>
-          #me-rs-drop:hover, #me-rs-drop.vergi-drag-over {
-            border-color: var(--accent);
-            background: var(--accent-dim);
-          }
-        </style>
-      `;
-      document.getElementById('contentArea').appendChild(panel);
-    }
+    const panel = document.getElementById('stepMaliyetEvrak');
     panel.style.display = 'block';
+    // Her navigate'te PDF upload state'ini sıfırla
+    const meStatus = document.getElementById('me-rs-status');
+    const meResult = document.getElementById('me-rs-result');
+    const meInput  = document.getElementById('me-rs-input');
+    if (meStatus) { meStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın'; meStatus.style.color = 'var(--text3)'; }
+    if (meResult) meResult.style.display = 'none';
+    if (meInput)  meInput.value = '';
+    if (typeof meLoadRsShipments === 'function') meLoadRsShipments();
+    // BA sıfırla
+    ['osnovica', 'carinski', 'vergi', 'kdv'].forEach(key => {
+      const el = document.getElementById(`me-ba-manual-${key}`);
+      if (el) el.value = '';
+    });
+    const meBaManualStatus = document.getElementById('me-ba-manual-status');
+    if (meBaManualStatus) meBaManualStatus.textContent = '';
+    if (typeof meBaManualPreview === 'function') meBaManualPreview();
+    if (typeof meLoadBaShipments === 'function') meLoadBaShipments();
+    // MK sıfırla
+    const meMkBrokerEl = document.getElementById('me-mk-manual-broker');
+    if (meMkBrokerEl) meMkBrokerEl.value = '120';
+    ['vergi', 'kdv', 'other'].forEach(key => {
+      const el = document.getElementById(`me-mk-manual-${key}`);
+      if (el) el.value = '';
+    });
+    const meMkManualStatus = document.getElementById('me-mk-manual-status');
+    if (meMkManualStatus) meMkManualStatus.textContent = '';
+    if (typeof meMkManualPreview === 'function') meMkManualPreview();
+    if (typeof meLoadMkShipments === 'function') meLoadMkShipments();
+    // GE sıfırla
+    const meGeStatus = document.getElementById('me-ge-status');
+    const meGeResult = document.getElementById('me-ge-result');
+    const meGeInput  = document.getElementById('me-ge-input');
+    if (meGeStatus) { meGeStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın (Broker veya IM)'; meGeStatus.style.color = 'var(--text3)'; }
+    if (meGeResult) meGeResult.style.display = 'none';
+    if (meGeInput)  meGeInput.value = '';
+    if (typeof meLoadGeShipments === 'function') meLoadGeShipments();
+    // KO sıfırla
+    const meKoStatus = document.getElementById('me-ko-status');
+    const meKoResult = document.getElementById('me-ko-result');
+    const meKoInput  = document.getElementById('me-ko-input');
+    if (meKoStatus) { meKoStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın'; meKoStatus.style.color = 'var(--text3)'; }
+    if (meKoResult) meKoResult.style.display = 'none';
+    if (meKoInput)  meKoInput.value = '';
+    if (typeof meLoadKoShipments === 'function') meLoadKoShipments();
+    // KZ sıfırla
+    const meKzStatus = document.getElementById('me-kz-status');
+    const meKzResult = document.getElementById('me-kz-result');
+    const meKzInput  = document.getElementById('me-kz-input');
+    if (meKzStatus) { meKzStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın (Beyanname veya Broker)'; meKzStatus.style.color = 'var(--text3)'; }
+    if (meKzResult) meKzResult.style.display = 'none';
+    if (meKzInput)  meKzInput.value = '';
+    if (typeof meLoadKzShipments === 'function') meLoadKzShipments();
+    // DE sıfırla
+    const meDeStatus = document.getElementById('me-de-status');
+    const meDeResult = document.getElementById('me-de-result');
+    const meDeInput  = document.getElementById('me-de-input');
+    if (meDeStatus) { meDeStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın'; meDeStatus.style.color = 'var(--text3)'; }
+    if (meDeResult) meDeResult.style.display = 'none';
+    if (meDeInput)  meDeInput.value = '';
+    if (typeof meLoadDeShipments === 'function') meLoadDeShipments();
+    // NL sıfırla
+    const meNlStatus = document.getElementById('me-nl-status');
+    const meNlResult = document.getElementById('me-nl-result');
+    const meNlInput  = document.getElementById('me-nl-input');
+    if (meNlStatus) { meNlStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın'; meNlStatus.style.color = 'var(--text3)'; }
+    if (meNlResult) meNlResult.style.display = 'none';
+    if (meNlInput)  meNlInput.value = '';
+    if (typeof meLoadNlShipments === 'function') meLoadNlShipments();
   } else if (mod === 'landed-cost') {
     let panel = document.getElementById('stepLandedCost');
     if (!panel) {
@@ -251,8 +280,30 @@ function sidebarSelect(mod) {
     }
     panel.style.display = 'block';
     if (typeof initLandedCostPanel === 'function') initLandedCostPanel();
+  } else if (mod === 'nebim-delivery') {
+    let panel = document.getElementById('stepNebimDelivery');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepNebimDelivery';
+      panel.className = 'panel';
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
+    if (typeof initNebimDeliveryPanel === 'function') initNebimDeliveryPanel();
+  }
+
+  // ── URL GÜNCELLEMESİ ───────────────────────────────────────────────────────
+  const newPath = '/' + mod;
+  if (location.pathname !== newPath) {
+    history.pushState(null, '', newPath);
   }
 }
+
+// Tarayıcı geri/ileri düğmesi
+window.addEventListener('popstate', () => {
+  const mod = location.pathname.replace(/^\//, '') || 'dashboard';
+  sidebarSelect(mod);
+});
 
 // ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────
 function updateWizardDots(activeStep) {
@@ -399,6 +450,8 @@ function switchFaturaUretTab(tab) {
     setTimeout(initTaslakPanel, 0);
   } else if (tab === 'gtip' && typeof initGtipPanel === 'function') {
     setTimeout(initGtipPanel, 0);
+  } else if (tab === 'invpl' && typeof resetSonrasiWizard === 'function') {
+    setTimeout(resetSonrasiWizard, 0);
   }
   // else if (tab === 'evrak' && typeof initEvrakPanel === 'function') {
   //   setTimeout(initEvrakPanel, 0);
@@ -410,6 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initYilAyari();
   await loadCountriesConfig();
   updateYilSelects();
-  sidebarSelect('dashboard');
+  const initMod = location.pathname.replace(/^\//, '') || 'dashboard';
+  sidebarSelect(initMod);
   if (typeof checkGecmisCount === 'function') checkGecmisCount();
 });

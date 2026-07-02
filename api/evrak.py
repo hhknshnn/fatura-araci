@@ -1,9 +1,6 @@
-from http.server import BaseHTTPRequestHandler
 import json
-import base64
 import io
 import os
-import traceback
 
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
@@ -128,63 +125,3 @@ def generate_evrak_pdf(ulke_kodu, evrak_tipi, form_data):
         pass
 
     return out_buf.getvalue(), dosya_adi
-
-
-# ── VERCEL HANDLER ────────────────────────────────────────────────────────────
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
-        self.end_headers()
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps({'status': 'ok', 'service': 'evrak'}).encode())
-
-    def do_POST(self):
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-            body   = json.loads(self.rfile.read(length))
-
-            ulke_kodu  = body.get('ulkeKodu', '')
-            evrak_tipi = body.get('evrakTipi', '')
-            form_data  = body.get('formData', {})
-
-            if not ulke_kodu:
-                raise ValueError('Ülke kodu boş')
-            if not evrak_tipi:
-                raise ValueError('Evrak tipi boş')
-
-            pdf_bytes, dosya_adi = generate_evrak_pdf(ulke_kodu, evrak_tipi, form_data)
-
-            result = json.dumps({
-                'success':  True,
-                'pdf':      base64.b64encode(pdf_bytes).decode('utf-8'),
-                'dosyaAdi': dosya_adi,
-            })
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(result.encode('utf-8'))
-
-        except Exception as e:
-            err = json.dumps({
-                'success': False,
-                'error':   str(e),
-                'trace':   traceback.format_exc(),
-            })
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(err.encode('utf-8'))
-
-    def log_message(self, format, *args):
-        pass

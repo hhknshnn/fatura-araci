@@ -347,6 +347,18 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
     if not rows:
         return jsonify({'error': 'Veri bulunamadı'}), 404
 
+    fatura_ref_no_map = {}
+    if rows:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            'SELECT shipment_id, fatura_ref_no FROM nebim_delivery_refs WHERE shipment_id = ANY(%s)',
+            ([r['id'] for r in rows],),
+        )
+        fatura_ref_no_map = {r[0]: r[1] for r in cur.fetchall() if r[1]}
+        cur.close()
+        conn.close()
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Maliyet Raporu'
@@ -360,7 +372,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
         'İhracat Beyanname TL', 'İhracat Beyanname EUR',
         'Araç Bekleme', 'Brokerage Fee & Other Costs EUR', 'Other Costs EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
-        'Durum',
+        'Durum', 'Fatura Ref No',
     ]
 
     header_fill = PatternFill('solid', fgColor='1F3864')
@@ -415,6 +427,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         c(28, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
         c(29, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
         c(30, s.get('durum', ''))
+        c(31, fatura_ref_no_map.get(s.get('id'), ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -500,6 +513,7 @@ def shipments_get():
     durum        = request.args.get('durum')
     musteri_tipi = request.args.get('musteri_tipi')
     sid          = request.args.get('id')
+    sefer_id     = request.args.get('sefer_id')
 
     if mode == 'dashboard':
         return jsonify({'success': True, 'stats': get_dashboard_stats()})
@@ -509,6 +523,25 @@ def shipments_get():
         if not s:
             return jsonify({'success': False, 'error': 'Bulunamadı'}), 404
         return jsonify({'success': True, 'shipment': s})
+
+    if sefer_id:
+        conn = get_conn()
+        cur  = conn.cursor()
+        cur.execute('''
+            SELECT id, ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
+                   mal_bedeli_eur, navlun_eur, sigorta_eur, eur_kuru, fatura_bedeli_eur,
+                   fatura_bedeli_tl, durum, yukleme_tarihi, gumruk_tarihi,
+                   varis_tarihi, gumrukleme_bitis, created_at,
+                   mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
+                   arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
+                   toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet,
+                   navlun_usd, sigorta_usd, usd_kuru
+            FROM shipments WHERE sefer_id = %s ORDER BY id
+        ''', (int(sefer_id),))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'shipments': [_row_to_dict(r) for r in rows]})
 
     shipments = get_all_shipments(ulke=ulke, durum=durum, musteri_tipi=musteri_tipi)
     return jsonify({'success': True, 'shipments': shipments})
@@ -1760,6 +1793,258 @@ def parse_rs_brokerage_pdf(pdf_bytes):
         print(f'RS brokerage PDF parse hatası: {e}')
 
     return result
+
+def parse_ge_broker_pdf(pdf_bytes):
+    """
+    Gebrüder Weiss broker faturasından KDV hariç tutarı çeker.
+    'ღირ-ბა დღგ-ს გარეშე GEL XXX' satırından alınır.
+    Format: 217,55 (ondalık virgül)
+    """
+    result = {'brokerage': 0.0}
+
+    def parse_gel(s):
+        s = s.strip().replace(',', '.')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text)
+
+        m = re.search(r'ღირ-ბა\s+დღგ-ს\s+გარეშე\s+GEL\s+([\d,]+)', text)
+        if m:
+            result['brokerage'] = parse_gel(m.group(1))
+
+    except Exception as e:
+        print(f'GE broker PDF parse hatası: {e}')
+
+    return result
+
+
+def parse_ge_im_pdf(pdf_bytes):
+    """
+    Gürcistan ithalat beyanından (sadece son sayfa) KDV (kod 28) ve gümrük vergisi (kod 20) çeker.
+    სახე ჯამი ... სულ ჯამი arası özet bölümden alınır.
+    Format: 21,453.80 (nokta ondalık)
+    """
+    result = {'kdv': 0.0, 'vergi': 0.0, 'toplam': 0.0}
+
+    def parse_gel(s):
+        s = s.strip().replace(',', '')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            last_text = pdf.pages[-1].extract_text() or ''
+        text = re.sub(r'\s+', ' ', last_text)
+
+        # "სახე ჯამი" ile "სულ ჯამი" arasındaki özet bölümü bul
+        m_section = re.search(r'სახე\s+ჯამი(.*?)სულ\s+ჯამი', text, re.DOTALL)
+        if m_section:
+            section = m_section.group(1)
+            # Özet satırında sadece "KOD TUTAR" var (detay satırlarında rate ve computed da var)
+            m28 = re.search(r'\b28\b\s+([\d,]+\.?\d*)', section)
+            if m28:
+                result['kdv'] = parse_gel(m28.group(1))
+            m20 = re.search(r'\b20\b\s+([\d,]+\.?\d*)', section)
+            if m20:
+                result['vergi'] = parse_gel(m20.group(1))
+
+        m_total = re.search(r'სულ\s+ჯამი\s+([\d,]+\.?\d*)', text)
+        if m_total:
+            result['toplam'] = parse_gel(m_total.group(1))
+
+    except Exception as e:
+        print(f'GE IM PDF parse hatası: {e}')
+
+    return result
+
+
+def parse_ko_pdf(pdf_bytes):
+    """
+    Kosova gümrük ödeme emrinden (Urdhërpagesë) CD (Dogana/vergi) ve VT (TVSH/KDV) çeker.
+    Tutarlar zaten EUR (E pagueshme/EUR) — kur çevrimi gerekmez.
+    Format: 5,407.05 (virgül binlik, nokta ondalık)
+    """
+    result = {'vergi': 0.0, 'kdv': 0.0, 'toplam': 0.0}
+
+    def parse_eur(s):
+        s = s.strip().replace(',', '')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text)
+
+        m_cd = re.search(r'\bCD\s+Dogana\s+([\d,]+\.\d+)', text)
+        if m_cd:
+            result['vergi'] = parse_eur(m_cd.group(1))
+
+        m_vt = re.search(r'\bVT\s+TVSH\s+([\d,]+\.\d+)', text)
+        if m_vt:
+            result['kdv'] = parse_eur(m_vt.group(1))
+
+        m_total = re.search(r'Totali\s+i\s+pagueshëm\s+([\d,]+\.\d+)', text)
+        if m_total:
+            result['toplam'] = parse_eur(m_total.group(1))
+
+    except Exception as e:
+        print(f'KO gümrük PDF parse hatası: {e}')
+
+    return result
+
+
+def parse_de_vergi_pdf(pdf_bytes):
+    """
+    Almanya (NIETEN Zollservice vb.) Rechnung/Vorauskassa faturasından kalemleri çeker.
+    Her iki belge tipinde de alan etiketleri (Zoll, Einfuhrumsatzsteuer, ...) aynıdır.
+    PDF'te metin katmanı yoksa (taranmış/görüntü çıktısı) pytesseract ile OCR (lang='deu') yapılır.
+    Tutarlar zaten EUR — kur çevrimi gerekmez. Tek evrak tek sevkiyat, oranlama yok.
+    Format: 1258,82 / 4.071,40 (binlik nokta, ondalık virgül)
+
+    Eşleme:
+      Zoll + Ausgleichs- und Antidumpingzoll          → gumruk_vergisi
+      Einfuhrumsatzsteuer                             → kdv
+      Weitere Tarifposition (Einfuhr) + Zollabfertigung → brokerage
+      Vorauskassenabwicklung + Speditionsversicherung
+        + ATLAS-Informatikgebühr + Porti/Papiere      → other_costs
+    """
+    result = {'gumruk_vergisi': 0.0, 'kdv': 0.0, 'brokerage': 0.0, 'other_costs': 0.0}
+
+    def parse_de_sayi(s):
+        s = s.strip().replace('.', '').replace(',', '.')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        if len(text) < 50:  # Metin katmanı yok — taranmış/görüntü PDF, OCR gerekli
+            try:
+                from pdf2image import convert_from_bytes
+                import pytesseract
+                images = convert_from_bytes(pdf_bytes, dpi=200, first_page=1, last_page=1)
+                text = ' '.join(pytesseract.image_to_string(img, lang='deu') for img in images)
+                text = re.sub(r'\s+', ' ', text).strip()
+            except Exception as ocr_err:
+                print(f'DE PDF OCR hatası: {ocr_err}')
+
+        def bul(pattern):
+            m = re.search(pattern, text)
+            return parse_de_sayi(m.group(1)) if m else 0.0
+
+        zoll        = bul(r'\bZoll\b\s+([\d.,]+)')
+        antidumping = bul(r'Ausgleichs-\s*und\s*Antidumpingzoll\s+([\d.,]+)')
+        einfuhr_ust = bul(r'Einfuhrumsatzsteuer\s+([\d.,]+)')
+        tarifpos    = bul(r'Weitere Tarifposition\s*\(Einfuhr\)\s+([\d.,]+)')
+        zollabf     = bul(r'\bZollabfertigung\b\s+([\d.,]+)')
+        vorauskasse = bul(r'Vorauskassenabwicklung\s+([\d.,]+)')
+        speditionsv = bul(r'Speditionsversicherung\s+([\d.,]+)')
+        atlas       = bul(r'ATLAS-Informatikgeb\w*\s+([\d.,]+)')
+        porti       = bul(r'Porti/Papiere\s+([\d.,]+)')
+
+        result['gumruk_vergisi'] = round(zoll + antidumping, 2)
+        result['kdv']            = round(einfuhr_ust, 2)
+        result['brokerage']      = round(tarifpos + zollabf, 2)
+        result['other_costs']    = round(vorauskasse + speditionsv + atlas + porti, 2)
+
+    except Exception as e:
+        print(f'DE vergi PDF parse hatası: {e}')
+
+    return result
+
+
+def parse_nl_broker_pdf(pdf_bytes):
+    """
+    NedLine Logistics (Hollanda) gümrük/broker faturasından "Mark" sütunundaki
+    kodlara göre kalemleri toplar. Referans no formatı (ANT.../IHR...) fark etmez.
+    Tutarlar zaten EUR — kur çevrimi gerekmez. Tek evrak tek sevkiyat, oranlama yapılmaz.
+    Format: 2.152,70 / 100,00 (binlik nokta, ondalık virgül)
+
+    Eşleme:
+      CC + T1 + CCHS (Customs Clearance + T1 + Customs Clearance Extra Hs) → brokerage
+      TAX + TAXFEE (Invoerrechten + Invoerrechten Fee)                     → vergi
+    """
+    result = {'brokerage': 0.0, 'vergi': 0.0}
+
+    def parse_eur(s):
+        s = s.strip().replace('.', '').replace(',', '.')
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = ' '.join((p.extract_text() or '') for p in pdf.pages)
+        text = re.sub(r'\s+', ' ', text)
+
+        def toplam(mark):
+            return sum(parse_eur(m) for m in re.findall(r'\b' + mark + r'\b\s+([\d.,]+)', text))
+
+        result['brokerage'] = round(toplam('CC') + toplam('T1') + toplam('CCHS'), 2)
+        result['vergi']     = round(toplam('TAX') + toplam('TAXFEE'), 2)
+
+    except Exception as e:
+        print(f'NL broker PDF parse hatası: {e}')
+
+    return result
+
+
+def _parse_kzt_sayi(s):
+    """KZT sayı formatı: '702 062,00' veya '3167375,35' — boşluk/nokta binlik, virgül ondalık."""
+    s = s.strip().replace('\xa0', '').replace(' ', '').replace('.', '').replace(',', '.')
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def parse_kz_beyanname_pdf(pdf_bytes):
+    """
+    Kazakistan gümrük beyannamesinin (ДЕКЛАРАЦИЯ НА ТОВАРЫ) ilk sayfasındaki
+    "В ПОДРОБНОСТИ ПОДСЧЕТА" özet kutusundan çeker.
+    Kod 1010 (beyan ücreti) + 2010 (ithalat gümrük vergisi) → vergi
+    Kod 5060 (KDV) → kdv
+    Kodlar ve tutarlar ayrı bloklar halinde (1010 2010 5060 ... tutar tutar tutar) çıkarıldığından
+    önce kod token'ları temizlenip sadece tutarlar sırayla eşleştirilir.
+    """
+    result = {'vergi': 0.0, 'kdv': 0.0}
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            text = pdf.pages[0].extract_text() or ''
+        text = re.sub(r'\s+', ' ', text)
+
+        m_section = re.search(r'В\s+ПОДРОБНОСТИ\s+ПОДСЧЕТА(.*?)Общая\s+сумма', text, re.DOTALL)
+        if m_section:
+            section = re.sub(r'\b(1010|2010|5060)\b', ' ', m_section.group(1))
+            amounts = re.findall(r'(\d[\d\s.]*,\d{2})\s*KZT', section)
+            if len(amounts) >= 3:
+                beyan_ucreti = _parse_kzt_sayi(amounts[0])
+                gumruk_v     = _parse_kzt_sayi(amounts[1])
+                result['kdv']   = _parse_kzt_sayi(amounts[2])
+                result['vergi'] = round(beyan_ucreti + gumruk_v, 2)
+
+    except Exception as e:
+        print(f'KZ beyanname PDF parse hatası: {e}')
+
+    return result
+
 
 def parse_aksu_beyanname_pdf(pdf_bytes):
     """

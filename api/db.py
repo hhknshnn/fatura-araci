@@ -63,6 +63,20 @@ def init_db():
         )
     ''')
 
+    # Nebim v3 entegrasyon hazırlığı: shipment/fatura bazlı referans ve onay durumu.
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS nebim_delivery_refs (
+            shipment_id       INTEGER PRIMARY KEY REFERENCES shipments(id) ON DELETE CASCADE,
+            fatura_no         TEXT NOT NULL,
+            fatura_ref_no     TEXT NOT NULL DEFAULT '',
+            ready_for_nebim   BOOLEAN NOT NULL DEFAULT FALSE,
+            nebim_status      TEXT NOT NULL DEFAULT 'pending',
+            nebim_response    JSONB NOT NULL DEFAULT '{}',
+            created_at        BIGINT NOT NULL,
+            updated_at        BIGINT NOT NULL
+        )
+    ''')
+
     # ── USD navlun/sigorta kolonları (v2026-07) ──────────────────────────
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS navlun_usd NUMERIC DEFAULT 0')
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS sigorta_usd NUMERIC DEFAULT 0')

@@ -293,6 +293,43 @@ function resetUlkeSecimi() {
   if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 }
 
+function resetSonrasiWizard() {
+  // State sıfırla
+  selectedDepo  = 'serbest';
+  lastFileData  = null;
+  lastPdfData   = null;
+  masterRows    = null;
+  workingRows   = null;
+  processedWB   = null;
+  cyExcelFiles  = [];
+  cyPdfFiles    = [];
+  cyMasterRows  = [];
+  window._pdfKur = null;
+
+  // Ülke + dropzone sıfırla (zaten var olan fonksiyon)
+  resetUlkeSecimi();
+
+  // Depo butonlarını default (serbest) yap
+  const btnSerbest = document.getElementById('mode-serbest');
+  const btnAntrepo = document.getElementById('mode-antrepo');
+  if (btnSerbest) btnSerbest.classList.add('active');
+  if (btnAntrepo) btnAntrepo.classList.remove('active');
+
+  // Dosya rozet/pill'lerini temizle
+  const fn = document.getElementById('fileName');
+  if (fn) { fn.textContent = ''; fn.style.display = 'none'; }
+  const pfn = document.getElementById('pdfFileName');
+  if (pfn) { pfn.textContent = ''; pfn.style.display = 'none'; }
+
+  // Dosya inputlarını temizle
+  const fi = document.getElementById('fileInput');
+  if (fi) fi.value = '';
+
+  // step3'ü gizle (fatura-uret > invpl sekmesinde hideAllPanels çağrılmıyor)
+  const step3 = document.getElementById('step3');
+  if (step3) step3.style.display = 'none';
+}
+
 function setMode(m) {
   currentMode = m;
   document.getElementById('modeGrouped').classList.toggle('active', m === 'grouped');
@@ -733,8 +770,7 @@ async function downloadRS() {
       const countryCfg = window.COUNTRIES_CACHE?.[currentCountry] || {};
       const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi || 'api_eur';
       const navlunSigortaParaBirimi = (
-        countryCfg.navlunSigortaParaBirimi ||
-        (sevkiyatKurKaynagi === 'pdf_eur' && countryCfg.currency === 'TRY' ? 'EUR' : 'TRY')
+        countryCfg.navlunSigortaParaBirimi || 'TRY'
       ).toUpperCase();
 
       // PDF'ten gelen kur ülkeye göre TRY/EUR veya bilgi amaçlı farklı bir kur olabilir.

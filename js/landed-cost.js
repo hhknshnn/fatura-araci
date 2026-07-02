@@ -129,7 +129,7 @@ function initLandedCostPanel() {
     `;
     renderLandedCostCountryPills();
   }
-  loadLandedCost();
+  clearLandedCostFilters();
 }
 
 function renderLandedCostCountryPills() {

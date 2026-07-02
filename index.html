@@ -96,6 +96,10 @@
             <i class="ti ti-chart-bar" aria-hidden="true"></i>
             <span class="nav-label">Landed Cost</span>
           </div>
+          <div class="nav-item" id="nav-nebim-delivery" onclick="sidebarSelect('nebim-delivery')">
+            <i class="ti ti-truck-delivery" aria-hidden="true"></i>
+            <span class="nav-label">Nebim İrsaliye</span>
+          </div>
         </div>
 
         <div class="nav-group-header open" id="ngh-yurtdisi" onclick="toggleNavGroup('yurtdisi')">
@@ -1483,7 +1487,14 @@
             <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
               <img src="https://flagcdn.com/20x15/rs.png" alt="RS"> Sırbistan — Gümrük & Brokerage PDF
             </div>
-            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Gümrük vergisi, KDV veya spediter faturasını yükleyin — sevkiyata otomatik eşleşir.</div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Önce sevkiyatı seçin, PDF'i yükleyin — değerler otomatik yazılır.</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-rs-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Sırbistan sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadRsShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-rs-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
             <div id="me-rs-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
               ondragleave="this.classList.remove('vergi-drag-over')"
               ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleRsPdf(event.dataTransfer.files[0])"
@@ -1500,51 +1511,257 @@
             <div id="me-rs-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
           </div>
 
-          <!-- ══════ GEÇİCİ: USD BACKFILL (KZ/GE) — iş bitince kaldır ══════ -->
-          <div id="usd-backfill-section" style="margin-bottom:24px;padding-top:20px;border-top:1px dashed var(--border2);">
-            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">
-              🚧 USD Backfill (Geçici) — Kazakistan / Gürcistan
+          <!-- Bosna Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/ba.png" alt="BA"> Bosna — Spediter (Broker) & ASYCUDA Vergi Evrakı
             </div>
             <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
-              Storage'da PDF'i silinmiş eski KZ/GE sevkiyatları için orijinal fatura PDF'ini yükleyip Navlun USD / Sigorta USD / USD Kuru alanlarını dolduruyor.
+              Sevkiyatı seçin, tutarları BAM olarak elle girin. Broker = Osnovica − Carinski dug (OBRACUN CARINSKOG DUGA) otomatik hesaplanır. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
             </div>
-            <button onclick="loadUsdBackfillList()"
-              style="margin-bottom:10px;padding:6px 14px;border-radius:var(--radius-md);border:0.5px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;">
-              🔄 Eksik Listesini Yükle
-            </button>
-            <div id="usd-backfill-list" style="margin-bottom:14px;"></div>
-            <div id="usd-backfill-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-ba-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Bosna sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadBaShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-ba-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+
+            <div style="padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);">
+              <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;">Broker = Osnovica − Carinski dug</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Osnovica (BAM)</div>
+                  <input type="number" id="me-ba-manual-osnovica" step="0.01" placeholder="0.00" oninput="meBaManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Carinski dug (BAM)</div>
+                  <input type="number" id="me-ba-manual-carinski" step="0.01" placeholder="0.00" oninput="meBaManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                </div>
+              </div>
+              <div id="me-ba-manual-broker-eur" style="font-size:12px;color:var(--text2);margin-bottom:14px;">Broker = 0,00 BAM → 0,00 €</div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Vergi / 001 (BAM)</div>
+                  <input type="number" id="me-ba-manual-vergi" step="0.01" placeholder="0.00" oninput="meBaManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                  <div id="me-ba-manual-vergi-eur" style="font-size:11px;color:var(--text3);margin-top:3px;">= 0,00 €</div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">KDV / 090 (BAM)</div>
+                  <input type="number" id="me-ba-manual-kdv" step="0.01" placeholder="0.00" oninput="meBaManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                  <div id="me-ba-manual-kdv-eur" style="font-size:11px;color:var(--text3);margin-top:3px;">= 0,00 €</div>
+                </div>
+              </div>
+              <button onclick="meBaManualSave()" style="padding:7px 14px;border:0;border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--accent);color:#fff;font-family:var(--font);">Kaydet</button>
+              <div id="me-ba-manual-status" style="font-size:12px;margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <!-- Makedonya Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/mk.png" alt="MK"> Makedonya — Gümrük Vergi Evrakı (Elle Giriş)
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin, tutarları MKD (Makedon Dinarı) olarak elle girin — taranmış evraktan otomatik okunamaz, sevk başına tek kayıt vardır. Broker her sevkiyata otomatik 120 € yazılır, gerekirse düzenleyin. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-mk-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Makedonya sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadMkShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-mk-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+
+            <div style="padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Broker (EUR, sevk başına otomatik)</div>
+              <input type="number" id="me-mk-manual-broker" step="0.01" placeholder="120.00" oninput="meMkManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;margin-bottom:14px;">
+
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Vergi / Tax (MKD)</div>
+                  <input type="number" id="me-mk-manual-vergi" step="0.01" placeholder="0.00" oninput="meMkManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                  <div id="me-mk-manual-vergi-eur" style="font-size:11px;color:var(--text3);margin-top:3px;">= 0,00 €</div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">KDV (MKD)</div>
+                  <input type="number" id="me-mk-manual-kdv" step="0.01" placeholder="0.00" oninput="meMkManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                  <div id="me-mk-manual-kdv-eur" style="font-size:11px;color:var(--text3);margin-top:3px;">= 0,00 €</div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Other Costs (MKD)</div>
+                  <input type="number" id="me-mk-manual-other" step="0.01" placeholder="0.00" oninput="meMkManualPreview()" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);box-sizing:border-box;">
+                  <div id="me-mk-manual-other-eur" style="font-size:11px;color:var(--text3);margin-top:3px;">= 0,00 €</div>
+                </div>
+              </div>
+              <button onclick="meMkManualSave()" style="padding:7px 14px;border:0;border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--accent);color:#fff;font-family:var(--font);">Kaydet</button>
+              <div id="me-mk-manual-status" style="font-size:12px;margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <!-- Gürcistan Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/ge.png" alt="GE"> Gürcistan — Broker & İthalat Beyannamesi PDF
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin, PDF tipini belirtin ve yükleyin. Gruplu araçlarda broker/KDV fatura bedellerine orantılı dağıtılır; vergi ANT faturasına yazılır.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-ge-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Gürcistan sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadGeShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-ge-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+            <div id="me-ge-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
               ondragleave="this.classList.remove('vergi-drag-over')"
-              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleUsdBackfillFiles(event.dataTransfer.files)"
-              onclick="document.getElementById('usd-backfill-input').click()"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleGePdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-ge-input').click()"
               style="display:flex;align-items:center;gap:12px;padding:14px 16px;
                      background:var(--surface2);border:1.5px dashed var(--border2);
                      border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
-              <input type="file" id="usd-backfill-input" accept=".pdf" multiple style="display:none;"
-                onchange="handleUsdBackfillFiles(this.files)">
+              <input type="file" id="me-ge-input" accept=".pdf" style="display:none;" onchange="meHandleGePdf(this.files[0])">
               <span style="font-size:20px;flex-shrink:0;">📄</span>
               <div style="flex:1;min-width:0;">
-                <div id="usd-backfill-status" style="font-size:12px;color:var(--text3);">
-                  Bir veya birden fazla PDF sürükleyin veya tıklayın — dosya adına göre otomatik eşleşir
-                </div>
+                <div id="me-ge-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın (Broker veya IM)</div>
               </div>
             </div>
-            <div id="usd-backfill-results" style="margin-top:10px;"></div>
+            <div id="me-ge-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
+          </div>
 
-            <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border2);">
-              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;">
-                📊 veya Excel ile toplu gir (fatura_no, navlun_usd, sigorta_usd sütunları)
-              </div>
-              <input type="file" id="usd-backfill-excel-input" accept=".xlsx,.xls"
-                onchange="handleUsdBackfillExcel(this.files[0])"
-                style="font-size:12px;">
-              <div id="usd-backfill-excel-status" style="font-size:12px;color:var(--text3);margin-top:8px;"></div>
+          <!-- Kosova Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/xk.png" alt="XK"> Kosova — Gümrük Ödeme Emri (Urdhërpagesë)
             </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin ve PDF'i yükleyin. Gruplu araçlarda vergi (Dogana) ve KDV (TVSH), fatura bedellerine orantılı dağıtılır. Broker masrafı her sevkiyata otomatik 300 EUR yazılır.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-ko-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Kosova sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadKoShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-ko-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+            <div id="me-ko-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleKoPdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-ko-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="me-ko-input" accept=".pdf" style="display:none;" onchange="meHandleKoPdf(this.files[0])">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="me-ko-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
+              </div>
+            </div>
+            <div id="me-ko-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
+          </div>
+
+          <!-- Kazakistan Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/kz.png" alt="KZ"> Kazakistan — Gümrük Beyannamesi & Broker Faturası
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin, PDF'i yükleyin. Beyannamede kod 1010+2010 → vergi, kod 5060 → KDV. Broker faturasında "Итого" (KDV hariç) → brokerage. Her fatura/beyanname sadece seçili sevkiyata yazılır — gruplu araçlarda dağıtım yapılmaz.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-kz-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Kazakistan sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadKzShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-kz-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+            <div id="me-kz-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleKzPdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-kz-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="me-kz-input" accept=".pdf" style="display:none;" onchange="meHandleKzPdf(this.files[0])">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="me-kz-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın (Beyanname veya Broker)</div>
+              </div>
+            </div>
+            <div id="me-kz-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
+          </div>
+
+          <!-- Almanya Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/de.png" alt="DE"> Almanya — Rechnung (Gümrük/Zollservice Faturası)
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin, PDF'i yükleyin. Tutarlar zaten EUR — kur çevrimi yapılmaz. Tek evrak sadece seçili sevkiyata yazılır, oranlama yapılmaz.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-de-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Almanya sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadDeShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-de-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+            <div id="me-de-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleDePdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-de-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="me-de-input" accept=".pdf" style="display:none;" onchange="meHandleDePdf(this.files[0])">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="me-de-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
+              </div>
+            </div>
+            <div id="me-de-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
+          </div>
+
+          <!-- Hollanda Bölümü -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+              <img src="https://flagcdn.com/20x15/nl.png" alt="NL"> Hollanda — NedLine Gümrük/Broker Faturası
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">
+              Sevkiyatı seçin, PDF'i yükleyin. Tutarlar zaten EUR — kur çevrimi yapılmaz. CC + T1 + CCHS → Broker and other costs; Invoerrechten + Fee (TAX + TAXFEE) → Tax. Tek evrak sadece seçili sevkiyata yazılır, oranlama yapılmaz.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <select id="me-nl-select" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;">
+                <option value="">— Hollanda sevkiyatı seçin —</option>
+              </select>
+              <button onclick="meLoadNlShipments()" title="Listeyi yenile" style="padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--font);">↺</button>
+            </div>
+            <div id="me-nl-select-status" style="font-size:11px;color:var(--text3);margin-bottom:8px;"></div>
+            <div id="me-nl-drop" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+              ondragleave="this.classList.remove('vergi-drag-over')"
+              ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleNlPdf(event.dataTransfer.files[0])"
+              onclick="document.getElementById('me-nl-input').click()"
+              style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                     background:var(--surface2);border:1.5px dashed var(--border2);
+                     border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+              <input type="file" id="me-nl-input" accept=".pdf" style="display:none;" onchange="meHandleNlPdf(this.files[0])">
+              <span style="font-size:20px;flex-shrink:0;">📄</span>
+              <div style="flex:1;min-width:0;">
+                <div id="me-nl-status" style="font-size:12px;color:var(--text3);">PDF'i buraya sürükleyin veya tıklayın</div>
+              </div>
+            </div>
+            <div id="me-nl-result" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-md);font-size:12px;"></div>
           </div>
 
           <style>
             #me-rs-drop:hover, #me-rs-drop.vergi-drag-over,
-            #usd-backfill-dropzone:hover, #usd-backfill-dropzone.vergi-drag-over {
+            #me-ge-drop:hover, #me-ge-drop.vergi-drag-over,
+            #me-ko-drop:hover, #me-ko-drop.vergi-drag-over,
+            #me-kz-drop:hover, #me-kz-drop.vergi-drag-over,
+            #me-de-drop:hover, #me-de-drop.vergi-drag-over,
+            #me-nl-drop:hover, #me-nl-drop.vergi-drag-over {
               border-color: var(--accent);
               background: var(--accent-dim);
             }
@@ -1628,13 +1845,13 @@
   <script src="js/gtip.js"></script>
   <script src="js/evrak.js"></script>
   <script src="js/mense.js"></script>
-  <script src="js/shell.js"></script>
+  <script src="js/nebim-delivery.js?v=20260702-nebim-excel-import"></script>
+  <script src="js/shell.js?v=20260702-makedonya-maliyet-evrak"></script>
   <script src="js/gecmis.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/users.js"></script>
   <script src="js/dashboard.js"></script>
-  <script src="js/shipments.js"></script>
-  <script src="js/usd-backfill.js"></script>
+  <script src="js/shipments.js?v=20260702-makedonya-maliyet-evrak"></script>
   <script src="js/landed-cost.js"></script>
   <script src="js/import.js"></script>
 

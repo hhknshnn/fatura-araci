@@ -607,6 +607,11 @@ function needsFreightRepair(s) {
   const ulke = String(s?.ulke || '').toUpperCase();
   const navlun = parseFloat(s?.navlun_eur) || 0;
   const sigorta = parseFloat(s?.sigorta_eur) || 0;
+  const faturaEur = parseFloat(s?.fatura_bedeli_eur) || 0;
+  const malEur = parseFloat(s?.mal_bedeli_eur) || 0;
+  if (ulke === 'SIRBİSTAN' || ulke === 'SIRBISTAN') {
+    return malEur < 0 || (faturaEur > 0 && navlun > faturaEur);
+  }
   if (ulke === 'BOSNA') return navlun === 0 && sigorta === 0;
   if (ulke === 'GÜRCİSTAN' || ulke === 'GURCISTAN') {
     return navlun > 0 && navlun < 100 && sigorta >= 0 && sigorta < 1;
@@ -1415,32 +1420,30 @@ function showMiniModal(title, bodyHtml, buttons) {
 }
 
 // ── SIRBİSTAN VERGİ PDF PARSE ─────────────────────────────────────────────────
-async function parseVergiPdf(file) {
+function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = async e => {
-      try {
-        const b = new Uint8Array(e.target.result);
-        let s = '';
-        for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
-        const pdf_b64 = btoa(s);
-
-        const token = sessionStorage.getItem('fa_auth_token');
-        const resp  = await fetch('/api/shipments/parse-vergi-pdf', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body:    JSON.stringify({ pdf: pdf_b64 }),
-        });
-        const data = await resp.json();
-        if (!data.success) throw new Error(data.error);
-        resolve(data);
-      } catch (err) {
-        reject(err);
-      }
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
     };
-    reader.onerror = () => reject(new Error('Dosya okunamadı'));
-    reader.readAsArrayBuffer(file);
+    reader.onerror = () => reject(reader.error || new Error('Dosya okunamadı'));
+    reader.readAsDataURL(file);
   });
+}
+
+async function parseVergiPdf(file) {
+  const pdf_b64 = await fileToBase64(file);
+  const token = sessionStorage.getItem('fa_auth_token');
+  const resp  = await fetch('/api/shipments/parse-vergi-pdf', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify({ pdf: pdf_b64 }),
+  });
+  const data = await resp.json();
+  if (!data.success) throw new Error(data.error);
+  return data;
 }
 
 async function handleVergiPdf(file) {
@@ -1483,7 +1486,36 @@ async function handleVergiPdf(file) {
   }
 }
 
-// Sırbistan PDF — mevcut parse-vergi-pdf endpoint'ini kullanır
+async function meLoadRsShipments() {
+  const sel      = document.getElementById('me-rs-select');
+  const statusEl = document.getElementById('me-rs-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res  = await fetch('/api/shipments?ulke=SIRBİSTAN', { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+// Sırbistan PDF — seçili sevkiyata otomatik yazar
 async function meHandleRsPdf(file) {
   if (!file) return;
   const statusEl = document.getElementById('me-rs-status');
@@ -1492,38 +1524,1158 @@ async function meHandleRsPdf(file) {
   statusEl.style.color = 'var(--text3)';
   resultEl.style.display = 'none';
 
+  let data;
   try {
-    const data = await parseVergiPdf(file);
-    const fmt = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-
-    statusEl.style.color = 'var(--success)';
-    statusEl.textContent = `✓ ${file.name} okundu`;
-
-    resultEl.style.display = 'block';
-    if (data.tip === 'vergi') {
-      resultEl.innerHTML = `
-        <div style="color:var(--success);">✓ Gümrük Vergisi faturası</div>
-        <div style="margin-top:6px;font-size:12px;">
-          Gümrük: <b>${fmt(data.rsd.carina)} RSD → ${fmt(data.eur.gumruk_vergisi)} €</b> &nbsp;|&nbsp;
-          KDV: <b>${fmt(data.rsd.pdv)} RSD → ${fmt(data.eur.kdv)} €</b><br>
-          <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
-        </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--text3);">
-          ℹ Sevkiyata uygulamak için ilgili sevkiyatı açıp PDF'i oradan yükleyin.
-        </div>`;
-    } else if (data.tip === 'brokerage') {
-      resultEl.innerHTML = `
-        <div style="color:var(--success);">✓ Spediter (Brokerage Fee & Other Costs EUR) faturası</div>
-        <div style="margin-top:6px;font-size:12px;">
-          Brokerage Fee & Other Costs EUR: <b>${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} €</b><br>
-          <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
-        </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--text3);">
-          ℹ Sevkiyata uygulamak için ilgili sevkiyatı açıp PDF'i oradan yükleyin.
-        </div>`;
-    }
+    data = await parseVergiPdf(file);
   } catch (err) {
     statusEl.style.color = 'var(--error)';
     statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmt = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  let detailHtml = '';
+  if (data.tip === 'vergi') {
+    detailHtml = `
+      <div style="color:var(--success);">✓ Gümrük Vergisi faturası</div>
+      <div style="margin-top:6px;font-size:12px;">
+        Gümrük: <b>${fmt(data.rsd.carina)} RSD → ${fmt(data.eur.gumruk_vergisi)} €</b> &nbsp;|&nbsp;
+        KDV: <b>${fmt(data.rsd.pdv)} RSD → ${fmt(data.eur.kdv)} €</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
+      </div>`;
+  } else if (data.tip === 'brokerage') {
+    detailHtml = `
+      <div style="color:var(--success);">✓ Spediter (Brokerage Fee & Other Costs EUR) faturası</div>
+      <div style="margin-top:6px;font-size:12px;">
+        Brokerage Fee & Other Costs EUR: <b>${fmt(data.rsd.nasi_troskovi)} RSD → ${fmt(data.eur.brokerage)} €</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.rsd_per_eur)} RSD</span>
+      </div>`;
+  }
+
+  const selEl     = document.getElementById('me-rs-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    resultEl.innerHTML = detailHtml + `
+      <div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  resultEl.innerHTML = detailHtml +
+    `<div id="me-rs-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Sevkiyata yazılıyor...</div>`;
+
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    const body = {
+      id:                    s.id,
+      ihracat_dosya_no:      s.ihracat_dosya_no || '',
+      nakliye_firmasi:       s.nakliye_firmasi || '',
+      plaka:                 s.plaka || '',
+      palet:                 s.palet || null,
+      durum:                 s.durum || '',
+      varis_tarihi:          s.varis_tarihi || '',
+      gumrukleme_bitis:      s.gumrukleme_bitis || '',
+      fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+      fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+      mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+      navlun_eur:            s.navlun_eur || 0,
+      sigorta_eur:           s.sigorta_eur || 0,
+      eur_kuru:              s.eur_kuru || 0,
+      navlun_usd:            s.navlun_usd || 0,
+      sigorta_usd:           s.sigorta_usd || 0,
+      usd_kuru:              s.usd_kuru || 0,
+      ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+      ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+      arac_bekleme:          s.arac_bekleme || 0,
+      other_costs_eur:       s.other_costs_eur || 0,
+      brokerage_eur:         data.tip === 'brokerage' ? data.eur.brokerage       : (s.brokerage_eur      || 0),
+      gumruk_vergisi_eur:    data.tip === 'vergi'     ? data.eur.gumruk_vergisi  : (s.gumruk_vergisi_eur || 0),
+      kdv_eur:               data.tip === 'vergi'     ? data.eur.kdv             : (s.kdv_eur            || 0),
+    };
+
+    const upRes  = await fetch('/api/shipments', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify(body),
+    });
+    const upData = await upRes.json();
+    if (!upData.success) throw new Error(upData.error);
+
+    const selLabel = selEl.options[selEl.selectedIndex]?.text || String(selectedId);
+    document.getElementById('me-rs-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi → ${selLabel}</span>`;
+    const inp = document.getElementById('me-rs-input');
+    if (inp) inp.value = '';
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-rs-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+  }
+}
+
+// ── GÜRCİSTAN MALİYET EVRAK ──────────────────────────────────────────────────
+
+async function meLoadGeShipments() {
+  const sel      = document.getElementById('me-ge-select');
+  const statusEl = document.getElementById('me-ge-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments?ulke=G%C3%9CRC%C4%B0STAN', { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleGePdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-ge-status');
+  const resultEl = document.getElementById('me-ge-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-ge-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmt    = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  const selEl      = document.getElementById('me-ge-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    let info = '';
+    if (data.tip === 'broker') {
+      info = `<div style="color:var(--success);">✓ Broker faturası (GW)</div>
+        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.gel.brokerage)} GEL → ${fmtEur(data.eur.brokerage)}</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</span></div>`;
+    } else {
+      info = `<div style="color:var(--success);">✓ İthalat Beyannamesi (IM)</div>
+        <div style="margin-top:6px;">KDV: <b>${fmt(data.gel.kdv)} GEL → ${fmtEur(data.eur.kdv)}</b><br>
+        Vergi: <b>${fmt(data.gel.vergi)} GEL → ${fmtEur(data.eur.vergi)}</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</span></div>`;
+    }
+    resultEl.innerHTML = info + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // Seçili sevkiyatı ve varsa sefer grubunu getir
+  try {
+    const token   = sessionStorage.getItem('fa_auth_token');
+    const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData   = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    let group = [s];  // tek sevkiyat varsayılan
+
+    // Gruplu araç ise tüm grup üyelerini çek
+    if (s.sefer_id) {
+      const gRes  = await fetch(`/api/shipments?sefer_id=${s.sefer_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const gData = await gRes.json();
+      if (gData.success && gData.shipments?.length > 0) group = gData.shipments;
+    }
+
+    // Toplam fatura bedeli
+    const toplamEur = group.reduce((sum, x) => sum + (parseFloat(x.fatura_bedeli_eur) || 0), 0);
+
+    // Her sevkiyat için pay hesapla
+    const paylar = group.map(x => {
+      const bedel = parseFloat(x.fatura_bedeli_eur) || 0;
+      const oran  = toplamEur > 0 ? bedel / toplamEur : 1 / group.length;
+      return { ...x, oran };
+    });
+
+    // Dağıtım gösterimi ve kayıt
+    let detailHtml = '';
+    const savePromises = [];
+
+    if (data.tip === 'broker') {
+      const toplam = data.eur.brokerage;
+      detailHtml = `<div style="color:var(--success);">✓ Broker faturası — ${fmt(data.gel.brokerage)} GEL → ${fmtEur(toplam)}</div>
+        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</div>`;
+
+      if (group.length > 1) {
+        detailHtml += `<div style="margin-top:8px;font-size:11px;color:var(--text3);">Orantılı dağıtım (fatura_bedeli_eur'a göre):</div>
+          <div style="margin-top:4px;">` +
+          paylar.map(p => `<div>${p.ihracat_dosya_no || p.fatura_no}: <b>${fmtEur(Math.round(toplam * p.oran * 100) / 100)}</b> (%${Math.round(p.oran * 100)})</div>`).join('') +
+          `</div>`;
+      }
+
+      for (const p of paylar) {
+        const pay = Math.round(toplam * p.oran * 100) / 100;
+        savePromises.push(meGeSaveField(p, 'brokerage_eur', pay, token));
+      }
+
+    } else {
+      // IM beyannamesi — KDV orantılı, vergi ANT faturasına
+      const toplamKdv   = data.eur.kdv;
+      const toplamVergi = data.eur.vergi;
+
+      detailHtml = `<div style="color:var(--success);">✓ İthalat Beyannamesi — KDV: ${fmtEur(toplamKdv)} | Vergi: ${fmtEur(toplamVergi)}</div>
+        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</div>`;
+
+      // KDV dağıtımı
+      if (group.length > 1) {
+        detailHtml += `<div style="margin-top:8px;font-size:11px;color:var(--text3);">KDV orantılı dağıtım:</div>
+          <div style="margin-top:4px;">` +
+          paylar.map(p => `<div>${p.ihracat_dosya_no || p.fatura_no}: <b>${fmtEur(Math.round(toplamKdv * p.oran * 100) / 100)}</b></div>`).join('') +
+          `</div>`;
+      }
+
+      // ANT faturasını bul
+      const antFatura = group.find(x => (x.fatura_no || '').startsWith('ANT'));
+      if (antFatura) {
+        detailHtml += `<div style="margin-top:6px;font-size:11px;">Vergi → <b>${antFatura.fatura_no}</b> (ANT)</div>`;
+      } else {
+        detailHtml += `<div style="margin-top:6px;font-size:11px;color:var(--text3);">ℹ ANT faturası bulunamadı; vergi seçili sevkiyata yazılacak.</div>`;
+      }
+
+      for (const p of paylar) {
+        const kdvPay = Math.round(toplamKdv * p.oran * 100) / 100;
+        savePromises.push(meGeSaveField(p, 'kdv_eur', kdvPay, token));
+      }
+
+      const vergiTarget = antFatura || s;
+      savePromises.push(meGeSaveField(vergiTarget, 'gumruk_vergisi_eur', toplamVergi, token));
+    }
+
+    resultEl.innerHTML = detailHtml +
+      `<div id="me-ge-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await Promise.all(savePromises);
+
+    document.getElementById('me-ge-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi (${group.length} sevkiyat güncellendi)</span>`;
+    const inp = document.getElementById('me-ge-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-ge-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+  }
+}
+
+async function meGeSaveField(shipment, field, value, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+  };
+  body[field] = value;
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
+// ── KOSOVA MALİYET EVRAK ─────────────────────────────────────────────────────
+
+async function meLoadKoShipments() {
+  const sel      = document.getElementById('me-ko-select');
+  const statusEl = document.getElementById('me-ko-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments?ulke=KOSOVA', { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleKoPdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-ko-status');
+  const resultEl = document.getElementById('me-ko-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-ko-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  const selEl      = document.getElementById('me-ko-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    resultEl.innerHTML = `<div style="color:var(--success);">✓ Gümrük Ödeme Emri (Urdhërpagesë)</div>
+      <div style="margin-top:6px;">Vergi (Dogana): <b>${fmtEur(data.eur.vergi)}</b><br>
+      KDV (TVSH): <b>${fmtEur(data.eur.kdv)}</b></div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // Seçili sevkiyatı ve varsa sefer grubunu getir
+  try {
+    const token   = sessionStorage.getItem('fa_auth_token');
+    const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData   = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    let group = [s];  // tek sevkiyat varsayılan
+
+    // Gruplu araç ise tüm grup üyelerini çek
+    if (s.sefer_id) {
+      const gRes  = await fetch(`/api/shipments?sefer_id=${s.sefer_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const gData = await gRes.json();
+      if (gData.success && gData.shipments?.length > 0) group = gData.shipments;
+    }
+
+    // Toplam fatura bedeli
+    const toplamEur = group.reduce((sum, x) => sum + (parseFloat(x.fatura_bedeli_eur) || 0), 0);
+
+    // Her sevkiyat için pay hesapla
+    const paylar = group.map(x => {
+      const bedel = parseFloat(x.fatura_bedeli_eur) || 0;
+      const oran  = toplamEur > 0 ? bedel / toplamEur : 1 / group.length;
+      return { ...x, oran };
+    });
+
+    const toplamVergi = data.eur.vergi;
+    const toplamKdv    = data.eur.kdv;
+    const KO_BROKERAGE_EUR = 300;
+
+    let detailHtml = `<div style="color:var(--success);">✓ Gümrük Ödeme Emri — Vergi: ${fmtEur(toplamVergi)} | KDV: ${fmtEur(toplamKdv)}</div>
+      <div style="margin-top:4px;color:var(--text3);">Broker masrafı her sevkiyata otomatik <b>${fmtEur(KO_BROKERAGE_EUR)}</b> yazılacak.</div>`;
+
+    // Vergi + KDV dağıtımı — ikisi de fatura_bedeli_eur oranına göre
+    if (group.length > 1) {
+      detailHtml += `<div style="margin-top:8px;font-size:11px;color:var(--text3);">Orantılı dağıtım (fatura_bedeli_eur'a göre):</div>
+        <div style="margin-top:4px;">` +
+        paylar.map(p => `<div>${p.ihracat_dosya_no || p.fatura_no}: Vergi <b>${fmtEur(Math.round(toplamVergi * p.oran * 100) / 100)}</b> · KDV <b>${fmtEur(Math.round(toplamKdv * p.oran * 100) / 100)}</b> · Broker <b>${fmtEur(KO_BROKERAGE_EUR)}</b> (%${Math.round(p.oran * 100)})</div>`).join('') +
+        `</div>`;
+    }
+
+    const savePromises = paylar.map(p => meKoSaveFields(p, {
+      gumruk_vergisi_eur: Math.round(toplamVergi * p.oran * 100) / 100,
+      kdv_eur:            Math.round(toplamKdv * p.oran * 100) / 100,
+      brokerage_eur:       KO_BROKERAGE_EUR,
+    }, token));
+
+    resultEl.innerHTML = detailHtml +
+      `<div id="me-ko-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await Promise.all(savePromises);
+
+    document.getElementById('me-ko-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi (${group.length} sevkiyat güncellendi)</span>`;
+    const inp = document.getElementById('me-ko-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-ko-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+  }
+}
+
+async function meKoSaveFields(shipment, fields, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+    ...fields,
+  };
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
+// ── KAZAKİSTAN MALİYET EVRAK ─────────────────────────────────────────────────
+
+async function meLoadKzShipments() {
+  const sel      = document.getElementById('me-kz-select');
+  const statusEl = document.getElementById('me-kz-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('KAZAKİSTAN')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleKzPdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-kz-status');
+  const resultEl = document.getElementById('me-kz-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-kz-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmt    = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  const selEl      = document.getElementById('me-kz-select');
+  const selectedId = selEl?.value;
+
+  // Beyanname yanıtı: {tip:'beyanname', kzt:{vergi,kdv}, eur:{vergi,kdv}, kur:{kzt_per_eur}}
+  // AVR/broker yanıtı (mevcut endpoint, tip alanı yok): {brokerage_kzt, other_costs_kzt, brokerage_eur, other_costs_eur, kzt_per_eur, kalemler}
+  const isBeyanname = data.tip === 'beyanname';
+
+  if (!selectedId) {
+    let info = '';
+    if (isBeyanname) {
+      info = `<div style="color:var(--success);">✓ Gümrük Beyannamesi</div>
+        <div style="margin-top:6px;">Vergi (1010+2010): <b>${fmt(data.kzt.vergi)} KZT → ${fmtEur(data.eur.vergi)}</b><br>
+        KDV (5060): <b>${fmt(data.kzt.kdv)} KZT → ${fmtEur(data.eur.kdv)}</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.kzt_per_eur)} KZT</span></div>`;
+    } else {
+      info = `<div style="color:var(--success);">✓ Broker faturası — Итого</div>
+        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.brokerage_kzt)} KZT → ${fmtEur(data.brokerage_eur)}</b><br>
+        Diğer masraflar: <b>${fmt(data.other_costs_kzt)} KZT → ${fmtEur(data.other_costs_eur)}</b><br>
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kzt_per_eur)} KZT</span></div>`;
+    }
+    resultEl.innerHTML = info + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // Seçili sevkiyata uygula — her fatura/beyanname 1 sevke eşittir, gruplu araçlarda orantılı dağıtım yapılmaz
+  try {
+    const token   = sessionStorage.getItem('fa_auth_token');
+    const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData   = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    let detailHtml = '';
+    let saveFields;
+
+    if (isBeyanname) {
+      const vergi = data.eur.vergi;
+      const kdv   = data.eur.kdv;
+
+      detailHtml = `<div style="color:var(--success);">✓ Gümrük Beyannamesi — Vergi: ${fmtEur(vergi)} | KDV: ${fmtEur(kdv)}</div>
+        <div style="margin-top:6px;">Vergi (1010+2010): <b>${fmt(data.kzt.vergi)} KZT</b> → ${fmtEur(vergi)}<br>
+        KDV (5060): <b>${fmt(data.kzt.kdv)} KZT</b> → ${fmtEur(kdv)}</div>
+        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.kzt_per_eur)} KZT</div>`;
+
+      saveFields = { gumruk_vergisi_eur: vergi, kdv_eur: kdv };
+
+    } else {
+      // Broker (AVR) faturası — brokerage_eur ve other_costs_eur tam olarak seçili sevkiyata yazılır
+      const brokerage = data.brokerage_eur || 0;
+      const other      = data.other_costs_eur || 0;
+
+      const kalemHtml = (data.kalemler || []).length
+        ? `<div style="margin-top:6px;font-size:11px;color:var(--text3);">Okunan kalemler:</div>
+           <div style="margin-top:2px;">` +
+           data.kalemler.map(k => `<div>${k.ad}: <b>${fmt(k.tutar)} KZT</b></div>`).join('') +
+           `</div>`
+        : '';
+
+      detailHtml = `<div style="color:var(--success);">✓ Broker faturası — Brokerage: ${fmtEur(brokerage)} | Diğer: ${fmtEur(other)}</div>
+        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.brokerage_kzt)} KZT</b> → ${fmtEur(brokerage)}<br>
+        Diğer masraflar: <b>${fmt(data.other_costs_kzt)} KZT</b> → ${fmtEur(other)}</div>
+        ${kalemHtml}
+        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kzt_per_eur)} KZT</div>`;
+
+      saveFields = { brokerage_eur: brokerage, other_costs_eur: other };
+    }
+
+    resultEl.innerHTML = detailHtml +
+      `<div id="me-kz-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await meKzSaveFields(s, saveFields, token);
+
+    document.getElementById('me-kz-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi</span>`;
+    const inp = document.getElementById('me-kz-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-kz-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+  }
+}
+
+async function meKzSaveFields(shipment, fields, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+    ...fields,
+  };
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
+// ── ALMANYA MALİYET EVRAK ─────────────────────────────────────────────────────
+
+async function meLoadDeShipments() {
+  const sel      = document.getElementById('me-de-select');
+  const statusEl = document.getElementById('me-de-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('ALMANYA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleDePdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-de-status');
+  const resultEl = document.getElementById('me-de-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-de-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  const gumrukV    = data.eur.gumruk_vergisi || 0;
+  const kdv        = data.eur.kdv || 0;
+  const brokerage  = data.eur.brokerage || 0;
+  const otherCosts = data.eur.other_costs || 0;
+
+  const detailHtml = `<div style="color:var(--success);">✓ Gümrük Faturası (Rechnung)</div>
+    <div style="margin-top:6px;">Gümrük Vergisi (Zoll + Antidumping): <b>${fmtEur(gumrukV)}</b><br>
+    KDV (Einfuhrumsatzsteuer): <b>${fmtEur(kdv)}</b><br>
+    Brokerage Fee & Other Costs (Weitere Tarifposition + Zollabfertigung): <b>${fmtEur(brokerage)}</b><br>
+    Other Costs (Vorauskassenabwicklung + Speditionsversicherung + ATLAS + Porti/Papiere): <b>${fmtEur(otherCosts)}</b></div>`;
+
+  const selEl      = document.getElementById('me-de-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    resultEl.innerHTML = detailHtml + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // Seçili sevkiyata uygula — tek evrak tek sevkiyat, oranlama yapılmaz
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    resultEl.innerHTML = detailHtml +
+      `<div id="me-de-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await meDeSaveFields(s, {
+      gumruk_vergisi_eur: gumrukV,
+      kdv_eur:            kdv,
+      brokerage_eur:      brokerage,
+      other_costs_eur:    otherCosts,
+    }, token);
+
+    document.getElementById('me-de-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi</span>`;
+    const inp = document.getElementById('me-de-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-de-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+  }
+}
+
+async function meDeSaveFields(shipment, fields, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+    ...fields,
+  };
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
+// ── HOLLANDA MALİYET EVRAK ────────────────────────────────────────────────
+
+async function meLoadNlShipments() {
+  const sel      = document.getElementById('me-nl-select');
+  const statusEl = document.getElementById('me-nl-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('HOLLANDA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleNlPdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-nl-status');
+  const resultEl = document.getElementById('me-nl-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-nl-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  const brokerage = data.eur.brokerage || 0;
+  const vergi     = data.eur.vergi || 0;
+
+  const detailHtml = `<div style="color:var(--success);">✓ NedLine Gümrük/Broker Faturası</div>
+    <div style="margin-top:6px;">Broker and other costs (CC + T1 + CCHS): <b>${fmtEur(brokerage)}</b><br>
+    Tax (Invoerrechten + Fee): <b>${fmtEur(vergi)}</b></div>`;
+
+  const selEl      = document.getElementById('me-nl-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    resultEl.innerHTML = detailHtml + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // Seçili sevkiyata uygula — tek evrak tek sevkiyat, oranlama yapılmaz
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    resultEl.innerHTML = detailHtml +
+      `<div id="me-nl-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await meNlSaveFields(s, {
+      brokerage_eur:      brokerage,
+      gumruk_vergisi_eur: vergi,
+    }, token);
+
+    document.getElementById('me-nl-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi</span>`;
+    const inp = document.getElementById('me-nl-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-nl-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+  }
+}
+
+async function meNlSaveFields(shipment, fields, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+    ...fields,
+  };
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
+// ── BOSNA MALİYET EVRAK ───────────────────────────────────────────────────
+
+async function meLoadBaShipments() {
+  const sel      = document.getElementById('me-ba-select');
+  const statusEl = document.getElementById('me-ba-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('BOSNA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+// ── BOSNA MANUEL GİRİŞ ─────────────────────────────────────────────────────
+
+const BA_BAM_PER_EUR = 1.95583;
+
+function meBaManualPreview() {
+  const fmt    = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+
+  const osnovica = parseFloat(document.getElementById('me-ba-manual-osnovica')?.value) || 0;
+  const carinski = parseFloat(document.getElementById('me-ba-manual-carinski')?.value) || 0;
+  const broker   = osnovica - carinski;
+  const brokerEl = document.getElementById('me-ba-manual-broker-eur');
+  if (brokerEl) brokerEl.textContent = `Broker = ${fmt(broker)} BAM → ${fmtEur(broker / BA_BAM_PER_EUR)}`;
+
+  for (const key of ['vergi', 'kdv']) {
+    const input = document.getElementById(`me-ba-manual-${key}`);
+    const out   = document.getElementById(`me-ba-manual-${key}-eur`);
+    if (!input || !out) continue;
+    const bam = parseFloat(input.value) || 0;
+    out.textContent = `= ${fmtEur(bam / BA_BAM_PER_EUR)}`;
+  }
+}
+
+async function meBaManualSave() {
+  const statusEl    = document.getElementById('me-ba-manual-status');
+  const selEl       = document.getElementById('me-ba-select');
+  const selectedId  = selEl?.value;
+
+  if (!selectedId) {
+    if (statusEl) { statusEl.textContent = '⚠ Önce sevkiyat seçin.'; statusEl.style.color = 'var(--error)'; }
+    return;
+  }
+
+  const osnovicaBam = parseFloat(document.getElementById('me-ba-manual-osnovica').value) || 0;
+  const carinskiBam = parseFloat(document.getElementById('me-ba-manual-carinski').value) || 0;
+  const brokerBam   = osnovicaBam - carinskiBam;
+  const vergiBam    = parseFloat(document.getElementById('me-ba-manual-vergi').value) || 0;
+  const kdvBam      = parseFloat(document.getElementById('me-ba-manual-kdv').value) || 0;
+
+  const saveFields = {};
+  if (brokerBam) saveFields.brokerage_eur      = Math.round(brokerBam / BA_BAM_PER_EUR * 100) / 100;
+  if (vergiBam)  saveFields.gumruk_vergisi_eur = Math.round(vergiBam  / BA_BAM_PER_EUR * 100) / 100;
+  if (kdvBam)    saveFields.kdv_eur            = Math.round(kdvBam    / BA_BAM_PER_EUR * 100) / 100;
+
+  if (Object.keys(saveFields).length === 0) {
+    if (statusEl) { statusEl.textContent = '⚠ En az bir tutar girin.'; statusEl.style.color = 'var(--error)'; }
+    return;
+  }
+
+  if (statusEl) { statusEl.textContent = '⏳ Kaydediliyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+
+    await meKzSaveFields(sData.shipment, saveFields, token);
+
+    if (statusEl) { statusEl.textContent = '✓ Kaydedildi'; statusEl.style.color = 'var(--success)'; }
+    ['osnovica', 'carinski', 'vergi', 'kdv'].forEach(key => {
+      const input = document.getElementById(`me-ba-manual-${key}`);
+      if (input) input.value = '';
+    });
+    meBaManualPreview();
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+// ── MAKEDONYA MALİYET EVRAK ────────────────────────────────────────────────
+
+async function meLoadMkShipments() {
+  const sel      = document.getElementById('me-mk-select');
+  const statusEl = document.getElementById('me-mk-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('MAKEDONYA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${label}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+// ── MAKEDONYA MANUEL GİRİŞ ───────────────────────────────────────────────────
+// MKD, Makedon Dinarı'nın Euro'ya sabit çapası (Merkez Bankası paritesi ~61,5).
+
+const MK_MKD_PER_EUR = 61.5;
+
+function meMkManualPreview() {
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  for (const key of ['vergi', 'kdv', 'other']) {
+    const input = document.getElementById(`me-mk-manual-${key}`);
+    const out   = document.getElementById(`me-mk-manual-${key}-eur`);
+    if (!input || !out) continue;
+    const mkd = parseFloat(input.value) || 0;
+    out.textContent = `= ${fmtEur(mkd / MK_MKD_PER_EUR)}`;
+  }
+}
+
+async function meMkManualSave() {
+  const statusEl   = document.getElementById('me-mk-manual-status');
+  const selEl      = document.getElementById('me-mk-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    if (statusEl) { statusEl.textContent = '⚠ Önce sevkiyat seçin.'; statusEl.style.color = 'var(--error)'; }
+    return;
+  }
+
+  const brokerEur = parseFloat(document.getElementById('me-mk-manual-broker').value) || 0;
+  const vergiMkd  = parseFloat(document.getElementById('me-mk-manual-vergi').value) || 0;
+  const kdvMkd    = parseFloat(document.getElementById('me-mk-manual-kdv').value) || 0;
+  const otherMkd  = parseFloat(document.getElementById('me-mk-manual-other').value) || 0;
+
+  const saveFields = {};
+  if (brokerEur) saveFields.brokerage_eur      = Math.round(brokerEur * 100) / 100;
+  if (vergiMkd)  saveFields.gumruk_vergisi_eur = Math.round(vergiMkd / MK_MKD_PER_EUR * 100) / 100;
+  if (kdvMkd)    saveFields.kdv_eur            = Math.round(kdvMkd   / MK_MKD_PER_EUR * 100) / 100;
+  if (otherMkd)  saveFields.other_costs_eur    = Math.round(otherMkd / MK_MKD_PER_EUR * 100) / 100;
+
+  if (Object.keys(saveFields).length === 0) {
+    if (statusEl) { statusEl.textContent = '⚠ En az bir tutar girin.'; statusEl.style.color = 'var(--error)'; }
+    return;
+  }
+
+  if (statusEl) { statusEl.textContent = '⏳ Kaydediliyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = sessionStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+
+    await meKzSaveFields(sData.shipment, saveFields, token);
+
+    if (statusEl) { statusEl.textContent = '✓ Kaydedildi'; statusEl.style.color = 'var(--success)'; }
+    ['vergi', 'kdv', 'other'].forEach(key => {
+      const input = document.getElementById(`me-mk-manual-${key}`);
+      if (input) input.value = '';
+    });
+    meMkManualPreview();
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
   }
 }
