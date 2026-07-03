@@ -1,15 +1,20 @@
 import json
 import io
 import os
+import re
 
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 
+_ULKE_KODU_RE = re.compile(r'^[a-z]{2,4}$')
+
 
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_evrak_config(ulke_kodu):
     """Ülkeye göre ek evrak config dosyasını yükler."""
+    if not _ULKE_KODU_RE.match(str(ulke_kodu or '')):
+        raise ValueError(f'Geçersiz ülke kodu: {ulke_kodu}')
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, 'config', f'evrak_{ulke_kodu}.json')
     with open(config_path, 'r', encoding='utf-8') as f:

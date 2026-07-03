@@ -28,7 +28,6 @@ def _find_template(filename):
     raise FileNotFoundError(f'{filename} bulunamadı. Aranan: {candidates}')
 
 
-def find_rs_template_path(): return _find_template('ref_rs.xlsx')
 def find_ba_template_path(): return _find_template('ref_ba.xlsx')
 def find_ge_template_path(): return _find_template('ref_ge.xlsx')
 def find_kz_template_path(): return _find_template('ref_kz.xlsx')
@@ -45,11 +44,12 @@ def find_ly_template_path(): return _find_template('ref_ly.xlsx')
 def find_lr_template_path(): return _find_template('ref_lr.xlsx')
 def find_lb_template_path(): return _find_template('ref_lb.xlsx')
 def find_abh_template_path(): return _find_template('ref_abh.xlsx')
+def find_jo_template_path(): return _find_template('ref_jo.xlsx')
+def find_mu_template_path(): return _find_template('ref_mu.xlsx')
 
 
 # ── Template path map — ülke kodu → fonksiyon ────────────────────────────────
 TEMPLATE_FINDER = {
-    'rs': find_rs_template_path,
     'ba': find_ba_template_path,
     'ge': find_ge_template_path,
     'kz': find_kz_template_path,
@@ -66,6 +66,8 @@ TEMPLATE_FINDER = {
     'lr': find_lr_template_path,
     'lb': find_lb_template_path,
     'abh': find_abh_template_path,
+    'jo': find_jo_template_path,
+    'mu': find_mu_template_path,
 }
 
 
@@ -181,6 +183,8 @@ HEADER_APPLIER = {
     'lr': apply_genel_header,
     'lb': apply_genel_header,
     'abh': apply_genel_header,
+    'jo': apply_genel_header,
+    'mu': apply_genel_header,
 }
 
 

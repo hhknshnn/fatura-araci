@@ -6,7 +6,7 @@ import sys
 import traceback
 
 import pandas as pd
-from flask import Flask, after_this_request, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
 from api.landed_cost import landed_cost_get, landed_cost_export
 from api.kur import get_tcmb_kurlar
@@ -125,26 +125,12 @@ def api_generate():
         price_list_out = None
         mill_test_out  = None
 
-        # ── Yeni dispatcher — hata alırsa eski koda düş ───────────────────
-        try:
-            excel_out, fatura_no, master_out, price_list_out, mill_test_out = \
-                gen_mod.dispatch(
-                    ulke_kodu, df, df_original, grup_kilolari, hedef_brut,
-                    hedef_net, depo_tipi, exception_skus, logo_bytes,
-                    pdf_fields, eur_kuru, usd_kuru
-                )
-        except NotImplementedError:
-            print(f'[WARN] dispatch: {ulke_kodu} için eski kod kullanılıyor')
-            kw = dict(hedef_net=hedef_net, depo_tipi=depo_tipi, df_original=df_original)
-            if ulke_kodu == 'ba':
-                excel_out, fatura_no, master_out = gen_mod.generate_excel_ba(
-                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-            elif ulke_kodu == 'ge':
-                excel_out, fatura_no, master_out = gen_mod.generate_excel_ge(
-                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
-            else:
-                excel_out, fatura_no, master_out = gen_mod.generate_excel(
-                    df, grup_kilolari, hedef_brut, exception_skus, logo_bytes, pdf_fields, **kw)
+        excel_out, fatura_no, master_out, price_list_out, mill_test_out = \
+            gen_mod.dispatch(
+                ulke_kodu, df, df_original, grup_kilolari, hedef_brut,
+                hedef_net, depo_tipi, exception_skus, logo_bytes,
+                pdf_fields, eur_kuru, usd_kuru
+            )
 
         resp = {
             'success':   True,

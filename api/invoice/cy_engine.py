@@ -51,7 +51,7 @@ def _parse_cy_pdf(pdf_bytes):
     return result
 
 
-def generate_cy(faturalar, grup_kilolari, exception_skus, df_original=None):
+def generate_cy(faturalar, grup_kilolari, exception_skus):
     """
     Kıbrıs PL üretimi.
 

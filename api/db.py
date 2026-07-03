@@ -77,10 +77,24 @@ def init_db():
         )
     ''')
 
+    # NOT: `shipments` ve `taslak_dosyalar` tabloları burada CREATE EDİLMEZ —
+    # mevcut prod veritabanında zaten var ve şeması (kolon sayısı/tipleri) bu
+    # dosyanın dışında yönetiliyor. Sıfırdan bir ortam kurulacaksa bu iki tablo
+    # ayrıca migrate edilmeli; aksi halde aşağıdaki ALTER TABLE satırları hata verir.
+
     # ── USD navlun/sigorta kolonları (v2026-07) ──────────────────────────
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS navlun_usd NUMERIC DEFAULT 0')
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS sigorta_usd NUMERIC DEFAULT 0')
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS usd_kuru NUMERIC DEFAULT 0')
+
+    # fatura_no benzersizliği DB seviyesinde garanti edilmiyordu (aynı anda gelen
+    # iki istek mükerrer kayıt oluşturabiliyordu). fatura_no boş/NULL olabilen
+    # taslak kayıtları etkilenmesin diye kısmi (partial) unique index kullanılıyor.
+    cur.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS shipments_fatura_no_unique_idx
+        ON shipments (fatura_no)
+        WHERE fatura_no IS NOT NULL AND fatura_no != ''
+    ''')
 
     conn.commit()
     cur.close()

@@ -5,7 +5,7 @@ const ULKE_LABELS = {
   rs:'Sırbistan', ba:'Bosna', ge:'Gürcistan', xk:'Kosova', mk:'Makedonya',
   be:'Belçika', de:'Almanya', nl:'Hollanda', kz:'Kazakistan', cy:'Kıbrıs',
   iq:'Irak', ly:'Libya', lr:'Liberya', lb:'Lübnan', uz:'Özbekistan', ru:'Rusya',
-  abh:'Abhazya'
+  abh:'Abhazya', jo:'Ürdün', mu:'Mauritius'
 };
 
 const DOSYA_TURU_LABELS = {

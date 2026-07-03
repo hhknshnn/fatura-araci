@@ -19,8 +19,9 @@ ULKE_MUSTERI_TIPI = {
     'ALMANYA': 'kurumsal', 'HOLLANDA': 'kurumsal', 'KAZAKİSTAN': 'kurumsal',
     'KIBRIS': 'franchise', 'IRAK': 'franchise', 'LİBYA': 'franchise',
     'LİBERYA': 'franchise', 'LÜBNAN': 'franchise', 'ÖZBEKİSTAN': 'franchise',
-    'RUSYA': 'franchise',
-    'ABHAZYA': 'toptan',
+    'RUSYA': 'franchise', 'ÜRDÜN': 'franchise',
+    'ABHAZYA': 'toptan', 'MAURITIUS': 'toptan',
+    'KENYA': 'devir',
 }
 
 def _musteri_tipi_from_ulke(ulke):
@@ -97,9 +98,9 @@ def create_shipment(data):
     ulke         = data.get('ulke', '')
     musteri_tipi = data.get('musteri_tipi') or _musteri_tipi_from_ulke(ulke)
 
-    # Franchise veya toptan ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
+    # Franchise/toptan/devir ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
     gumruk_tarihi = data.get('gumruk_tarihi') or None
-    if musteri_tipi in ('franchise', 'toptan'):
+    if musteri_tipi in ('franchise', 'toptan', 'devir'):
         varis_tarihi      = gumruk_tarihi or data.get('varis_tarihi') or None
         gumrukleme_bitis  = gumruk_tarihi or data.get('gumrukleme_bitis') or None
         durum_default     = 'TESLİM EDİLDİ'
@@ -108,44 +109,60 @@ def create_shipment(data):
         gumrukleme_bitis  = data.get('gumrukleme_bitis') or None
         durum_default     = data.get('durum', 'YOLDA')
 
+    yukleme_tarihi = data.get('yukleme_tarihi') or None
+
+    # USD kuru elle/faturadan gelmediyse yükleme tarihine göre otomatik çek
+    usd_kuru = float(data.get('usd_kuru', 0) or 0)
+    if not usd_kuru and yukleme_tarihi:
+        usd_kuru = _get_usd_kuru_for_date(str(yukleme_tarihi))
+
     conn = get_conn()
-    cur  = conn.cursor()
-    cur.execute('''
-        INSERT INTO shipments (
-            ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
-            fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
-            eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
-            varis_tarihi, gumrukleme_bitis, durum, musteri_tipi, palet,
-            navlun_usd, sigorta_usd, usd_kuru
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        RETURNING id
-    ''', (
-        data.get('ihracat_dosya_no', ''),
-        fatura_no,
-        ulke,
-        data.get('nakliye_firmasi', ''),
-        data.get('plaka', ''),
-        data.get('fatura_bedeli_tl', 0),
-        data.get('mal_bedeli_eur', 0),
-        data.get('navlun_eur', 0),
-        data.get('sigorta_eur', 0),
-        data.get('eur_kuru', 0),
-        data.get('fatura_bedeli_eur', 0),
-        data.get('yukleme_tarihi') or None,
-        gumruk_tarihi,
-        varis_tarihi,
-        gumrukleme_bitis,
-        _normalize_durum(durum_default),
-        musteri_tipi,
-        data.get('palet') or None,
-        data.get('navlun_usd', 0),
-        data.get('sigorta_usd', 0),
-        data.get('usd_kuru', 0),
-    ))
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute('''
+                INSERT INTO shipments (
+                    ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
+                    fatura_bedeli_tl, mal_bedeli_eur, navlun_eur, sigorta_eur,
+                    eur_kuru, fatura_bedeli_eur, yukleme_tarihi, gumruk_tarihi,
+                    varis_tarihi, gumrukleme_bitis, durum, musteri_tipi, palet,
+                    navlun_usd, sigorta_usd, usd_kuru
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id
+            ''', (
+                data.get('ihracat_dosya_no', ''),
+                fatura_no,
+                ulke,
+                data.get('nakliye_firmasi', ''),
+                data.get('plaka', ''),
+                data.get('fatura_bedeli_tl', 0),
+                data.get('mal_bedeli_eur', 0),
+                data.get('navlun_eur', 0),
+                data.get('sigorta_eur', 0),
+                data.get('eur_kuru', 0),
+                data.get('fatura_bedeli_eur', 0),
+                yukleme_tarihi,
+                gumruk_tarihi,
+                varis_tarihi,
+                gumrukleme_bitis,
+                _normalize_durum(durum_default),
+                musteri_tipi,
+                data.get('palet') or None,
+                data.get('navlun_usd', 0),
+                data.get('sigorta_usd', 0),
+                usd_kuru,
+            ))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            if 'shipments_fatura_no_unique_idx' in str(e):
+                raise ValueError(f'Bu fatura no zaten kayıtlı: {fatura_no}')
+            raise
+        finally:
+            cur.close()
+    finally:
+        conn.close()
     return new_id
 
 
@@ -155,15 +172,18 @@ def update_shipment(shipment_id, data):
     cur  = conn.cursor()
 
     # USD alanları formdan gelmiyorsa mevcut DB değerini koru (veri kaybını önler)
-    if not {'navlun_usd', 'sigorta_usd', 'usd_kuru'} & set(data.keys()):
-        cur.execute('SELECT navlun_usd, sigorta_usd, usd_kuru FROM shipments WHERE id = %s', (shipment_id,))
-        existing = cur.fetchone() or (0, 0, 0)
-    else:
-        existing = (0, 0, 0)
+    cur.execute('SELECT navlun_usd, sigorta_usd, usd_kuru, yukleme_tarihi FROM shipments WHERE id = %s', (shipment_id,))
+    existing = cur.fetchone() or (0, 0, 0, None)
 
     navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
     sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
     usd_kuru    = data.get('usd_kuru',    existing[2]) or 0
+
+    # USD kuru elle/faturadan gelmediyse yükleme tarihine göre otomatik çek
+    if not usd_kuru:
+        yukleme_tarihi = data.get('yukleme_tarihi') or existing[3]
+        if yukleme_tarihi:
+            usd_kuru = _get_usd_kuru_for_date(str(yukleme_tarihi))
 
     toplam = (
         float(data.get('ihracat_beyanname_eur', 0) or 0) +
@@ -456,6 +476,8 @@ def _normalize_durum(raw):
         return 'YOLDA'
     # Nokta, boşluk gibi karakterleri temizle
     s = raw.strip().rstrip('.').strip().upper()
+    if s in ('YÜKLENECEK', 'YUKLENECEK', 'TO BE LOADED'):
+        return 'Yüklenecek'
     if s in ('YOLDA', 'IN TRANSIT', 'TRANSIT'):
         return 'YOLDA'
     if s in ('TESLIM EDILDI', 'TESLİM EDİLDİ', 'DELIVERED', 'TESLIM',
@@ -960,6 +982,7 @@ def bulk_update_shipments(rows):
                 'ihracat_beyanname_tl': to_float, 'ihracat_beyanname_eur': to_float,
                 'brokerage_eur': to_float, 'gumruk_vergisi_eur': to_float,
                 'kdv_eur': to_float, 'toplam_maliyet_eur': to_float,
+                'navlun_usd': to_float, 'sigorta_usd': to_float, 'usd_kuru': to_float,
                 'durum': to_str,  # aşağıda varis_tarihi kontrolü yapılıyor
             }
             date_fields = ['yukleme_tarihi', 'gumruk_tarihi', 'varis_tarihi', 'gumrukleme_bitis']
@@ -984,8 +1007,8 @@ def bulk_update_shipments(rows):
                 elif 'durum' not in fields:
                     fields['durum'] = 'YOLDA'
 
-            # Franchise/toptan ise durum otomatik TESLİM EDİLDİ yap
-            if db_musteri_tipi in ('franchise', 'toptan'):
+            # Franchise/toptan/devir ise durum otomatik TESLİM EDİLDİ yap
+            if db_musteri_tipi in ('franchise', 'toptan', 'devir'):
                 if 'durum' not in fields or not fields.get('durum'):
                     fields['durum'] = 'TESLİM EDİLDİ'
 
@@ -1012,12 +1035,13 @@ def bulk_update_shipments(rows):
             set_clause = ', '.join(f'{k} = %s' for k in fields)
             values = list(fields.values()) + [fatura_no]
             cur.execute(f'UPDATE shipments SET {set_clause} WHERE fatura_no = %s', values)
+            conn.commit()
             guncellenen += 1
 
         except Exception as e:
+            conn.rollback()
             hatalar.append(f'Satır {i+1}: {str(e)}')
 
-    conn.commit()
     cur.close()
     conn.close()
     return guncellenen, atlanan, hatalar
@@ -1106,12 +1130,14 @@ def bulk_import_shipments(rows):
                     gumruk_vergisi_yerel, gumruk_vergisi_birim, gumruk_vergisi_eur,
                     kdv_yerel, kdv_birim, kdv_eur,
                     toplam_maliyet_eur,
+                    navlun_usd, sigorta_usd, usd_kuru,
                     yukleme_tarihi, gumruk_tarihi, varis_tarihi, gumrukleme_bitis,
                     durum, musteri_tipi
                 ) VALUES (
                     %s,%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,
                     %s,%s,%s,%s,%s,%s
                 )
             ''', (
@@ -1143,6 +1169,9 @@ def bulk_import_shipments(rows):
                 to_str(row.get('kdv_birim')),
                 to_float(row.get('kdv_eur')),
                 to_float(row.get('toplam_maliyet_eur')),
+                to_float(row.get('navlun_usd')),
+                to_float(row.get('sigorta_usd')),
+                to_float(row.get('usd_kuru')),
                 to_date(row.get('yukleme_tarihi')),
                 to_date(row.get('gumruk_tarihi')),
                 to_date(row.get('varis_tarihi')),
@@ -1150,11 +1179,12 @@ def bulk_import_shipments(rows):
                 _normalize_durum(_otomatik_durum(to_str(row.get('durum', '')), to_date(row.get('varis_tarihi')))),
                 musteri_tipi,
             ))
+            conn.commit()
             eklenen += 1
         except Exception as e:
+            conn.rollback()
             hatalar.append(f'Satır {i+1}: {str(e)}')
 
-    conn.commit()
     cur.close()
     conn.close()
     return eklenen, atlanan, hatalar
@@ -1400,12 +1430,13 @@ def bulk_update_palet(rows):
                 continue
 
             cur.execute('UPDATE shipments SET palet = %s WHERE fatura_no = %s', (palet, fatura_no))
+            conn.commit()
             guncellenen += 1
 
         except Exception as e:
+            conn.rollback()
             hatalar.append(f'Satır {i+1}: {str(e)}')
 
-    conn.commit()
     cur.close()
     conn.close()
     return guncellenen, atlanan, hatalar

@@ -53,37 +53,202 @@ function nebimEscape(value) {
 function initNebimDeliveryPanel() {
   const panel = ensureNebimDeliveryPanel();
   if (!panel) return;
-  panel.style.cssText = 'padding:0;min-height:100%;background:var(--bg);';
+  panel.className = 'panel nebim-shell';
+  panel.style.cssText = 'display:block;';
   panel.style.display = 'block';
   panel.innerHTML = `
-    <div style="padding:18px 20px;border-bottom:0.5px solid var(--border2);background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <style>
+      .nebim-shell {
+        min-height:100%;
+        padding:12px 22px 22px;
+        border:0;
+        border-radius:0;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.99) 100%),
+          radial-gradient(circle at 0 0, rgba(37,99,235,0.08), transparent 34%),
+          radial-gradient(circle at 100% 8%, rgba(20,184,166,0.08), transparent 28%);
+        box-shadow:none;
+      }
+      .nebim-header {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:20px;
+        align-items:start;
+        padding:0 2px 16px;
+        border-bottom:1px solid rgba(15,23,42,0.08);
+        margin-bottom:14px;
+      }
+      .nebim-kicker {
+        width:fit-content;
+        padding:8px 14px;
+        border:1px solid rgba(37,99,235,0.14);
+        border-radius:999px;
+        background:rgba(239,246,255,0.82);
+        font-size:13px;
+        font-weight:800;
+        color:#1D4ED8;
+        text-transform:uppercase;
+        letter-spacing:.08em;
+      }
+      .nebim-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+      .nebim-btn, .nebim-icon-btn {
+        height:36px;
+        border:0;
+        border-radius:var(--radius-md);
+        background:#2563EB;
+        color:#fff;
+        font:12px var(--font);
+        font-weight:750;
+        cursor:pointer;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:7px;
+        box-shadow:0 10px 20px rgba(37,99,235,0.18);
+        transition:transform .15s ease, background .15s ease, box-shadow .15s ease;
+      }
+      .nebim-btn { padding:0 13px; }
+      .nebim-btn:hover, .nebim-icon-btn:hover { transform:translateY(-1px); background:#1D4ED8; box-shadow:0 14px 26px rgba(37,99,235,0.24); }
+      .nebim-icon-btn {
+        width:36px;
+        background:#FFFFFF;
+        color:#475569;
+        border:1px solid rgba(15,23,42,0.10);
+        box-shadow:none;
+      }
+      .nebim-icon-btn:hover { color:#1D4ED8; background:#EFF6FF; }
+      .nebim-select {
+        height:36px;
+        padding:0 10px;
+        border:1px solid rgba(15,23,42,0.10);
+        border-radius:var(--radius-md);
+        background:#FFFFFF;
+        color:var(--text);
+        font:12px var(--font);
+      }
+      .nebim-select:focus {
+        outline:none;
+        border-color:#2563EB;
+        box-shadow:0 0 0 3px rgba(37,99,235,0.12);
+      }
+      .nebim-summary {
+        display:grid;
+        grid-template-columns:repeat(5,minmax(0,1fr));
+        gap:10px;
+        margin-bottom:12px;
+      }
+      .nebim-metric {
+        min-height:64px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        padding:12px;
+        border:1px solid rgba(15,23,42,0.08);
+        border-radius:var(--radius-md);
+        background:rgba(255,255,255,0.92);
+        box-shadow:0 12px 34px rgba(15,23,42,0.06);
+      }
+      .nebim-metric-label { display:block; color:#64748B; font-size:11px; font-weight:750; }
+      .nebim-metric-value { display:block; margin-top:4px; color:#0F172A; font-size:20px; font-weight:780; line-height:1; }
+      .nebim-metric i {
+        width:30px;
+        height:30px;
+        border-radius:8px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        background:#EFF6FF;
+        color:#2563EB;
+        font-size:16px;
+      }
+      .nebim-metric.warn i { background:#FFFBEB; color:#B45309; }
+      .nebim-metric.error i { background:#FEF2F2; color:#DC2626; }
+      .nebim-toggle {
+        min-height:64px;
+        display:flex;
+        align-items:center;
+        gap:9px;
+        padding:12px;
+        border:1px solid rgba(15,23,42,0.08);
+        border-radius:var(--radius-md);
+        background:rgba(255,255,255,0.92);
+        color:#475569;
+        font-size:12px;
+        font-weight:750;
+        cursor:pointer;
+        box-shadow:0 12px 34px rgba(15,23,42,0.06);
+      }
+      .nebim-toggle input { width:15px; height:15px; margin:0; accent-color:#2563EB; cursor:pointer; }
+      .nebim-status {
+        min-height:18px;
+        font-size:12px;
+        color:var(--text3);
+        margin-bottom:8px;
+      }
+      .nebim-table-shell {
+        background:rgba(255,255,255,0.94);
+        border:1px solid rgba(15,23,42,0.08);
+        border-radius:var(--radius-md);
+        overflow:auto;
+        max-width:100%;
+        box-shadow:0 12px 34px rgba(15,23,42,0.06);
+      }
+      .nebim-table-shell input {
+        border-color:rgba(15,23,42,0.10) !important;
+      }
+      .nebim-table-shell input:focus {
+        outline:none;
+        border-color:#2563EB !important;
+        box-shadow:0 0 0 3px rgba(37,99,235,0.12);
+      }
+      .nebim-footer-btn {
+        height:32px;
+        padding:0 12px;
+        border:1px solid rgba(15,23,42,0.10);
+        border-radius:var(--radius-md);
+        background:#FFFFFF;
+        color:#475569;
+        font:12px var(--font);
+        font-weight:700;
+        cursor:pointer;
+      }
+      .nebim-footer-btn:hover { background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE; }
+      @media (max-width: 1100px) {
+        .nebim-header { grid-template-columns:1fr; align-items:start; }
+        .nebim-actions { justify-content:flex-start; }
+        .nebim-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      }
+      @media (max-width: 640px) {
+        .nebim-shell { padding:12px 16px 16px; }
+        .nebim-actions { width:100%; }
+        .nebim-btn, .nebim-select { width:100%; }
+        .nebim-icon-btn { flex:1; }
+        .nebim-summary { grid-template-columns:1fr; }
+      }
+    </style>
+    <div class="nebim-header">
       <div>
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">Nebim v3 hazırlık</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text);margin-top:2px;">Kazakistan &amp; Sırbistan İrsaliye Referansları</div>
+        <div class="nebim-kicker">Nebim v3 hazırlık</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="nebim-actions">
         <input type="file" id="nebim-excel-input" accept=".xlsx,.xls" style="display:none;" onchange="handleNebimExcelImport(this.files[0]); this.value = '';">
-        <button onclick="document.getElementById('nebim-excel-input').click()" title="Excel'den aktar"
-          style="height:32px;padding:0 12px;border:0;border-radius:var(--radius-md);background:var(--accent);color:#fff;font:12px var(--font);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <button class="nebim-btn" onclick="document.getElementById('nebim-excel-input').click()" title="Excel'den aktar">
           <i class="ti ti-file-spreadsheet" aria-hidden="true"></i><span>Excel'den Aktar</span>
         </button>
-        <select id="nebim-country-filter" onchange="nebimSetCountryFilter(this.value)"
-          style="height:32px;padding:0 10px;border:0.5px solid var(--border2);border-radius:var(--radius-md);background:var(--surface2);color:var(--text);font:12px var(--font);">
+        <select class="nebim-select" id="nebim-country-filter" onchange="nebimSetCountryFilter(this.value)">
           <option value="all">Tüm ülkeler</option>
           <option value="KAZAKİSTAN">Kazakistan</option>
           <option value="SIRBİSTAN">Sırbistan</option>
         </select>
-        <button onclick="loadNebimDeliveryItems()" title="Yenile"
-          style="width:32px;height:32px;border:0.5px solid var(--border2);border-radius:var(--radius-md);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        <button class="nebim-icon-btn" onclick="loadNebimDeliveryItems()" title="Yenile">
           <i class="ti ti-refresh" aria-hidden="true"></i>
         </button>
       </div>
     </div>
-    <div style="padding:14px 20px 0;">
-      <div id="nebim-delivery-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
-      <div id="nebim-delivery-status" style="font-size:12px;color:var(--text3);margin-bottom:8px;"></div>
-      <div id="nebim-delivery-table" style="background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-md);overflow:auto;max-width:100%;"></div>
-    </div>
+    <div id="nebim-delivery-summary" class="nebim-summary"></div>
+    <div id="nebim-delivery-status" class="nebim-status"></div>
+    <div id="nebim-delivery-table" class="nebim-table-shell"></div>
   `;
   loadNebimDeliveryItems();
 }
@@ -179,22 +344,26 @@ function renderNebimDeliverySummary() {
   const ready = nebimDeliveryItems.filter(x => x.ready_for_nebim).length;
   const missingRef = nebimDeliveryItems.filter(x => !String(x.fatura_ref_no || '').trim()).length;
   const missingPlate = nebimDeliveryItems.filter(x => !String(x.plaka || '').trim()).length;
-  const pill = (label, value, color) => `
-    <div style="padding:7px 10px;border-radius:var(--radius-md);background:var(--surface);border:0.5px solid var(--border2);font-size:12px;color:var(--text2);">
-      ${label}: <span style="font-weight:700;color:${color};">${value}</span>
+  const metric = (label, value, icon, tone = '') => `
+    <div class="nebim-metric ${tone}">
+      <div>
+        <span class="nebim-metric-label">${label}</span>
+        <span class="nebim-metric-value">${value}</span>
+      </div>
+      <i class="ti ${icon}" aria-hidden="true"></i>
     </div>`;
   const hideToggle = `
     <label title="Dolu olanları gizle"
-      style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:var(--radius-md);background:var(--surface);border:0.5px solid var(--border2);font-size:12px;color:var(--text2);cursor:pointer;">
+      class="nebim-toggle">
       <input type="checkbox" ${nebimHideReady ? 'checked' : ''} onchange="nebimToggleHideReady(this.checked)"
-        style="width:14px;height:14px;margin:0;accent-color:var(--accent);cursor:pointer;">
-      Gizle
+        >
+      Hazır olanları gizle
     </label>`;
   el.innerHTML = [
-    pill('Toplam', total, 'var(--text)'),
-    pill('Nebim hazır', ready, '#166534'),
-    pill('Ref no bekleyen', missingRef, '#854F0B'),
-    pill('Plaka bekleyen', missingPlate, '#991B1B'),
+    metric('Toplam fatura', total, 'ti-files'),
+    metric('Nebim hazır', ready, 'ti-circle-check'),
+    metric('Ref no bekleyen', missingRef, 'ti-alert-circle', 'warn'),
+    metric('Plaka bekleyen', missingPlate, 'ti-car-off', 'error'),
     hideToggle,
   ].join('');
 }
@@ -260,15 +429,13 @@ function renderNebimDeliveryTable() {
   let footerHtml = '';
   if (remaining > 0 || nebimVisibleCount > NEBIM_PAGE_SIZE) {
     footerHtml = `
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border-top:0.5px solid var(--border2);background:var(--surface);">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-top:1px solid rgba(15,23,42,0.08);background:#FFFFFF;">
         ${remaining > 0 ? `
-          <button onclick="nebimShowMoreItems()"
-            style="height:30px;padding:0 12px;border:0.5px solid var(--border2);border-radius:var(--radius-md);background:var(--surface2);color:var(--text2);font:12px var(--font);font-weight:600;cursor:pointer;">
+          <button class="nebim-footer-btn" onclick="nebimShowMoreItems()">
             + ${Math.min(NEBIM_PAGE_SIZE, remaining)} kayıt göster (${remaining} kaldı)
           </button>` : ''}
         ${nebimVisibleCount > NEBIM_PAGE_SIZE ? `
-          <button onclick="nebimCollapseItems()"
-            style="height:30px;padding:0 12px;border:0.5px solid var(--border2);border-radius:var(--radius-md);background:var(--surface2);color:var(--text2);font:12px var(--font);font-weight:600;cursor:pointer;">
+          <button class="nebim-footer-btn" onclick="nebimCollapseItems()">
             Daralt
           </button>` : ''}
       </div>`;
@@ -283,17 +450,17 @@ function nebimTh(label) {
   nebimTh._idx = (nebimTh._idx || 0) + 1;
   const icon = nebimSortColumn === key ? (nebimSortDirection === 'asc' ? ' ↑' : ' ↓') : '';
   return `<th onclick="setNebimSort('${key}')" title="Sırala"
-    style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text2);font-weight:600;border-right:0.5px solid var(--border2);white-space:nowrap;position:relative;overflow:hidden;cursor:pointer;user-select:none;">
+    style="padding:10px 14px;text-align:left;font-size:11px;color:#475569;font-weight:750;border-right:1px solid rgba(15,23,42,0.08);white-space:nowrap;position:relative;overflow:hidden;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.04em;">
     ${label}<span style="color:var(--accent);font-weight:700;">${icon}</span>
   </th>`;
 }
 
 function nebimDeliveryRow(item, idx) {
-  const bg = idx % 2 ? 'var(--surface2)' : 'var(--surface)';
+  const bg = idx % 2 ? '#F8FAFC' : '#FFFFFF';
   const disabled = !String(item.plaka || '').trim();
   const countryFlag = String(item.ulke || '').toUpperCase().includes('KAZ') ? 'kz' : 'rs';
   return `
-    <tr style="background:${bg};border-bottom:0.5px solid var(--border2);">
+    <tr style="background:${bg};border-bottom:1px solid rgba(15,23,42,0.08);">
       <td style="${nebimTdStyle()}"><img src="https://flagcdn.com/20x15/${countryFlag}.png" alt="" style="vertical-align:-2px;margin-right:6px;">${nebimEscape(item.ulke || '-')}</td>
       <td style="${nebimTdStyle()}">${nebimEscape(item.ihracat_dosya_no || '-')}</td>
       <td style="${nebimTdStyle()}font-family:var(--mono);">${nebimEscape(item.fatura_no || '-')}</td>
@@ -364,7 +531,7 @@ function parseDosyaNo(value) {
 }
 
 function nebimTdStyle() {
-  return 'padding:7px 14px;font-size:11.5px;color:var(--text2);white-space:nowrap;border-right:0.5px solid var(--border2);overflow:hidden;text-overflow:ellipsis;';
+  return 'padding:8px 14px;font-size:11.5px;color:var(--text2);white-space:nowrap;border-right:1px solid rgba(15,23,42,0.08);overflow:hidden;text-overflow:ellipsis;';
 }
 
 function initNebimColResize() {
@@ -469,10 +636,10 @@ function measureNebimColWidth(table, index) {
 }
 
 function nebimStatusBadge(item, disabled) {
-  if (disabled) return '<span style="color:#991B1B;font-weight:600;">Plaka yok</span>';
-  if (item.ready_for_nebim) return '<span style="color:#166534;font-weight:600;">Hazır</span>';
-  if (item.fatura_ref_no) return '<span style="color:#854F0B;font-weight:600;">Onay bekliyor</span>';
-  return '<span style="color:var(--text3);">Bekliyor</span>';
+  if (disabled) return '<span style="display:inline-flex;align-items:center;border-radius:999px;background:#FEF2F2;color:#991B1B;font-weight:750;padding:4px 8px;">Plaka yok</span>';
+  if (item.ready_for_nebim) return '<span style="display:inline-flex;align-items:center;border-radius:999px;background:#F0FDF4;color:#166534;font-weight:750;padding:4px 8px;">Hazır</span>';
+  if (item.fatura_ref_no) return '<span style="display:inline-flex;align-items:center;border-radius:999px;background:#FFFBEB;color:#854F0B;font-weight:750;padding:4px 8px;">Onay bekliyor</span>';
+  return '<span style="display:inline-flex;align-items:center;border-radius:999px;background:#F1F5F9;color:#64748B;font-weight:700;padding:4px 8px;">Bekliyor</span>';
 }
 
 async function saveNebimDeliveryRef(shipmentId, fromCheckbox, trigger) {

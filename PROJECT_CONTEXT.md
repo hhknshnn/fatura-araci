@@ -85,7 +85,7 @@ Ulke yonlendirmesi:
 
 - TRY grubu: `rs`, `ba`, `ge`, `kz`, `ru`
 - EUR grubu: `xk`, `mk`, `de`, `nl`, `be`
-- USD grubu: `iq`, `ly`, `lr`, `lb`, `uz`, `abh`
+- USD grubu: `iq`, `ly`, `lr`, `lb`, `uz`, `abh`, `jo`, `mu`
 - Kibris: `cy` akisi `app.py` icinde ozel ele alinir ve `api/invoice/cy_engine.py` kullanilir.
 
 ### api/invoice/*
@@ -98,7 +98,7 @@ Fatura uretim motorlari burada moduler halde durur.
 - `templates.py`: Sablon dosyalarini bulma ve template yardimcilari.
 - `try_engine.py`: TRY bazli ulkeler: Sirbistan, Bosna, Gurcistan, Kazakistan, Rusya.
 - `eur_engine.py`: EUR bazli ulkeler: Kosova, Makedonya, Belcika, Almanya, Hollanda.
-- `usd_engine.py`: USD bazli ulkeler: Irak, Libya, Liberya, Lubnan, Ozbekistan, Abhazya.
+- `usd_engine.py`: USD bazli ulkeler: Irak, Libya, Liberya, Lubnan, Ozbekistan, Abhazya, Urdun, Mauritius.
 - `cy_engine.py`: Kibris ozel PL/master akisi.
 - `price_list.py`: Kazakistan price list PDF uretimi.
 

@@ -220,42 +220,37 @@ function applyFiltersAndRender() {
   renderPage();
 }
 
-function updateOzetFromVisible(count) {
-  const tbody = document.getElementById('shipments-tbody');
-  if (!tbody) return;
-  const visibleRows = [...tbody.querySelectorAll('tr[data-id]')].filter(r => r.style.display !== 'none');
-  const ids = visibleRows.map(r => parseInt(r.dataset.id));
-  const list = allShipments.filter(s => ids.includes(s.id));
-
-  const grupTemsilci = new Set();
-  let toplam = 0;
-  list.forEach(item => {
-    if (!item.sefer_id) toplam++;
-    else if (!grupTemsilci.has(item.sefer_id)) { grupTemsilci.add(item.sefer_id); toplam++; }
-  });
-  const faturaEur  = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
-  const faturaTl   = list.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
-  const navlunEur  = list.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
-  const sigortaEur = list.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
-  const fmt   = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(val) + ' €';
-  const fmtTl = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(val) + ' ₺';
-
-  const ozet = document.getElementById('shipments-ozet');
-  if (!ozet) return;
+// Özet şeridi HTML'i — ayrı standalone pilller (Sevkiyat/Navlun/Sigorta) ve
+// aralarında ince ayraç bulunan tek bir grup kutusu (Fatura/TL/USD) üretir.
+function ozetHtml({ toplam, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd }) {
   const pill = (icon, label, val, iconColor) => `
-    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 11px;
                 background:var(--surface);border:0.5px solid var(--border2);
                 border-radius:20px;white-space:nowrap;">
-      <i class="ti ti-${icon}" style="font-size:13px;color:${iconColor};" aria-hidden="true"></i>
-      <span style="font-size:12px;color:var(--text3);">${label}</span>
-      <span style="font-size:12px;font-weight:600;color:var(--text);">${val}</span>
+      <i class="ti ti-${icon}" style="font-size:12.5px;color:${iconColor};" aria-hidden="true"></i>
+      <span style="font-size:11.5px;color:var(--text3);">${label}</span>
+      <span style="font-size:11.5px;font-weight:600;color:var(--text);">${val}</span>
     </div>`;
-  ozet.innerHTML = `
-    ${pill('package',       'Sevkiyat', toplam,          'var(--text2)')}
-    ${pill('currency-euro', 'Fatura',   fmt(faturaEur),  '#185FA5')}
-    ${pill('currency-lira', 'TL',       fmtTl(faturaTl), '#3B6D11')}
-    ${pill('ship',          'Navlun',   fmt(navlunEur),  '#854F0B')}
-    ${pill('shield',        'Sigorta',  fmt(sigortaEur), '#533AB7')}
+  const segment = (icon, label, val, iconColor, divider) => `
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 11px;white-space:nowrap;
+                ${divider ? 'border-left:1px solid var(--border2);' : ''}">
+      <i class="ti ti-${icon}" style="font-size:12.5px;color:${iconColor};" aria-hidden="true"></i>
+      <span style="font-size:11.5px;color:var(--text3);">${label}</span>
+      <span style="font-size:11.5px;font-weight:600;color:var(--text);">${val}</span>
+    </div>`;
+  const faturaGroup = `
+    <div style="display:flex;align-items:center;
+                background:var(--surface);border:0.5px solid var(--border2);
+                border-radius:20px;overflow:hidden;">
+      ${segment('currency-euro',   'Fatura', fmt(faturaEur),    '#185FA5', false)}
+      ${segment('currency-lira',   'TL',     fmtTl(faturaTl),   '#3B6D11', true)}
+      ${segment('currency-dollar', 'USD',    fmtUsd(faturaUsd), '#1B7A6B', true)}
+    </div>`;
+  return `
+    ${pill('package', 'Sevkiyat', toplam, 'var(--text2)')}
+    ${faturaGroup}
+    ${pill('ship',    'Navlun',   fmt(navlunEur),  '#854F0B')}
+    ${pill('shield',  'Sigorta',  fmt(sigortaEur), '#533AB7')}
   `;
 }
 
@@ -286,6 +281,7 @@ function normalizeDurum(raw) {
   const s = raw.toString().trim().toUpperCase()
     .replace('İ', 'İ')
     .replace('I', 'I');
+  if (s === 'YÜKLENECEK' || s === 'YUKLENECEK' || s === 'TO BE LOADED') return 'Yüklenecek';
   if (s === 'YOLDA' || s === 'IN TRANSIT' || s === 'TRANSIT') return 'YOLDA';
   if (s === 'TESLİM EDİLDİ' || s === 'TESLIM EDILDI' || s === 'DELIVERED' || s === 'TESLIM') return 'TESLİM EDİLDİ';
   if (s === 'VARIŞ GÜMRÜK' || s === 'VARIS GUMRUK' || s === 'CUSTOMS' || s === 'GÜMRÜKTE') return 'Varış Gümrük';
@@ -314,7 +310,12 @@ async function loadShipments(ulke = '', durum = '') {
       wrapper.style.maxHeight = Math.max(200, h) + 'px';
     }
     wrapper._adjustHeight = setWrapperHeight;
-    // İlk render sonrası ve resize'da çağır
+    // İlk render sonrası ve resize'da çağır — önceki loadShipments() çağrısından
+    // kalan listener'ı temizle, aksi halde her çağrıda bir tane daha birikir.
+    if (wrapper._resizeHandler) {
+      window.removeEventListener('resize', wrapper._resizeHandler);
+    }
+    wrapper._resizeHandler = setWrapperHeight;
     setTimeout(setWrapperHeight, 100);
     window.addEventListener('resize', setWrapperHeight);
   }
@@ -483,28 +484,20 @@ function renderShipments(list, fullList) {
   });
   const faturaEur  = summaryList.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_eur) || 0), 0);
   const faturaTl   = summaryList.reduce((s, r) => s + (parseFloat(r.fatura_bedeli_tl)  || 0), 0);
+  const faturaUsd  = summaryList.reduce((s, r) => {
+    const tl  = parseFloat(r.fatura_bedeli_tl) || 0;
+    const kur = parseFloat(r.usd_kuru) || 0;
+    return s + (kur > 0 ? tl / kur : 0);
+  }, 0);
   const navlunEur  = summaryList.reduce((s, r) => s + (parseFloat(r.navlun_eur) || 0), 0);
   const sigortaEur = summaryList.reduce((s, r) => s + (parseFloat(r.sigorta_eur) || 0), 0);
-  const fmt   = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
-  const fmtTl = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
+  const fmt    = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
+  const fmtTl  = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
+  const fmtUsd = val => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' $';
 
   const ozet = document.getElementById('shipments-ozet');
   if (ozet) {
-    const pill = (icon, label, val, iconColor) => `
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;
-                  background:var(--surface);border:0.5px solid var(--border2);
-                  border-radius:20px;white-space:nowrap;">
-        <i class="ti ti-${icon}" style="font-size:13px;color:${iconColor};" aria-hidden="true"></i>
-        <span style="font-size:12px;color:var(--text3);">${label}</span>
-        <span style="font-size:12px;font-weight:600;color:var(--text);">${val}</span>
-      </div>`;
-    ozet.innerHTML = `
-      ${pill('package',       'Sevkiyat', toplam,          'var(--text2)')}
-      ${pill('currency-euro', 'Fatura',   fmt(faturaEur),  '#185FA5')}
-      ${pill('currency-lira', 'TL',       fmtTl(faturaTl), '#3B6D11')}
-      ${pill('ship',          'Navlun',   fmt(navlunEur),  '#854F0B')}
-      ${pill('shield',        'Sigorta',  fmt(sigortaEur), '#533AB7')}
-    `;
+    ozet.innerHTML = ozetHtml({ toplam, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd });
   }
 
   // Tablo — Varış sütunu yok
@@ -550,18 +543,18 @@ function renderShipments(list, fullList) {
                       onclick="toggleSatirSec(event, ${s.id})"
                       style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
                   </td>
-                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${s.ihracat_dosya_no || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);">${s.fatura_no || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);">${s.palet || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${escapeHtml(s.ihracat_dosya_no) || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);">${escapeHtml(s.fatura_no) || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);">${escapeHtml(s.palet) || '-'}</td>
                   <td style="padding:5px 8px;white-space:nowrap;border-right:1px solid var(--border2);">${depoTag}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);">${s.ulke || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);">${s.nakliye_firmasi || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);">${s.plaka || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);">${escapeHtml(s.ulke) || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);">${escapeHtml(s.nakliye_firmasi) || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);">${escapeHtml(s.plaka) || '-'}</td>
                   <td style="padding:5px 8px;white-space:nowrap;width:70px;border-right:1px solid var(--border2);">
-                    ${s.sefer_id ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${s.sefer_id}</span>` : '<span style="color:var(--text3);font-size:11px;">-</span>'}
+                    ${s.sefer_id ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${escapeHtml(s.sefer_id)}</span>` : '<span style="color:var(--text3);font-size:11px;">-</span>'}
                   </td>
                   <td style="padding:5px 8px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);">${s.yukleme_tarihi || '-'}</td>
+                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);">${escapeHtml(s.yukleme_tarihi) || '-'}</td>
                   <td style="padding:5px 8px;white-space:nowrap;">
                     <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
@@ -575,15 +568,12 @@ function renderShipments(list, fullList) {
 }
 
 function durumStyle(durum) {
+  if (durum === 'Yüklenecek')    return 'background:#F3E8FD;color:#6B21A8;';
   if (durum === 'YOLDA')         return 'background:#FAEEDA;color:#633806;';
   if (durum === 'TESLİM EDİLDİ') return 'background:#EAF3DE;color:#27500A;';
   if (durum === 'Varış Gümrük')  return 'background:#E6F1FB;color:#0C447C;';
   if (durum === 'HAZIRLANIYOR')  return 'background:#F1EFE8;color:#5F5E5A;';
   return 'background:#F1EFE8;color:#5F5E5A;';
-}
-
-function filterShipments() {
-  applyFiltersAndRender();
 }
 
 function formatDateInput(dateStr) {
@@ -596,11 +586,6 @@ function formatDateInput(dateStr) {
 function formatEUR(val) {
   if (!val && val !== 0) return '-';
   return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' €';
-}
-
-function formatTL(val) {
-  if (!val && val !== 0) return '-';
-  return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ' ₺';
 }
 
 function needsFreightRepair(s) {
@@ -1007,11 +992,11 @@ function setRadioFilter(name, value) {
 
 function applyPendingDashboardShipmentFilter() {
   const filter = window.pendingDashboardShipmentFilter;
+  if (!filter) return;
   resetShipmentFilterControls();
   window.pendingDashboardShipmentFilter = null;
   const title = document.getElementById('topbarTitle');
   if (title) title.textContent = 'Sevkiyatlar';
-  if (!filter) return;
 
   if (filter.durum) {
     document.getElementById('filter-durum').value = filter.durum;
@@ -1095,13 +1080,13 @@ function openGruplaModal() {
       <input type="checkbox" data-id="${s.id}" ${checked ? 'checked' : ''}
         style="width:14px;height:14px;accent-color:var(--accent);">
       <div style="flex:1;">
-        <span style="font-weight:600;color:var(--text);">${s.ihracat_dosya_no || '-'}</span>
+        <span style="font-weight:600;color:var(--text);">${escapeHtml(s.ihracat_dosya_no) || '-'}</span>
         <span style="color:var(--text3);margin:0 6px;">·</span>
-        <span style="color:var(--text2);font-family:var(--mono);font-size:11px;">${s.fatura_no || '-'}</span>
+        <span style="color:var(--text2);font-family:var(--mono);font-size:11px;">${escapeHtml(s.fatura_no) || '-'}</span>
         <span style="color:var(--text3);margin:0 6px;">·</span>
-        <span style="color:var(--text3);">${s.ulke || '-'}</span>
+        <span style="color:var(--text3);">${escapeHtml(s.ulke) || '-'}</span>
       </div>
-      <span style="font-size:11px;color:var(--text3);">${s.plaka || '-'}</span>`;
+      <span style="font-size:11px;color:var(--text3);">${escapeHtml(s.plaka) || '-'}</span>`;
 
     item.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) gruplaSecilen.add(s.id);
@@ -1617,7 +1602,7 @@ async function meHandleRsPdf(file) {
     if (inp) inp.value = '';
   } catch (saveErr) {
     const saveEl = document.getElementById('me-rs-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
   }
 }
 
@@ -1795,8 +1780,8 @@ async function meHandleGePdf(file) {
 
   } catch (saveErr) {
     const saveEl = document.getElementById('me-ge-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
-    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 
@@ -1970,8 +1955,8 @@ async function meHandleKoPdf(file) {
 
   } catch (saveErr) {
     const saveEl = document.getElementById('me-ko-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
-    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 
@@ -2154,8 +2139,8 @@ async function meHandleKzPdf(file) {
 
   } catch (saveErr) {
     const saveEl = document.getElementById('me-kz-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
-    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 
@@ -2302,8 +2287,8 @@ async function meHandleDePdf(file) {
 
   } catch (saveErr) {
     const saveEl = document.getElementById('me-de-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
-    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 
@@ -2444,8 +2429,8 @@ async function meHandleNlPdf(file) {
 
   } catch (saveErr) {
     const saveEl = document.getElementById('me-nl-save-status');
-    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${saveErr.message}</span>`;
-    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${saveErr.message}</div>`;
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 

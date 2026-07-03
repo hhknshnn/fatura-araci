@@ -1,7 +1,8 @@
 """
 USD bazlı INV + PL üretim motoru.
 
-Ülkeler: IQ (Irak), LY (Libya), LR (Liberya), LB (Lübnan), UZ (Özbekistan)
+Ülkeler: IQ (Irak), LY (Libya), LR (Liberya), LB (Lübnan), UZ (Özbekistan),
+         JO (Ürdün), MU (Mauritius)
 
 Excel Fiyat kolonu USD cinsindendir — doğrudan kullanılır, çevrim yok.
 Freight/Insurance: YOK (tüm ülkeler).
@@ -140,9 +141,10 @@ def _generate_usd_genel(ulke_kodu, df, grup_kilolari, hedef_brut, exception_skus
                 dat(ws_inv, er, cn, parse_num(row.get('Fiyat', 0)),
                     bg=bg, align='right', fmt=USD_FMT)
             elif src_col == '__USD_CALC__':
-                miktar = parse_num(row.get('Miktar', 0))
-                dat(ws_inv, er, cn,
-                    round(miktar * parse_num(row.get('Fiyat', 0)), 2),
+                line_total = row.get('__LINE_TOTAL__')
+                if line_total is None:
+                    line_total = parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0))
+                dat(ws_inv, er, cn, round(parse_num(line_total), 2),
                     bg=bg, align='right', fmt=USD_FMT)
             elif out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)),
@@ -251,8 +253,10 @@ def _generate_uz(df, grup_kilolari, hedef_brut, exception_skus,
         for c_idx, (out_col, src_col) in enumerate(KZ_INV_COLS):
             cn = c_idx + 1
             if src_col == '__CALC__':
-                dat(ws_inv, er, cn,
-                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                line_total = row.get('__LINE_TOTAL__')
+                if line_total is None:
+                    line_total = parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0))
+                dat(ws_inv, er, cn, round(parse_num(line_total), 2),
                     bg=bg, align='right', fmt=USD_FMT)
             elif out_col == 'UNIT':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)),
@@ -361,4 +365,18 @@ def generate_abh(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                  usd_kuru=1.0, df_original=None):
     """Abhazya — USD, Freight/Insurance YOK."""
     return _generate_usd_genel('abh', df, grup_kilolari, hedef_brut, exception_skus,
+                                pdf_fields, hedef_net, depo_tipi, df_original)
+
+def generate_jo(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                pdf_fields=None, hedef_net=0, depo_tipi='serbest',
+                usd_kuru=1.0, df_original=None):
+    """Ürdün — USD, Freight/Insurance YOK."""
+    return _generate_usd_genel('jo', df, grup_kilolari, hedef_brut, exception_skus,
+                                pdf_fields, hedef_net, depo_tipi, df_original)
+
+def generate_mu(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
+                pdf_fields=None, hedef_net=0, depo_tipi='serbest',
+                usd_kuru=1.0, df_original=None):
+    """Mauritius — USD, Freight/Insurance YOK."""
+    return _generate_usd_genel('mu', df, grup_kilolari, hedef_brut, exception_skus,
                                 pdf_fields, hedef_net, depo_tipi, df_original)

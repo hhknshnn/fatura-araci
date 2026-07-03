@@ -217,9 +217,25 @@ def sku_grupla(df):
     """
     SKU bazında gruplandırma — INV ve PL için tekil satır üretir.
     Miktar toplanır, diğer kolonlar ilk değeri alır.
+
+    Aynı SKU farklı satırlarda farklı birim fiyatla geldiyse (nadir ama mümkün),
+    gruplanmış 'Fiyat' kolonu sadece ilk satırın fiyatını taşır — bu yüzden
+    "Miktar(toplam) × Fiyat(ilk)" formülüyle hesaplanan tutar yanlış olabilir.
+    Burada gruplama öncesi her satırın gerçek tutarı (Miktar × Fiyat) hesaplanıp
+    '__LINE_TOTAL__' kolonunda toplanıyor; çağıran kod TOPLAM için bunu
+    kullanmalı, gruplanmış Miktar/Fiyat'ı tekrar çarpmamalı.
     """
+    has_tutar = 'Miktar' in df.columns and 'Fiyat' in df.columns
+    if has_tutar:
+        df = df.copy()
+        df['__LINE_TOTAL__'] = (
+            df['Miktar'].apply(parse_num) * df['Fiyat'].apply(parse_num)
+        )
+
     agg_dict = {col: 'first' for col in df.columns if col != 'SKU'}
     agg_dict['Miktar'] = 'sum'
+    if has_tutar:
+        agg_dict['__LINE_TOTAL__'] = 'sum'
     return df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
 

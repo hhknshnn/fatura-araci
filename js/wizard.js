@@ -192,7 +192,7 @@ function selectCountry(c) {
   if (nakliyeEl) nakliyeEl.value = DEFAULT_NAKLIYE[c] || '';
 
   // ── DROPZONE: Ülke seçilince göster ──────────────────────────────────────
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh', 'jo', 'mu'];
   const dropZone = document.getElementById('dropZone');
   if (dropZone) dropZone.style.display = 'block';
 
@@ -204,7 +204,8 @@ function selectCountry(c) {
     de: 'cc2-kurumsal', nl: 'cc2-kurumsal', kz: 'cc2-kurumsal',
     cy: 'cc2-franchise', iq: 'cc2-franchise', ly: 'cc2-franchise',
     lr: 'cc2-franchise', lb: 'cc2-franchise', uz: 'cc2-franchise', ru: 'cc2-franchise',
-    abh: 'cc2-toptan',
+    jo: 'cc2-franchise',
+    abh: 'cc2-toptan', mu: 'cc2-toptan',
   };
   const aktifGrup = grupMap[c];
   grupIds.forEach(gid => {
@@ -632,7 +633,7 @@ function showMenseAyrim() {
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
 function buildAndDownloadReady() {
   if (!workingRows) return;
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh', 'jo', 'mu'];
   if (backendUlkeler.includes(currentCountry)) {
     document.getElementById('downloadBtn').style.display = 'block';
     document.getElementById('downloadBtn').classList.add('visible');
@@ -663,7 +664,7 @@ function showStatus(type, html) {
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────────────────
 async function downloadResult() {
-  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'cy', 'abh'];
+  const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'cy', 'abh', 'jo', 'mu'];
   if (backendUlkeler.includes(currentCountry)) { await downloadRS(); return; }
   if (!processedWB) return;
   const suffix = COUNTRIES[currentCountry]?.suffix || ('_' + currentCountry);
@@ -882,7 +883,7 @@ async function downloadRS() {
         mk: 'MAKEDONYA', be: 'BELÇİKA', de: 'ALMANYA', nl: 'HOLLANDA',
         kz: 'KAZAKİSTAN', ru: 'RUSYA', uz: 'ÖZBEKİSTAN', cy: 'KIBRIS',
         iq: 'IRAK', ly: 'LİBYA', lr: 'LİBERYA', lb: 'LÜBNAN',
-        abh: 'ABHAZYA',
+        abh: 'ABHAZYA', jo: 'ÜRDÜN', mu: 'MAURITIUS',
       };
 
       const dosyaNoEl = document.getElementById('ihracatDosyaNo');

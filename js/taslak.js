@@ -185,6 +185,36 @@ const TASLAK_ULKELER = {
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
+  jo: {
+    label: 'Ürdün', flag: 'jo', grup: 'franchise',
+    template: 'templates/taslak_lb.xlsx',
+    alanlar: [
+      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  mu: {
+    label: 'Mauritius', flag: 'mu', grup: 'toptan',
+    template: 'templates/taslak_lb.xlsx',
+    alanlar: [
+      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
+    ]
+  },
+  ke: {
+    label: 'Kenya', flag: 'ke', grup: 'devir',
+    template: 'templates/taslak_ke.xlsx',
+    alanlar: [
+      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 470' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 4388,65', oninput: 'hesaplaNet()' },
+      { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
+      { id: 'referansNo', label: 'Dosya No', tip: 'text', prefix: '2026-', placeholder: 'örn: 105' },
+    ]
+  },
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -220,18 +250,20 @@ function buildTaslakUlkeGrid() {
   const kurBody = document.getElementById('tcbody-kurumsal');
   const fraBody = document.getElementById('tcbody-franchise');
   const toptanBody = document.getElementById('tcbody-toptan');
+  const devirBody = document.getElementById('tcbody-devir');
   if (!kurBody || !fraBody) return;
 
   // Mevcut içeriği temizle, JS ile yeniden oluştur
   kurBody.innerHTML = '';
   fraBody.innerHTML = '';
   if (toptanBody) toptanBody.innerHTML = '';
+  if (devirBody) devirBody.innerHTML = '';
 
   Object.entries(TASLAK_ULKELER).forEach(([kod, cfg]) => {
     // Para birimini belirle — config'de yoksa ülke kodundan çıkar
     const cur = cfg.currency ||
       (kod === 'be' || kod === 'de' || kod === 'nl' || kod === 'xk' || kod === 'mk' ? 'EUR' :
-        kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' || kod === 'abh' ? 'USD' : 'TRY');
+        kod === 'iq' || kod === 'ly' || kod === 'lr' || kod === 'lb' || kod === 'uz' || kod === 'abh' || kod === 'jo' || kod === 'mu' ? 'USD' : 'TRY');
 
     const curClass = cur === 'EUR' ? 'cur-eur' : cur === 'USD' ? 'cur-usd' : 'cur-try';
     const card = document.createElement('div');
@@ -259,6 +291,10 @@ function buildTaslakUlkeGrid() {
       const toptanBody = document.getElementById('tcbody-toptan');
       if (toptanBody) toptanBody.appendChild(card);
     }
+    else if (cfg.grup === 'devir') {
+      const devirBody = document.getElementById('tcbody-devir');
+      if (devirBody) devirBody.appendChild(card);
+    }
     else kurBody.appendChild(card);
   });
 }
@@ -279,7 +315,7 @@ function filterTaslakCountryList() {
   let total = 0;
 
   // Tüm taslak kartlarını gez
-  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc').forEach(card => {
+  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc, #tcbody-devir .cc').forEach(card => {
     const name = card.dataset.name || '';
     const show = !q || name.includes(q);
     card.style.display = show ? '' : 'none';
@@ -287,7 +323,7 @@ function filterTaslakCountryList() {
   });
 
   // Her grup için kart sayısını güncelle, arama varsa grubu aç
-  ['kurumsal', 'franchise', 'toptan'].forEach(grup => {
+  ['kurumsal', 'franchise', 'toptan', 'devir'].forEach(grup => {
     const body = document.getElementById('tcbody-' + grup);
     const countEl = document.getElementById('tccount-' + grup);
     const chevron = document.getElementById('tcchevron-' + grup);
@@ -310,7 +346,7 @@ async function selectTaslakUlke(kod) {
   taslakUlke = kod;
 
   // Önceki seçimi temizle, yeni kartı aktif yap
-  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc, #tcbody-devir .cc').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('taslak-ulke-' + kod);
   if (btn) btn.classList.add('active');
 
@@ -485,19 +521,6 @@ function handleMenseTaslakFile(file) {
   if (badge) { badge.textContent = '✓ ' + file.name; badge.style.display = 'inline-flex'; }
   const r = new FileReader();
   r.onload = e => { menseTaslakBytes = e.target.result; };
-  r.readAsArrayBuffer(file);
-}
-
-function handleTaslakFile(file) {
-  if (!file) return;
-  const badge = document.getElementById('taslakFileName');
-  badge.textContent = '✓ ' + file.name;
-  badge.style.display = 'inline-flex';
-  const r = new FileReader();
-  r.onload = e => {
-    taslakBytes = e.target.result;
-    document.getElementById('taslakIndir').style.display = 'block';
-  };
   r.readAsArrayBuffer(file);
 }
 

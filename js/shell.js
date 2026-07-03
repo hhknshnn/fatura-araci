@@ -158,6 +158,8 @@ function sidebarSelect(mod) {
 
   } else if (mod === 'fatura-uret') {
     document.getElementById('contentArea').classList.add('fu-content-area');
+    // Hub'a her yeni girişte INV+PL sekmesi ilk açılışında bir kez sıfırlansın
+    _fuInvplOpened = false;
     // Fatura Üret — sekme yapısı (Taslak, GTİP & Menşe, INV+PL, Ek Evrak)
     let panel = document.getElementById('stepFaturaUret');
     if (!panel) {
@@ -166,10 +168,31 @@ function sidebarSelect(mod) {
       panel.className = 'panel fu-shell';
       panel.innerHTML = `
         <div class="fu-header">
-          <div>
+          <div class="fu-heading">
             <div class="fu-kicker">Fatura operasyonları</div>
-            <div class="fu-title">Fatura Üret</div>
-            <div class="fu-subtitle">Taslak, GTİP, menşe, INV + PL ve ek evrak süreçlerini tek çalışma alanından yönetin.</div>
+          </div>
+          <div class="fu-header-metrics" aria-label="Fatura üret özeti">
+            <div class="fu-metric">
+              <i class="ti ti-files" aria-hidden="true"></i>
+              <div>
+                <span>3</span>
+                <small>Aktif modül</small>
+              </div>
+            </div>
+            <div class="fu-metric">
+              <i class="ti ti-route" aria-hidden="true"></i>
+              <div>
+                <span>Tek akış</span>
+                <small>Uçtan uca üretim</small>
+              </div>
+            </div>
+            <div class="fu-metric">
+              <i class="ti ti-shield-check" aria-hidden="true"></i>
+              <div>
+                <span>Kontrollü</span>
+                <small>GTİP + menşe</small>
+              </div>
+            </div>
           </div>
         </div>
         <div class="fu-tabs" role="tablist" aria-label="Fatura üret bölümleri">
@@ -200,8 +223,10 @@ function sidebarSelect(mod) {
     switchFaturaUretTab('taslak');
 
   } else if (mod === 'maliyet-evrak') {
+    document.getElementById('contentArea').style.padding = '0';
     const panel = document.getElementById('stepMaliyetEvrak');
     panel.style.display = 'block';
+    initMaliyetEvrakAccordion(panel);
     // Her navigate'te PDF upload state'ini sıfırla
     const meStatus = document.getElementById('me-rs-status');
     const meResult = document.getElementById('me-rs-result');
@@ -271,6 +296,7 @@ function sidebarSelect(mod) {
     if (meNlInput)  meNlInput.value = '';
     if (typeof meLoadNlShipments === 'function') meLoadNlShipments();
   } else if (mod === 'landed-cost') {
+    document.getElementById('contentArea').style.padding = '0';
     let panel = document.getElementById('stepLandedCost');
     if (!panel) {
       panel = document.createElement('div');
@@ -296,6 +322,47 @@ function sidebarSelect(mod) {
   const newPath = '/' + mod;
   if (location.pathname !== newPath) {
     history.pushState(null, '', newPath);
+  }
+}
+
+function initMaliyetEvrakAccordion(panel) {
+  if (!panel || panel.dataset.accordionReady === '1') return;
+  panel.dataset.accordionReady = '1';
+
+  panel.querySelectorAll('.me-card-head').forEach(head => {
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.setAttribute('aria-expanded', 'false');
+  });
+
+  panel.addEventListener('click', event => {
+    const head = event.target.closest('.me-card-head');
+    if (!head || !panel.contains(head)) return;
+    toggleMaliyetEvrakCard(head.closest('.me-card'));
+  });
+
+  panel.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const head = event.target.closest('.me-card-head');
+    if (!head || !panel.contains(head)) return;
+    event.preventDefault();
+    toggleMaliyetEvrakCard(head.closest('.me-card'));
+  });
+}
+
+function toggleMaliyetEvrakCard(card) {
+  if (!card) return;
+  const panel = card.closest('#stepMaliyetEvrak');
+  const willOpen = !card.classList.contains('is-open');
+
+  panel.querySelectorAll('.me-card.is-open').forEach(openCard => {
+    openCard.classList.remove('is-open');
+    openCard.querySelector('.me-card-head')?.setAttribute('aria-expanded', 'false');
+  });
+
+  if (willOpen) {
+    card.classList.add('is-open');
+    card.querySelector('.me-card-head')?.setAttribute('aria-expanded', 'true');
   }
 }
 
@@ -353,7 +420,7 @@ function updateTopbarBadges() {
     rs: 'Sırbistan', ba: 'Bosna', ge: 'Gürcistan', xk: 'Kosova', mk: 'Makedonya',
     be: 'Belçika', de: 'Almanya', nl: 'Hollanda', kz: 'Kazakistan', cy: 'Kıbrıs',
     iq: 'Irak', ly: 'Libya', lr: 'Liberya', lb: 'Lübnan', uz: 'Özbekistan', ru: 'Rusya',
-    abh: 'Abhazya'
+    abh: 'Abhazya', jo: 'Ürdün', mu: 'Mauritius'
   };
 
   if (typeof currentCountry !== 'undefined' && currentCountry) {
@@ -402,6 +469,8 @@ function filterCountryList() {
 
 // ── FATURA ÜRET — SEKME GEÇİŞİ ───────────────────────────────────────────────
 // Orijinal panelleri taşır — innerHTML kopyası değil, gerçek DOM elemanları
+let _fuInvplOpened = false;
+
 function switchFaturaUretTab(tab) {
   // Sekme butonlarını güncelle
   ['taslak', 'gtip', 'invpl' /*, 'evrak' */].forEach(t => {
@@ -450,7 +519,8 @@ function switchFaturaUretTab(tab) {
     setTimeout(initTaslakPanel, 0);
   } else if (tab === 'gtip' && typeof initGtipPanel === 'function') {
     setTimeout(initGtipPanel, 0);
-  } else if (tab === 'invpl' && typeof resetSonrasiWizard === 'function') {
+  } else if (tab === 'invpl' && !_fuInvplOpened && typeof resetSonrasiWizard === 'function') {
+    _fuInvplOpened = true;
     setTimeout(resetSonrasiWizard, 0);
   }
   // else if (tab === 'evrak' && typeof initEvrakPanel === 'function') {

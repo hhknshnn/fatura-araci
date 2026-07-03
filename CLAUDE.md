@@ -87,7 +87,7 @@ Fatura uretim motorlari:
 - `templates.py`: sablon bulma.
 - `try_engine.py`: rs, ba, ge, kz, ru.
 - `eur_engine.py`: xk, mk, be, de, nl.
-- `usd_engine.py`: iq, ly, lr, lb, uz, abh.
+- `usd_engine.py`: iq, ly, lr, lb, uz, abh, jo, mu.
 - `cy_engine.py`: Kibris ozel akisi.
 - `price_list.py`: Kazakistan price list PDF.
 

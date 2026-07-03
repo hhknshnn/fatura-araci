@@ -190,6 +190,18 @@
         "invTemplate": "ref_lr",
         "taslakTemplate": "taslak_lr"
     },
+    "lb": {
+        "label": "Lübnan",
+        "flag": "lb",
+        "currency": "USD",
+        "engine": "usd_standard",
+        "grup": "franchise",
+        "sevkiyatKurKaynagi": "api_usd_to_eur",
+        "invKurKaynagi": null,
+        "invKurFallback": null,
+        "invTemplate": "ref_lb",
+        "taslakTemplate": "taslak_lb"
+    },
     "abh": {
         "label": "Abhazya",
         "flag": "un",
@@ -201,5 +213,29 @@
         "invKurFallback": null,
         "invTemplate": "ref_abh",
         "taslakTemplate": "taslak_abh"
+    },
+    "jo": {
+        "label": "Ürdün",
+        "flag": "jo",
+        "currency": "USD",
+        "engine": "usd_standard",
+        "grup": "franchise",
+        "sevkiyatKurKaynagi": "api_usd_to_eur",
+        "invKurKaynagi": null,
+        "invKurFallback": null,
+        "invTemplate": "ref_jo",
+        "taslakTemplate": "taslak_jo"
+    },
+    "mu": {
+        "label": "Mauritius",
+        "flag": "mu",
+        "currency": "USD",
+        "engine": "usd_standard",
+        "grup": "toptan",
+        "sevkiyatKurKaynagi": "api_usd_to_eur",
+        "invKurKaynagi": null,
+        "invKurFallback": null,
+        "invTemplate": "ref_mu",
+        "taslakTemplate": "taslak_mu"
     }
 }

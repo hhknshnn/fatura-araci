@@ -16,9 +16,12 @@ const KOLON_MAP = {
   fatura_bedeli_tl:      ['fatura bedeli tl', 'fatura bedeli \\ntl'],
   mal_bedeli_tl:         ['mal bedeli tl', 'mal bedeli \\ntl'],
   mal_bedeli_eur:        ['malbedeli döviz', 'mal bedeli döviz', 'mal bedeli eur', 'mal bedeli usd', 'malbedeli eur', 'mal bedeli usd'],
-  navlun_eur:            ['navlun döviz', 'navlun eur', 'navlun usd', 'navlun \\nusd', 'freight'],
-  sigorta_eur:           ['sigorta döviz', 'sigorta eur', 'sigorta usd', 'sigorta'],
-  eur_kuru:              ['eur kur', 'eur kuru', 'usd kur', 'usd kuru'],
+  navlun_eur:            ['navlun döviz', 'navlun eur', 'freight'],
+  sigorta_eur:           ['sigorta döviz', 'sigorta eur'],
+  eur_kuru:              ['eur kur', 'eur kuru'],
+  navlun_usd:            ['navlun usd', 'navlun \\nusd'],
+  sigorta_usd:           ['sigorta usd'],
+  usd_kuru:              ['usd kur', 'usd kuru'],
   fatura_bedeli_eur:     ['fatura bedeli döviz', 'fatura bedeli eur', 'fatura bedeli usd', 'fatura bedeli̇ döviz'],
   arac_bekleme:          ['araç bekleme masrafı', 'arac bekleme', 'araç bekleme masrafı usd'],
   ihracat_beyanname_tl:  ['ihracat beyanname tl', 'i̇hracatbeyanname tl', 'ihracatbeyanname tl'],
@@ -50,7 +53,10 @@ const KOLON_ETIKETLER = {
   mal_bedeli_eur:        'Mal Bedeli Döviz',
   navlun_eur:            'Navlun EUR',
   sigorta_eur:           'Sigorta EUR',
-  eur_kuru:              'EUR/USD Kuru',
+  eur_kuru:              'EUR Kuru',
+  navlun_usd:            'Navlun USD',
+  sigorta_usd:           'Sigorta USD',
+  usd_kuru:              'USD Kuru',
   fatura_bedeli_eur:     'Fatura Bedeli EUR',
   arac_bekleme:          'Araç Bekleme',
   ihracat_beyanname_tl:  'İhracat Beyanname TL',
@@ -263,6 +269,7 @@ function initImportPanel() {
               <option value="LİBYA">Libya</option>
               <option value="LİBERYA">Liberya</option>
               <option value="LÜBNAN">Lübnan</option>
+              <option value="ÜRDÜN">Ürdün</option>
               <option value="ÖZBEKİSTAN">Özbekistan</option>
               <option value="RUSYA">Rusya</option>
               <option value="SIRBİSTAN">Sırbistan</option>
@@ -544,11 +551,14 @@ function buildPreviewTable() {
   const eurSutunlar = ['fatura_bedeli_eur', 'mal_bedeli_eur', 'navlun_eur',
                        'sigorta_eur', 'ihracat_beyanname_eur', 'brokerage_eur',
                        'gumruk_vergisi_eur', 'kdv_eur', 'toplam_maliyet_eur', 'eur_kuru'];
-  const gosterilecek = [...zorunlu, ...eurSutunlar];
+  // USD sütunları — her zaman göster, boşsa uyarı ver
+  const usdSutunlar = ['navlun_usd', 'sigorta_usd', 'usd_kuru'];
+  const gosterilecek = [...zorunlu, ...eurSutunlar, ...usdSutunlar];
 
-  // Hangi EUR sütunları tamamen boş?
+  // Hangi EUR/USD sütunları tamamen boş?
+  const dovizSutunlar = [...eurSutunlar, ...usdSutunlar];
   const tamBosSutunlar = new Set(
-    eurSutunlar.filter(k => !importPreviewRows.some(r => r[k] && String(r[k]).trim()))
+    dovizSutunlar.filter(k => !importPreviewRows.some(r => r[k] && String(r[k]).trim()))
   );
 
   const thStyle = 'padding:6px 10px;background:var(--surface2);border:0.5px solid var(--border2);' +
@@ -562,7 +572,7 @@ function buildPreviewTable() {
   const thead = `<thead>
     <tr>${gosterilecek.map(k =>
       `<th style="${tamBosSutunlar.has(k) ? thBosStyle : thStyle}">
-        ${KOLON_ETIKETLER[k] || k}${tamBosSutunlar.has(k) ? ' ⚠' : ''}
+        ${escapeHtml(KOLON_ETIKETLER[k] || k)}${tamBosSutunlar.has(k) ? ' ⚠' : ''}
       </th>`).join('')}
     </tr>
   </thead>`;
@@ -572,10 +582,10 @@ function buildPreviewTable() {
       ${gosterilecek.map(k => {
         const val = row[k];
         const bos = !val || !String(val).trim();
-        if (eurSutunlar.includes(k) && bos) {
+        if (dovizSutunlar.includes(k) && bos) {
           return `<td style="${tdBosStyle}">—</td>`;
         }
-        return `<td style="${tdStyle}">${val ?? ''}</td>`;
+        return `<td style="${tdStyle}">${escapeHtml(val ?? '')}</td>`;
       }).join('')}
     </tr>`
   ).join('')}${importPreviewRows.length > 20 ?
@@ -942,28 +952,28 @@ function buildFrPreviewTable() {
       <td style="${tdStyle}">${s.usd_kuru ? parseFloat(s.usd_kuru).toFixed(4) : '—'}</td>
       <td style="${tdStyle}">${s.eur_kuru ? parseFloat(s.eur_kuru).toFixed(4) : '—'}</td>
       <td style="${tdStyle}">
-        <input type="number" step="0.01" value="${s.navlun_eur || ''}" placeholder="0"
+        <input type="number" step="0.01" value="${escapeHtml(s.navlun_eur ?? '')}" placeholder="0"
           onchange="frSonuclar[${i}].navlun_eur = parseFloat(this.value)||0"
           style="${inpStyle}">
       </td>
       <td style="${tdStyle}">
-        <input type="number" step="0.01" value="${s.sigorta_eur || ''}" placeholder="0"
+        <input type="number" step="0.01" value="${escapeHtml(s.sigorta_eur ?? '')}" placeholder="0"
           onchange="frSonuclar[${i}].sigorta_eur = parseFloat(this.value)||0"
           style="${inpStyle}">
       </td>
-      <td style="${tdStyle};font-weight:600;color:var(--accent);">${s.palet || '—'}</td>
+      <td style="${tdStyle};font-weight:600;color:var(--accent);">${escapeHtml(s.palet) || '—'}</td>
       <td style="${tdStyle}">
-        <input type="text" value="${s.ihracat_dosya_no || ''}" placeholder="2026-xxx"
+        <input type="text" value="${escapeHtml(s.ihracat_dosya_no ?? '')}" placeholder="2026-xxx"
           onchange="frSonuclar[${i}].ihracat_dosya_no = this.value.trim()"
           style="${inpStyle}">
       </td>
       <td style="${tdStyle}">
-        <input type="text" value="${s.nakliye_firmasi || ''}" placeholder="Firma"
+        <input type="text" value="${escapeHtml(s.nakliye_firmasi ?? '')}" placeholder="Firma"
           onchange="frSonuclar[${i}].nakliye_firmasi = this.value.trim()"
           style="${inpStyle}">
       </td>
       <td style="${tdStyle}">
-        <input type="text" value="${s.plaka || ''}" placeholder="Plaka"
+        <input type="text" value="${escapeHtml(s.plaka ?? '')}" placeholder="Plaka"
           onchange="frSonuclar[${i}].plaka = this.value.trim()"
           style="${inpStyle}">
       </td>
@@ -1179,32 +1189,6 @@ function resetFrImport() {
   if (parseBtn) parseBtn.style.display = 'none';
   const input = document.getElementById('fr-file-input');
   if (input) input.value = '';
-}
-
-function setFrMode(mode) {
-  frMode = mode;
-  const importEl = document.getElementById('fr-mode-import');
-  const paletEl  = document.getElementById('fr-mode-palet');
-  const btn      = document.getElementById('fr-import-btn');
-  if (!importEl || !paletEl) return;
-
-  if (mode === 'import') {
-    importEl.style.border     = '1.5px solid var(--accent)';
-    importEl.style.background = 'var(--accent-dim)';
-    importEl.querySelector('div').style.color = 'var(--accent-text)';
-    paletEl.style.border     = '1.5px solid var(--border2)';
-    paletEl.style.background = 'var(--surface2)';
-    paletEl.querySelector('div').style.color = 'var(--text)';
-    if (btn) btn.textContent = '⬆ Yeni Kayıt Ekle';
-  } else {
-    paletEl.style.border     = '1.5px solid var(--accent)';
-    paletEl.style.background = 'var(--accent-dim)';
-    paletEl.querySelector('div').style.color = 'var(--accent-text)';
-    importEl.style.border     = '1.5px solid var(--border2)';
-    importEl.style.background = 'var(--surface2)';
-    importEl.querySelector('div').style.color = 'var(--text)';
-    if (btn) btn.textContent = '📦 Palet Güncelle';
-  }
 }
 
 // ── PALET GÜNCELLE FONKSİYONLARI ─────────────────────────────────────────────

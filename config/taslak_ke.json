@@ -1,0 +1,31 @@
+{
+  "ulke": "Kenya",
+  "dosyaAdi": "Kenya",
+  "sheet": "FT.",
+  "dosyaAdiSablon": "Fatura Taslak - {refNo} - DEVİR",
+  "alanlar": {
+    "kap": {
+      "hucre": "C3",
+      "tip": "metin",
+      "label": "Packages"
+    },
+    "brutKg": {
+      "hucre": "C4",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)"
+    },
+    "netKg": {
+      "hucre": "C5",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=C4*0.9"
+    },
+    "referansNo": {
+      "hucre": "C8",
+      "tip": "metin",
+      "label": "Dosya No",
+      "prefix": "2026-"
+    }
+  },
+  "menseAlanlar": {}
+}

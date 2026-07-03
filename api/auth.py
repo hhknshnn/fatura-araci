@@ -1,8 +1,6 @@
 # api/auth.py
 # Kullanıcı girişi, oturum yönetimi — PostgreSQL tabanlı
 
-import json
-import hashlib
 import bcrypt
 import secrets
 import time

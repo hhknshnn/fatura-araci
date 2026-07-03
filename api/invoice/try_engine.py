@@ -195,8 +195,10 @@ def generate_rs(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         for c_idx, (out_col, src_col) in enumerate(RS_INV_COLS):
             cn = c_idx + 1
             if src_col == '__CALC__':
-                dat(ws_inv, er, cn,
-                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                line_total = row.get('__LINE_TOTAL__')
+                if line_total is None:
+                    line_total = parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0))
+                dat(ws_inv, er, cn, round(parse_num(line_total), 2),
                     bg=bg, align='right', fmt=TL_FMT)
             elif out_col == 'QTY':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)), bg=bg, align='right', fmt='#,##0')
@@ -372,8 +374,10 @@ def _generate_kz_like(ulke_kodu, df, grup_kilolari, hedef_brut, exception_skus,
         for c_idx, (out_col, src_col) in enumerate(inv_cols):
             cn = c_idx + 1
             if src_col == '__CALC__':
-                dat(ws_inv, er, cn,
-                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                line_total = row.get('__LINE_TOTAL__')
+                if line_total is None:
+                    line_total = parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0))
+                dat(ws_inv, er, cn, round(parse_num(line_total), 2),
                     bg=bg, align='right', fmt=inv_fmt)
             elif out_col == 'UNIT':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)),
@@ -693,8 +697,10 @@ def generate_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)),
                     bg=bg, align='right', fmt='#,##0')
             elif src_col == '__CALC__':
-                dat(ws_inv, er, cn,
-                    round(parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0)), 2),
+                line_total = row.get('__LINE_TOTAL__')
+                if line_total is None:
+                    line_total = parse_num(row.get('Miktar', 0)) * parse_num(row.get('Fiyat', 0))
+                dat(ws_inv, er, cn, round(parse_num(line_total), 2),
                     bg=bg, align='right', fmt=TRY_FMT)
             elif out_col == 'UNIT PRICE':
                 dat(ws_inv, er, cn, parse_num(row.get(src_col, 0)),

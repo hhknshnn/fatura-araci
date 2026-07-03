@@ -5,6 +5,8 @@ import re
 import pdfplumber
 import openpyxl
 
+_ULKE_KODU_RE = re.compile(r'^[a-z]{2,4}$')
+
 def _normalize_pdf_text(text):
     return re.sub(r'\s+', ' ', (text or '').replace('\u00a0', ' ')).strip()
 
@@ -117,6 +119,8 @@ def parse_pdf_fields(pdf_bytes):
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_config(ulke_kodu):
     """Ülkeye göre taslak config dosyasını yükle."""
+    if not _ULKE_KODU_RE.match(str(ulke_kodu or '')):
+        raise ValueError(f'Geçersiz ülke kodu: {ulke_kodu}')
     # Vercel'de çalışma dizini /var/task, config klasörü oradan erişilebilir
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, 'config', f'taslak_{ulke_kodu}.json')
@@ -238,8 +242,12 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
     # Frontend zaten yıl+no gönderiyor (örn: 2027-100), prefix'i atla
     if ref_no and '-' in ref_no:
             prefix = ''
-    ulke    = config.get('dosyaAdi', 'Taslak')
-    dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
+    sablon = config.get('dosyaAdiSablon')
+    if sablon:
+        dosya_adi = sablon.replace('{refNo}', f'{prefix}{ref_no}') + '.xlsx'
+    else:
+        ulke    = config.get('dosyaAdi', 'Taslak')
+        dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
     # ── BYTES OLARAK DÖNDÜR ───────────────────────────────────────────────────
     buf = io.BytesIO()
     wb.save(buf)

@@ -15,33 +15,6 @@ async function loadCountriesConfig() {
   }
 }
 
-// ── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────────────
-function ulkeInvKurGerekli(kod) {
-  const cfg = window.COUNTRIES_CACHE?.[kod];
-  if (!cfg) return false;
-  return cfg.invKurKaynagi === 'pdf_eur' || cfg.invKurFallback === 'input';
-}
-
-function ulkeCurrency(kod) {
-  return window.COUNTRIES_CACHE?.[kod]?.currency || 'TRY';
-}
-
-function ulkeEngine(kod) {
-  return window.COUNTRIES_CACHE?.[kod]?.engine || null;
-}
-
-function ulkeSevkiyatKurKaynagi(kod) {
-  return window.COUNTRIES_CACHE?.[kod]?.sevkiyatKurKaynagi || 'api_eur';
-}
-
-function ulkelerByGrup(grup) {
-  if (!window.COUNTRIES_CACHE) return [];
-  return Object.entries(window.COUNTRIES_CACHE)
-    .filter(([_, cfg]) => cfg.grup === grup)
-    .map(([kod, cfg]) => ({ kod, ...cfg }));
-}
-
-
 // ── ÜLKE TANIMLARI ──────────────────────────────────────────────────────────
 // Bu dosya tüm ülkelerin çıktı sütunlarını tanımlar.
 // Yeni ülke eklemek için sadece bu dosyayı düzenlemen yeterli.
@@ -64,6 +37,8 @@ const COUNTRIES = {
   lr: { label: 'Liberya',  suffix: '_liberya' },
   lb: { label: 'Lübnan',   suffix: '_lubnan'  },
   abh: { label: 'Abhazya', suffix: '_abhazya' },
+  jo: { label: 'Ürdün',     suffix: '_urdun'    },
+  mu: { label: 'Mauritius', suffix: '_mauritius' },
 };
 
 const KZ_COLS = [

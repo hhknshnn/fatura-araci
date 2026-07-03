@@ -44,6 +44,8 @@ ULKE_CONFIG = {
     'lb': dict(inv_fmt=USD_FMT, grand_total='GRAND TOTAL USD', freight=False, excel_kur='usd', engine='usd_engine'),
     'uz': dict(inv_fmt=USD_FMT, grand_total='GRAND TOTAL USD', freight=False, excel_kur='usd', engine='usd_engine'),
     'abh': dict(inv_fmt=USD_FMT, grand_total='GRAND TOTAL USD', freight=False, excel_kur='usd', engine='usd_engine'),
+    'jo': dict(inv_fmt=USD_FMT, grand_total='GRAND TOTAL USD', freight=False, excel_kur='usd', engine='usd_engine'),
+    'mu': dict(inv_fmt=USD_FMT, grand_total='GRAND TOTAL USD', freight=False, excel_kur='usd', engine='usd_engine'),
     'cy': dict(inv_fmt=None,    grand_total=None,               freight=False, excel_kur=None,  engine='cy_engine'),
 }
 
