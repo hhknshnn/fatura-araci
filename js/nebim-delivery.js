@@ -366,6 +366,36 @@ function renderNebimDeliverySummary() {
     metric('Plaka bekleyen', missingPlate, 'ti-car-off', 'error'),
     hideToggle,
   ].join('');
+  updateNebimWarnBadge(total - ready);
+}
+
+// ── SIDEBAR UYARI ROZETİ ─────────────────────────────────────────────────────
+// Ref no girilmemiş ya da girilip Nebim'e hazır işaretlenmemiş kayıt sayısını
+// sidebar'daki "Nebim İrsaliye" öğesinde kırmızı rozet olarak gösterir.
+function updateNebimWarnBadge(count) {
+  const badge = document.getElementById('nav-nebim-warn-badge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.title = `${count} sevkiyat için fatura ref no girilmemiş ya da Nebim onayı verilmemiş`;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+    badge.title = '';
+  }
+}
+
+// Sayfa açılışında, Nebim İrsaliye ekranı henüz açılmadan rozeti doldurmak için.
+async function checkNebimWarningCount() {
+  try {
+    const resp = await fetch('/api/nebim-delivery', { headers: nebimAuthHeaders() });
+    const data = await resp.json();
+    if (!data.success || !Array.isArray(data.items)) return;
+    const pending = data.items.filter(x => !x.ready_for_nebim).length;
+    updateNebimWarnBadge(pending);
+  } catch (e) {
+    // sessizce geç
+  }
 }
 
 function nebimToggleHideReady(checked) {

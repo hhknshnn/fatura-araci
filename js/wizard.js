@@ -105,7 +105,13 @@ function setupStepFaturaOncesi() {
   const nextBtn = document.getElementById('step2Next');
   if (nextBtn) {
     nextBtn.style.display = masterRows ? 'block' : 'none';
-    nextBtn.onclick = () => { goStep(2); };
+    nextBtn.onclick = () => {
+      if (window._excelLoading || window._pdfLoading) {
+        showStatus('error', '⚠ Dosyalar henüz okunuyor, lütfen bekleyin.');
+        return;
+      }
+      goStep(2);
+    };
   }
 }
 // ── ADIM 1: MOD SEÇ ───────────────────────────────────────────────────────────
@@ -834,13 +840,17 @@ async function downloadRS() {
         // USD fatura: PDF'te TRY/USD kuru varsa onu kullan, yoksa API
         const tryUsdKuru = pdfKur > 0 ? pdfKur : apiTryUsd;
         eur_kuru = apiEurKuru;
-        const mal_toplam_tl = mal_toplam_ham * tryUsdKuru;
-        mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_tl / eur_kuru : 0;
         const freight = navlunSigortaToEur(eur_kuru);
         navlun_eur = freight.navlun;
         sigorta_eur = freight.sigorta;
+        // PDF'te TL toplamı doğrudan yazılıyorsa (örn. Ödenecek Tutar (TL)),
+        // faturayla birebir eşleşmesi için o kullanılır; yoksa mal bedeli üzerinden hesaplanır.
+        const mal_toplam_tl = pdf_fatura_tl > 0
+          ? Math.max(pdf_fatura_tl - freight.tl, 0)
+          : mal_toplam_ham * tryUsdKuru;
+        mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_tl / eur_kuru : 0;
         fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
-        fatura_bedeli_tl = mal_toplam_tl + freight.tl;
+        fatura_bedeli_tl = pdf_fatura_tl > 0 ? pdf_fatura_tl : mal_toplam_tl + freight.tl;
 
       } else if (sevkiyatKurKaynagi === 'pdf_eur') {
         eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
@@ -888,6 +898,17 @@ async function downloadRS() {
 
       const dosyaNoEl = document.getElementById('ihracatDosyaNo');
       const ihracatDosyaNo = dosyaNoEl?.value?.trim() ? '2026-' + dosyaNoEl.value.trim() : '';
+
+      // ANT (antrepo) faturalarında KAP sayısı 30'a bölünüp yukarı yuvarlanır,
+      // palet alanına "173 (6)" gibi kap sayısı + parantez içinde palet sayısı yazılır.
+      let paletVal = data.pdfFields?.kap || null;
+      if (paletVal && String(data.faturaNo || '').toUpperCase().startsWith('ANT')) {
+        const kapNum = parseInt(String(paletVal).match(/\d+/)?.[0] || '0', 10);
+        if (kapNum > 0) {
+          paletVal = `${kapNum} (${Math.ceil(kapNum / 30)})`;
+        }
+      }
+
       const sevkRes = await fetch('/api/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
@@ -909,7 +930,7 @@ async function downloadRS() {
           nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
           yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
           gumruk_tarihi:  document.getElementById('gumrukTarihiInput')?.value || '',
-          palet: data.pdfFields?.kap || null,
+          palet: paletVal,
         })
       });
       const sevkData = await sevkRes.json();

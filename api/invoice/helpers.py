@@ -195,14 +195,15 @@ def parse_pdf(pdf_bytes):
                 if result['kur'] <= 0:
                     result['kur'] = _extract_pdf_amount(text, [
                         r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+                        r'\bD[ÖO]V[İI]Z\s+KURU\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
                     ])
                 if result['fatura_tl'] <= 0:
                     result['fatura_tl'] = _extract_pdf_amount(text, [
-                        r'\b[ÖO]DENECEK\s+TUTAR\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bMAL\s+H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bGENEL\s+TOPLAM\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bNet\s+Tutar\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\b[ÖO]DENECEK\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bMAL\s+(?:VE\s+)?H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bGENEL\s+TOPLAM\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                        r'\bNet\s+Tutar\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)\s*([\d.,]+)',
                     ])
                 if not result['kap']:
                     result['kap'] = _extract_pdf_packages(text)

@@ -536,4 +536,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   const initMod = location.pathname.replace(/^\//, '') || 'dashboard';
   sidebarSelect(initMod);
   if (typeof checkGecmisCount === 'function') checkGecmisCount();
+  if (typeof checkNebimWarningCount === 'function') checkNebimWarningCount();
 });

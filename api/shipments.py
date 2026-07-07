@@ -1223,9 +1223,14 @@ def parse_fr_pdf_import():
             usd_tutar   = parsed.get('fatura_bedeli_usd', 0.0)
             eur_tutar   = parsed.get('fatura_bedeli_eur', 0.0)
             tl_tutar    = parsed.get('fatura_bedeli_tl', 0.0)
+            tl_tutar_pdf = parsed.get('fatura_bedeli_tl_pdf', 0.0)
 
             # TL hesapla — para birimine göre
-            if para_birimi == 'USD' and usd_kuru:
+            # Fatura PDF'inde "Ödenecek Tutar (TL)" doğrudan yazıyorsa, kur ile
+            # yeniden hesaplamak yerine faturayla birebir eşleşmesi için o değer kullanılır.
+            if tl_tutar_pdf:
+                fatura_tl = tl_tutar_pdf
+            elif para_birimi == 'USD' and usd_kuru:
                 fatura_tl = round(usd_tutar * usd_kuru, 2)
             elif para_birimi == 'EUR' and usd_kuru:
                 fatura_tl = round(eur_tutar * usd_kuru, 2)  # usd_kuru burada EUR/TL kuru
@@ -2169,6 +2174,7 @@ def parse_fr_fatura_pdf(pdf_bytes):
         'yukleme_tarihi':    None,
         'fatura_bedeli_usd': 0.0,
         'fatura_bedeli_tl':  0.0,
+        'fatura_bedeli_tl_pdf': 0.0,
         'usd_kuru':          0.0,
         'para_birimi':       'TL',
         'fatura_tipi':       None,  # 'ANT' veya 'IHR'
@@ -2251,6 +2257,14 @@ def parse_fr_fatura_pdf(pdf_bytes):
             if kur_birimi == 'TL' and kur_deger > 1:
                 # 1 USD/EUR = X TL formatı
                 result['usd_kuru'] = kur_deger
+
+        # ── PDF'te yazılı TL Toplamı (varsa, fatura ile birebir eşleşmesi için öncelikli) ──
+        # USD/EUR ile kesilip döviz kuru bilgisi bulunan faturalarda TL toplamı
+        # tekrar hesaplanmak yerine faturada yazan "Ödenecek Tutar (TL)" değeri kullanılır.
+        if result['para_birimi'] in ('USD', 'EUR'):
+            m = re.search(r'Ödenecek Tutar\s*\(TL\)[:\s]*([\d.,]+)', full)
+            if m:
+                result['fatura_bedeli_tl_pdf'] = parse_tr_sayi(m.group(1))
 
         # ── Palet / Kap ──────────────────────────────────────────────────────
         m = re.search(r'\*?\s*KAP(?:\s*ADETİ)?[:\s]*([\d]+(?:\s*\([^)]+\))?)', full, re.IGNORECASE)

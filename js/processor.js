@@ -92,10 +92,18 @@ function handleFile(file) {
   // Excel yüklenince drop zone'a loaded class ekle
   const dz = document.getElementById('dropZone');
   if (dz) dz.classList.add('loaded');
+  window._excelLoading = true;
+  const nextBtnEarly = document.getElementById('step2Next') || document.getElementById('step4Next');
+  if (nextBtnEarly) nextBtnEarly.style.display = 'none';
+
   const r = new FileReader();
   r.onload = e => {
     lastFileData = e.target.result;
     loadFile(lastFileData);
+  };
+  r.onerror = () => {
+    window._excelLoading = false;
+    if (badge) { badge.textContent = '⚠ Excel okunamadı'; badge.style.color = 'var(--error)'; }
   };
   r.readAsArrayBuffer(file);
 }
@@ -105,6 +113,11 @@ function handlePdf(file) {
   const badge = document.getElementById('pdfFileName');
   badge.textContent = '⏳ PDF okunuyor... (0s)';
   badge.style.display = 'inline-flex';
+
+  // PDF okunurken Devam butonunu gizle — okuma bitmeden ilerlenmesin
+  window._pdfLoading = true;
+  const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
+  if (nextBtn) nextBtn.style.display = 'none';
 
   let elapsed = 0;
   const timer = setInterval(() => {
@@ -146,7 +159,16 @@ function handlePdf(file) {
       // PDF yüklenince drop zone'a loaded class ekle
       const dz = document.getElementById('dropZone');
       if (dz) dz.classList.add('loaded');
+      window._pdfLoading = false;
+      // Excel de yüklenmişse Devam butonunu tekrar göster
+      if (masterRows && nextBtn) nextBtn.style.display = 'block';
     }
+  };
+  r.onerror = () => {
+    clearInterval(timer);
+    window._pdfLoading = false;
+    badge.textContent = '⚠ PDF okunamadı';
+    if (masterRows && nextBtn) nextBtn.style.display = 'block';
   };
   r.readAsArrayBuffer(file);
 }
@@ -171,8 +193,8 @@ function loadFile(data) {
 
     masterRows = rows;
 
-    // Devam butonunu göster
-    if (nextBtn) nextBtn.style.display = 'block';
+    // Devam butonunu göster — ancak PDF hâlâ okunuyorsa gizli kalsın
+    if (nextBtn && !window._pdfLoading) nextBtn.style.display = 'block';
 
     // fileName badge güncelle
     const badge = document.getElementById('fileName');
@@ -183,6 +205,8 @@ function loadFile(data) {
     const badge = document.getElementById('fileName');
     if (badge) { badge.textContent = '⚠ ' + err.message; badge.style.color = 'var(--error)'; }
     console.error('loadFile hatası:', err.message);
+  } finally {
+    window._excelLoading = false;
   }
 }
 

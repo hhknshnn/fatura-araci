@@ -1637,6 +1637,22 @@ body {
   white-space: nowrap;
 }
 
+.nav-warn-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--error);
+  color: #fff;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.sidebar.mini .nav-warn-badge {
+  display: none !important;
+}
+
 .nav-divider {
   height: 0.5px;
   background: var(--border2);

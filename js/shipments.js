@@ -868,20 +868,42 @@ function openNewShipmentForm() {
   panel.style.display   = 'flex';
 }
 
-async function deleteShipment() {
+function deleteShipment() {
   const id = document.getElementById('detail-id').value;
   if (!id) return;
-  if (!confirm('Bu sevkiyatı silmek istediğinizden emin misiniz?')) return;
 
-  const token = sessionStorage.getItem('fa_auth_token');
-  const res   = await fetch('/api/shipments', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ id: parseInt(id) }),
-  });
-  const data = await res.json();
-  if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; loadShipments(); }
-  else alert('Silme hatası: ' + (data.error || 'Bilinmeyen hata'));
+  const dosyaNo = document.getElementById('detail-dosya-no')?.textContent || '';
+  const faturaNo = document.getElementById('detail-fatura-no')?.textContent || '';
+
+  showMiniModal('🗑 Sevkiyatı Sil', `
+    <div style="padding:12px 14px;background:#FFF5F5;border:0.5px solid #FECACA;
+                border-radius:var(--radius-md);
+                display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:20px;flex-shrink:0;">⚠️</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#B91C1C;margin-bottom:4px;">
+          Bu işlem geri alınamaz!
+        </div>
+        <div style="font-size:12px;color:#DC2626;">
+          <b>${dosyaNo}${faturaNo ? ' · ' + faturaNo : ''}</b> kalıcı olarak silinecek.
+        </div>
+      </div>
+    </div>`,
+    [
+      { label: 'Vazgeç', style: 'ghost', action: null },
+      { label: '🗑 Evet, Sil', style: 'danger', action: async () => {
+        const token = sessionStorage.getItem('fa_auth_token');
+        const res   = await fetch('/api/shipments', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ id: parseInt(id) }),
+        });
+        const data = await res.json();
+        if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; loadShipments(); }
+        else showMiniModal('⚠️ Hata', 'Silme hatası: ' + (data.error || 'Bilinmeyen hata'), [{ label: 'Tamam', style: 'primary', action: null }]);
+      }}
+    ]
+  );
 }
 
 // ── CUSTOM DROPDOWN ───────────────────────────────────────────────────────────
