@@ -1,7 +1,7 @@
 import io
 import re
 
-import pdfplumber
+from pypdf import PdfReader
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from .constants import DARK_BLUE, MID_BLUE, LIGHT_BLUE, LIGHT_GRAY
@@ -162,53 +162,52 @@ def parse_pdf(pdf_bytes):
     """
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0, 'kap': '', 'fatura_tl': 0.0}
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            page_count = len(pdf.pages)
-            preferred_indexes = list(range(max(0, page_count - 2), page_count))
-            remaining_indexes = [i for i in range(page_count) if i not in preferred_indexes]
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        page_count = len(reader.pages)
+        preferred_indexes = list(range(max(0, page_count - 2), page_count))
 
-            for indexes in (preferred_indexes, remaining_indexes):
-                texts = []
-                for i in indexes:
-                    texts.append(_normalize_pdf_text(pdf.pages[i].extract_text() or ''))
-                text = ' '.join(t for t in texts if t).strip()
-                if not text:
-                    continue
-                if result['navlun'] <= 0:
-                    result['navlun'] = _extract_pdf_amount(text, [
-                        r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                        r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                    ]) or _extract_amount_near_keywords(text, [
-                        r'\bNAVLUN\b',
-                        r'\bFREIGHT\b',
-                        r'\bTA[SŞ]IMA\b',
-                    ])
-                if result['sigorta'] <= 0:
-                    result['sigorta'] = _extract_pdf_amount(text, [
-                        r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                        r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                    ]) or _extract_amount_near_keywords(text, [
-                        r'\bS[İI]GORTA\b',
-                        r'\bSIGORTA\b',
-                        r'\bINSURANCE\b',
-                    ])
-                if result['kur'] <= 0:
-                    result['kur'] = _extract_pdf_amount(text, [
-                        r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
-                        r'\bD[ÖO]V[İI]Z\s+KURU\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
-                    ])
-                if result['fatura_tl'] <= 0:
-                    result['fatura_tl'] = _extract_pdf_amount(text, [
-                        r'\b[ÖO]DENECEK\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bMAL\s+(?:VE\s+)?H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bGENEL\s+TOPLAM\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                        r'\bNet\s+Tutar\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)\s*([\d.,]+)',
-                    ])
-                if not result['kap']:
-                    result['kap'] = _extract_pdf_packages(text)
-                if result['navlun'] > 0 and result['sigorta'] > 0:
-                    break
+        for indexes in (preferred_indexes,):
+            texts = []
+            for i in indexes:
+                texts.append(_normalize_pdf_text(reader.pages[i].extract_text() or ''))
+            text = ' '.join(t for t in texts if t).strip()
+            if not text:
+                continue
+            if result['navlun'] <= 0:
+                result['navlun'] = _extract_pdf_amount(text, [
+                    r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                ]) or _extract_amount_near_keywords(text, [
+                    r'\bNAVLUN\b',
+                    r'\bFREIGHT\b',
+                    r'\bTA[SŞ]IMA\b',
+                ])
+            if result['sigorta'] <= 0:
+                result['sigorta'] = _extract_pdf_amount(text, [
+                    r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                    r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+                ]) or _extract_amount_near_keywords(text, [
+                    r'\bS[İI]GORTA\b',
+                    r'\bSIGORTA\b',
+                    r'\bINSURANCE\b',
+                ])
+            if result['kur'] <= 0:
+                result['kur'] = _extract_pdf_amount(text, [
+                    r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+                    r'\bD[ÖO]V[İI]Z\s+KURU\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+                ])
+            if result['fatura_tl'] <= 0:
+                result['fatura_tl'] = _extract_pdf_amount(text, [
+                    r'\b[ÖO]DENECEK\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                    r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                    r'\bMAL\s+(?:VE\s+)?H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                    r'\bGENEL\s+TOPLAM\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+                    r'\bNet\s+Tutar\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)\s*([\d.,]+)',
+                ])
+            if not result['kap']:
+                result['kap'] = _extract_pdf_packages(text)
+            if result['navlun'] > 0 and result['sigorta'] > 0:
+                break
     except Exception:
         pass
     return result

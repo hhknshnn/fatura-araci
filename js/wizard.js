@@ -1037,6 +1037,17 @@ async function downloadCY() {
         const fatura_bedeli_eur = eur_kuru > 0 ? Math.round(fatura_bedeli_tl / eur_kuru * 100) / 100 : 0;
 
         const masterInfo = (data.masterList || []).find(m => m.fatura_no === f.faturaNo);
+
+        // ANT (antrepo) faturalarında KAP sayısı 30'a bölünüp yukarı yuvarlanır,
+        // palet alanına "173 (6)" gibi kap sayısı + parantez içinde palet sayısı yazılır.
+        let paletValCY = masterInfo?.kap || null;
+        if (paletValCY && String(f.faturaNo || '').toUpperCase().startsWith('ANT')) {
+          const kapNum = parseInt(String(paletValCY).match(/\d+/)?.[0] || '0', 10);
+          if (kapNum > 0) {
+            paletValCY = `${kapNum} (${Math.ceil(kapNum / 30)})`;
+          }
+        }
+
         const sevkRes = await fetch('/api/shipments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
@@ -1053,7 +1064,7 @@ async function downloadCY() {
             nakliye_firmasi:   document.getElementById('nakliyeInput')?.value?.trim() || '',
             yukleme_tarihi:    document.getElementById('yuklemeTarihiInput')?.value || '',
             gumruk_tarihi:     document.getElementById('gumrukTarihiInput')?.value || '',
-            palet:             masterInfo?.kap || null,
+            palet:             paletValCY,
           })
         });
         const sevkData = await sevkRes.json();
