@@ -120,6 +120,23 @@ def _extract_pdf_amount(text, patterns):
     return 0.0
 
 
+def _extract_pdf_invoice_total_tl(text):
+    """PDF dip toplamını çıkar; mal/hizmet ara toplamını sadece son çare kullan."""
+    priority_patterns = [
+        r'\bNet\s+Tutar\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+        r'\b[ÖO]DENECEK\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+        r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+        r'\bGENEL\s+TOPLAM\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+    ]
+    fallback_patterns = [
+        r'\bMAL\s+(?:VE\s+)?H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
+    ]
+    return (
+        _extract_pdf_amount(text, priority_patterns) or
+        _extract_pdf_amount(text, fallback_patterns)
+    )
+
+
 def _extract_amount_near_keywords(text, keywords, window=140):
     money_re = re.compile(
         r'(?:TRY|TL|₺)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2,4})|[0-9]+[.,][0-9]{2,4})\s*(?:TRY|TL|₺)?',
@@ -197,13 +214,7 @@ def parse_pdf(pdf_bytes):
                     r'\bD[ÖO]V[İI]Z\s+KURU\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
                 ])
             if result['fatura_tl'] <= 0:
-                result['fatura_tl'] = _extract_pdf_amount(text, [
-                    r'\b[ÖO]DENECEK\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                    r'\bVERG[İI]LER\s+DAH[İI]L\s+TOPLAM\s+TUTAR\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                    r'\bMAL\s+(?:VE\s+)?H[İI]ZMET\s+TOPLAM\s+TUTAR[İI]?\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                    r'\bGENEL\s+TOPLAM\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)\s*(?:TRY|TL|₺)?',
-                    r'\bNet\s+Tutar\s*(?:\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)\s*([\d.,]+)',
-                ])
+                result['fatura_tl'] = _extract_pdf_invoice_total_tl(text)
             if not result['kap']:
                 result['kap'] = _extract_pdf_packages(text)
             if result['navlun'] > 0 and result['sigorta'] > 0:

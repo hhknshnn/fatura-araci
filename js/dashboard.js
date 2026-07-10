@@ -189,7 +189,7 @@ function renderHbar(container, ulkeler) {
   const max = ulkeler[0].sayi || 1;
   const colors = ['#2563EB', '#8B5CF6', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4', '#EC4899', '#F97316'];
 
-  container.innerHTML = ulkeler.slice(0, 7).map((u, i) => {
+  const barSatiri = (u, renk, gecikme) => {
     const pct = Math.round((u.sayi / max) * 100);
     return `
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
@@ -199,16 +199,142 @@ function renderHbar(container, ulkeler) {
         </div>
         <div style="height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
           <div class="dash-hbar-fill" data-w="${pct}"
-            style="height:100%;border-radius:3px;background:${colors[i % colors.length]};width:0;transition:width 1.2s cubic-bezier(0.4,0,0.2,1) ${0.1 + i * 0.08}s;"></div>
+            style="height:100%;border-radius:3px;background:${renk};width:0;transition:width 1.2s cubic-bezier(0.4,0,0.2,1) ${gecikme}s;"></div>
         </div>
       </div>`;
-  }).join('');
+  };
+
+  const barsHtml = ulkeler.slice(0, 7)
+    .map((u, i) => barSatiri(u, colors[i % colors.length], 0.1 + i * 0.08))
+    .join('');
+
+  // 8. ve sonrasi: donut'taki gri "Diğer" dilimiyle ayni aile — acilir/kapanir
+  const kalanUlkeler = ulkeler.slice(7);
+  let kalanHtml = '';
+  if (kalanUlkeler.length) {
+    kalanHtml = `
+      <div id="dash-hbar-rest" style="display:none;">
+        ${kalanUlkeler.map(u => barSatiri(u, '#94A3B8', 0)).join('')}
+      </div>
+      <button type="button" onclick="dashToggleRest('dash-hbar-rest', this)"
+        data-acik-metin="Diğer ${kalanUlkeler.length} ülkeyi gizle"
+        data-kapali-metin="Diğer ${kalanUlkeler.length} ülkeyi göster"
+        style="display:flex;align-items:center;gap:5px;border:none;background:none;padding:2px 0;
+               font-family:var(--font);font-size:11.5px;font-weight:500;color:#64748B;cursor:pointer;">
+        <i class="ti ti-chevron-down" style="font-size:12px;transition:transform 0.15s;display:inline-block;" aria-hidden="true"></i>
+        <span>Diğer ${kalanUlkeler.length} ülkeyi göster</span>
+      </button>`;
+  }
+
+  container.innerHTML = barsHtml + kalanHtml + renderUlkeDonut(ulkeler, colors);
 
   setTimeout(() => {
     container.querySelectorAll('.dash-hbar-fill').forEach(el => {
       el.style.width = el.dataset.w + '%';
     });
   }, 300);
+}
+
+// ── ÜLKE PAY DONUT'U (hbar kartının alt bölümü) ──────────────────────────────
+// Barlarla ayni veri ve ayni renkler: renk ulkeyi takip eder, sira degismez.
+function renderUlkeDonut(ulkeler, colors) {
+  const toplam = ulkeler.reduce((t, u) => t + (u.sayi || 0), 0);
+  if (!toplam) return '';
+
+  const dilimler = ulkeler.slice(0, 7).map((u, i) => ({
+    ad: u.ulke, sayi: u.sayi || 0, renk: colors[i % colors.length],
+  }));
+  const kalan = ulkeler.slice(7);
+  if (kalan.length) {
+    dilimler.push({
+      ad: `Diğer (${kalan.length} ülke)`,
+      sayi: kalan.reduce((t, u) => t + (u.sayi || 0), 0),
+      renk: '#CBD5E1',
+      kalanListe: kalan,
+    });
+  }
+
+  const R = 46, CEVRE = 2 * Math.PI * R, ARALIK = 2; // segmentler arasi 2px yuzey boslugu
+  let konum = 0;
+  const segler = [];
+  const lejant = [];
+
+  dilimler.forEach(d => {
+    const uzunluk = (d.sayi / toplam) * CEVRE;
+    const pct = Math.round((d.sayi / toplam) * 100);
+    const dash = Math.max(uzunluk - ARALIK, 0.5);
+    segler.push(`
+      <circle class="dash-donut-seg" cx="60" cy="60" r="${R}" fill="none"
+        stroke="${d.renk}" stroke-width="14"
+        stroke-dasharray="${dash.toFixed(2)} ${(CEVRE - dash).toFixed(2)}"
+        stroke-dashoffset="${(-(konum + ARALIK / 2)).toFixed(2)}">
+        <title>${escapeHtml(d.ad)}: ${d.sayi} sevkiyat (%${pct})</title>
+      </circle>`);
+    if (d.kalanListe) {
+      // "Diğer" satiri: tiklaninca icindeki ulkeler acilir
+      const altListe = d.kalanListe.map(u => `
+        <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#64748B;min-width:0;">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.ulke)}</span>
+          <span style="color:#94A3B8;flex-shrink:0;">${u.sayi || 0}</span>
+        </div>`).join('');
+      lejant.push(`
+        <div style="min-width:0;">
+          <div onclick="dashToggleRest('dash-donut-rest', this)" title="Diğer ülkeleri göster/gizle"
+            style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#475569;min-width:0;cursor:pointer;user-select:none;">
+            <span style="width:8px;height:8px;border-radius:2px;background:${d.renk};flex-shrink:0;"></span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.ad)}</span>
+            <i class="ti ti-chevron-down" style="font-size:11px;color:#94A3B8;transition:transform 0.15s;display:inline-block;" aria-hidden="true"></i>
+            <span style="color:#94A3B8;flex-shrink:0;">%${pct}</span>
+          </div>
+          <div id="dash-donut-rest" data-display="flex" style="display:none;flex-direction:column;gap:4px;margin-top:5px;padding-left:15px;">
+            ${altListe}
+          </div>
+        </div>`);
+    } else {
+      lejant.push(`
+        <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#475569;min-width:0;">
+          <span style="width:8px;height:8px;border-radius:2px;background:${d.renk};flex-shrink:0;"></span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.ad)}</span>
+          <span style="color:#94A3B8;flex-shrink:0;">%${pct}</span>
+        </div>`);
+    }
+    konum += uzunluk;
+  });
+
+  return `
+    <div style="display:flex;align-items:center;gap:18px;margin-top:14px;padding-top:16px;border-top:0.5px solid #F1F5F9;">
+      <div style="position:relative;flex-shrink:0;width:148px;height:148px;">
+        <svg width="148" height="148" viewBox="0 0 120 120" role="img" aria-label="Ülkelere göre sevkiyat payı">
+          <g transform="rotate(-90 60 60)">${segler.join('')}</g>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+          <div style="font-size:20px;font-weight:600;color:#0F172A;line-height:1.1;">${toplam}</div>
+          <div style="font-size:10px;color:#94A3B8;">Toplam</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1;">
+        ${lejant.join('')}
+      </div>
+    </div>`;
+}
+
+// ── AÇILIR/KAPANIR "DİĞER" BÖLÜMLERİ ─────────────────────────────────────────
+// tetik: uzerinde .ti chevron'u ve istege bagli data-acik-metin/data-kapali-metin
+// tasiyan buton ya da lejant satiri.
+function dashToggleRest(id, tetik) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const acikti = el.style.display !== 'none';
+  el.style.display = acikti ? 'none' : (el.dataset.display || 'block');
+
+  const ok = tetik.querySelector('.ti');
+  if (ok) ok.style.transform = acikti ? '' : 'rotate(180deg)';
+
+  if (tetik.dataset.acikMetin && tetik.dataset.kapaliMetin) {
+    const spanlar = tetik.querySelectorAll('span');
+    const sonSpan = spanlar[spanlar.length - 1];
+    if (sonSpan) sonSpan.textContent = acikti ? tetik.dataset.kapaliMetin : tetik.dataset.acikMetin;
+  }
 }
 
 // ── SON SEVKİYATLAR ───────────────────────────────────────────────────────────

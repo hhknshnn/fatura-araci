@@ -4087,8 +4087,9 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
 
 #stepSevkiyatlar > div:first-child > div:first-child {
   padding: 10px 12px !important;
-  background: rgba(255,255,255,0.86);
-  backdrop-filter: blur(14px);
+  /* backdrop-filter kullanma: fixed konumlu .custom-dd-menu'nun
+     containing block'u bu satir olur ve menu overflow ile kirpilir */
+  background: #FFFFFF;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 

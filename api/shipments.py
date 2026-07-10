@@ -337,7 +337,6 @@ def get_dashboard_stats():
         ) t
         GROUP BY ulke
         ORDER BY sayi DESC
-        LIMIT 8
     ''')
     ulkeler = [{'ulke': r[0], 'sayi': r[1]} for r in cur.fetchall()]
 

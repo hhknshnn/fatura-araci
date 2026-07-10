@@ -209,20 +209,31 @@ function onSort(col) {
   applyFiltersAndRender();
 }
 
+function getHiddenFilterValues(id) {
+  const raw = document.getElementById(id)?.value || '';
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch(e) {
+    return raw ? [raw] : [];
+  }
+}
+
 function applyFiltersAndRender() {
-  const durum       = document.getElementById('filter-durum')?.value        || '';
   const depo        = document.getElementById('filter-depo')?.value         || '';
-  const musteriTipi = document.getElementById('filter-musteri-tipi')?.value || '';
-  const ay          = document.getElementById('filter-ay')?.value            || '';
+  const durumlar    = getHiddenFilterValues('filter-durum');
+  const musteriTipleri = getHiddenFilterValues('filter-musteri-tipi');
+  const aylar       = getHiddenFilterValues('filter-ay');
 
   // Filtrelenmiş listeyi her zaman allShipments'tan sıfırdan hesapla
   let filtered = allShipments;
   if (selectedUlkeler && selectedUlkeler.size > 0)
     filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
-  if (durum)       filtered = filtered.filter(s => normalizeDurum(s.durum) === durum);
+  if (durumlar.length > 0) filtered = filtered.filter(s => durumlar.includes(normalizeDurum(s.durum)));
   if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
-  if (musteriTipi) filtered = filtered.filter(s => s.musteri_tipi === musteriTipi);
-  if (ay)          filtered = filtered.filter(s => (s.yukleme_tarihi || '').slice(5, 7) === ay);
+  if (musteriTipleri.length > 0) filtered = filtered.filter(s => musteriTipleri.includes(s.musteri_tipi));
+  if (aylar.length > 0) filtered = filtered.filter(s => aylar.includes((s.yukleme_tarihi || '').slice(5, 7)));
   if (dashboardSeferFilter === 'tek') filtered = filtered.filter(s => !s.sefer_id);
   if (dashboardSeferFilter === 'gruplu') filtered = filtered.filter(s => !!s.sefer_id);
 
@@ -939,35 +950,105 @@ document.addEventListener('click', e => {
 });
 
 function onDDChange(type, input) {
+  if (['tip', 'durum', 'ay'].includes(type)) {
+    updateMultiDropdownFilter(type, input);
+    return;
+  }
+
   document.querySelectorAll('.custom-dd.open').forEach(d => d.classList.remove('open'));
   const val = input.value;
-  if (type === 'tip') {
-    document.getElementById('filter-musteri-tipi').value = val;
-    const btn = document.querySelector('#dd-tip .custom-dd-btn');
-    const label = document.getElementById('dd-tip-label');
-    label.textContent = val ? (val.charAt(0).toUpperCase() + val.slice(1)) : 'Tipler';
-    btn.classList.toggle('active', !!val);
-  } else if (type === 'durum') {
-    document.getElementById('filter-durum').value = val;
-    const btn = document.querySelector('#dd-durum .custom-dd-btn');
-    const label = document.getElementById('dd-durum-label');
-    label.textContent = val ? val : 'Durumlar';
-    btn.classList.toggle('active', !!val);
-  } else if (type === 'depo') {
+  if (type === 'depo') {
     document.getElementById('filter-depo').value = val;
     const btn = document.querySelector('#dd-depo .custom-dd-btn');
     const label = document.getElementById('dd-depo-label');
     label.textContent = val ? val : 'Depolar';
     btn.classList.toggle('active', !!val);
-  } else if (type === 'ay') {
-    document.getElementById('filter-ay').value = val;
-    const btn = document.querySelector('#dd-ay .custom-dd-btn');
-    const label = document.getElementById('dd-ay-label');
-    const ayAdlari = {'01':'Ocak','02':'Şubat','03':'Mart','04':'Nisan','05':'Mayıs','06':'Haziran','07':'Temmuz','08':'Ağustos','09':'Eylül','10':'Ekim','11':'Kasım','12':'Aralık'};
-    label.textContent = val ? ayAdlari[val] : 'Ay';
-    btn.classList.toggle('active', !!val);
   }
   applyFiltersAndRender();
+}
+
+function onMultiDDApply(type) {
+  commitMultiDropdownFilter(type);
+  applyFiltersAndRender();
+  document.getElementById(`dd-${type}`)?.classList.remove('open');
+}
+
+const ayAdlari = {'01':'Ocak','02':'Şubat','03':'Mart','04':'Nisan','05':'Mayıs','06':'Haziran','07':'Temmuz','08':'Ağustos','09':'Eylül','10':'Ekim','11':'Kasım','12':'Aralık'};
+
+const multiDropdownFilters = {
+  tip: {
+    inputName: 'dd-tip-r',
+    hiddenId: 'filter-musteri-tipi',
+    labelId: 'dd-tip-label',
+    buttonSelector: '#dd-tip .custom-dd-btn',
+    emptyLabel: 'Tipler',
+    countLabel: 'Tip',
+    format: val => val.charAt(0).toUpperCase() + val.slice(1)
+  },
+  durum: {
+    inputName: 'dd-durum-r',
+    hiddenId: 'filter-durum',
+    labelId: 'dd-durum-label',
+    buttonSelector: '#dd-durum .custom-dd-btn',
+    emptyLabel: 'Durumlar',
+    countLabel: 'Durum',
+    format: val => val
+  },
+  ay: {
+    inputName: 'dd-ay-r',
+    hiddenId: 'filter-ay',
+    labelId: 'dd-ay-label',
+    buttonSelector: '#dd-ay .custom-dd-btn',
+    emptyLabel: 'Ay',
+    countLabel: 'Ay',
+    format: val => ayAdlari[val] || val
+  }
+};
+
+function updateMultiDropdownFilter(type, changedInput) {
+  const config = multiDropdownFilters[type];
+  if (!config) return;
+
+  const inputs = [...document.querySelectorAll(`input[name="${config.inputName}"]`)];
+  const allInput = inputs.find(input => input.value === '');
+
+  if (changedInput.value === '' && changedInput.checked) {
+    inputs.forEach(input => {
+      if (input.value !== '') input.checked = false;
+    });
+  } else {
+    if (allInput) allInput.checked = false;
+  }
+
+  const selected = inputs
+    .filter(input => input.value !== '' && input.checked)
+    .map(input => input.value);
+
+  if (selected.length === 0 && allInput) allInput.checked = true;
+
+  const btn = document.querySelector(config.buttonSelector);
+  const label = document.getElementById(config.labelId);
+  if (selected.length === 0) {
+    label.textContent = config.emptyLabel;
+    btn.classList.remove('active');
+  } else if (selected.length === 1) {
+    label.textContent = config.format(selected[0]);
+    btn.classList.add('active');
+  } else {
+    label.textContent = `${selected.length} ${config.countLabel}`;
+    btn.classList.add('active');
+  }
+}
+
+function commitMultiDropdownFilter(type) {
+  const config = multiDropdownFilters[type];
+  if (!config) return;
+
+  const selected = [...document.querySelectorAll(`input[name="${config.inputName}"]`)]
+    .filter(input => input.value !== '' && input.checked)
+    .map(input => input.value);
+
+  document.getElementById(config.hiddenId).value = selected.length ? JSON.stringify(selected) : '';
 }
 
 function onUlkeChange() {
@@ -1000,10 +1081,10 @@ function resetShipmentFilterControls() {
 
   selectedUlkeler = new Set();
   document.querySelectorAll('#dd-ulke-menu input[type=checkbox]').forEach(cb => cb.checked = false);
-  document.querySelectorAll('input[name="dd-tip-r"]')[0].checked   = true;
-  document.querySelectorAll('input[name="dd-durum-r"]')[0].checked = true;
-  document.querySelectorAll('input[name="dd-depo-r"]')[0].checked  = true;
-  document.querySelectorAll('input[name="dd-ay-r"]')[0].checked    = true;
+  document.querySelectorAll('input[name="dd-tip-r"]').forEach((input, index) => input.checked = index === 0);
+  document.querySelectorAll('input[name="dd-durum-r"]').forEach((input, index) => input.checked = index === 0);
+  document.querySelectorAll('input[name="dd-depo-r"]').forEach((input, index) => input.checked = index === 0);
+  document.querySelectorAll('input[name="dd-ay-r"]').forEach((input, index) => input.checked = index === 0);
 
   document.getElementById('dd-tip-label').textContent   = 'Tipler';
   document.getElementById('dd-ulke-label').textContent  = 'Ülkeler';

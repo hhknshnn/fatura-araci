@@ -12,7 +12,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260703-pill-headings">
+  <link rel="stylesheet" href="css/style.css?v=20260710-filter-dd-fix">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/tabler-icons.min.css">
 
@@ -371,6 +371,15 @@
               background: var(--accent-dim);
               color: var(--accent);
             }
+
+            .dash-donut-seg {
+              transition: stroke-width 0.15s ease, opacity 0.15s ease;
+              cursor: default;
+            }
+
+            .dash-donut-seg:hover {
+              stroke-width: 17;
+            }
           </style>
 
           <!-- KPI Kartları -->
@@ -501,16 +510,19 @@
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
                   <div class="custom-dd-menu" id="dd-tip-menu">
-                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="" checked
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="" checked
                         onchange="onDDChange('tip',this)"><span>Tümü</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="kurumsal"
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="kurumsal"
                         onchange="onDDChange('tip',this)"><span>Kurumsal</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="franchise"
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="franchise"
                         onchange="onDDChange('tip',this)"><span>Franchise</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="toptan"
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="toptan"
                         onchange="onDDChange('tip',this)"><span>Toptan</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-tip-r" value="devir"
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="devir"
                         onchange="onDDChange('tip',this)"><span>Devir</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('tip')">Uygula</button>
+                    </div>
                   </div>
                 </div>
 
@@ -579,18 +591,21 @@
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
                   <div class="custom-dd-menu" id="dd-durum-menu">
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="" checked
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="" checked
                         onchange="onDDChange('durum',this)"><span>Tümü</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="Yüklenecek"
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Yüklenecek"
                         onchange="onDDChange('durum',this)"><span>Yüklenecek</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="YOLDA"
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="YOLDA"
                         onchange="onDDChange('durum',this)"><span>Yolda</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="Varış Gümrük"
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Varış Gümrük"
                         onchange="onDDChange('durum',this)"><span>Varış Gümrük</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="Gümrükleme"
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Gümrükleme"
                         onchange="onDDChange('durum',this)"><span>Gümrükleme</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-durum-r" value="TESLİM EDİLDİ"
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="TESLİM EDİLDİ"
                         onchange="onDDChange('durum',this)"><span>Teslim Edildi</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('durum')">Uygula</button>
+                    </div>
                   </div>
                 </div>
 
@@ -619,32 +634,35 @@
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
                   <div class="custom-dd-menu" id="dd-ay-menu">
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="" checked
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="" checked
                         onchange="onDDChange('ay',this)"><span>Tümü</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="01"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="01"
                         onchange="onDDChange('ay',this)"><span>Ocak</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="02"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="02"
                         onchange="onDDChange('ay',this)"><span>Şubat</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="03"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="03"
                         onchange="onDDChange('ay',this)"><span>Mart</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="04"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="04"
                         onchange="onDDChange('ay',this)"><span>Nisan</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="05"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="05"
                         onchange="onDDChange('ay',this)"><span>Mayıs</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="06"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="06"
                         onchange="onDDChange('ay',this)"><span>Haziran</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="07"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="07"
                         onchange="onDDChange('ay',this)"><span>Temmuz</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="08"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="08"
                         onchange="onDDChange('ay',this)"><span>Ağustos</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="09"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="09"
                         onchange="onDDChange('ay',this)"><span>Eylül</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="10"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="10"
                         onchange="onDDChange('ay',this)"><span>Ekim</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="11"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="11"
                         onchange="onDDChange('ay',this)"><span>Kasım</span></label>
-                    <label class="dd-item"><input type="radio" name="dd-ay-r" value="12"
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="12"
                         onchange="onDDChange('ay',this)"><span>Aralık</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('ay')">Uygula</button>
+                    </div>
                   </div>
                 </div>
 
@@ -1973,8 +1991,8 @@
   <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
   <script src="js/users.js?v=20260710-admin-portal"></script>
   <script src="js/audit-log.js"></script>
-  <script src="js/dashboard.js?v=20260710-login-refresh"></script>
-  <script src="js/shipments.js?v=20260702-makedonya-maliyet-evrak"></script>
+  <script src="js/dashboard.js?v=20260710-ulke-donut-2"></script>
+  <script src="js/shipments.js?v=20260710-multi-filter-apply"></script>
   <script src="js/landed-cost.js?v=20260703-modern-lc"></script>
   <script src="js/import.js"></script>
 
