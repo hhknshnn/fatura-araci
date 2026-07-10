@@ -8,12 +8,23 @@ let currentPage = 1;
 let filteredList = [];
 
 const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','yukleme_tarihi','durum'];
-const COL_DEFAULTS = { ihracat_dosya_no:110, fatura_no:130, palet:60, _depo:60, ulke:90, nakliye_firmasi:120, plaka:100, sefer_id:80, fatura_bedeli_eur:110, yukleme_tarihi:90, durum:110 };
+const COL_DEFAULTS = { ihracat_dosya_no:96, fatura_no:118, palet:52, _depo:56, ulke:82, nakliye_firmasi:104, plaka:86, sefer_id:72, fatura_bedeli_eur:98, yukleme_tarihi:84, durum:96 };
+const COL_MAX = { ihracat_dosya_no:120, fatura_no:140, palet:72, _depo:72, ulke:110, nakliye_firmasi:140, plaka:110, sefer_id:96, fatura_bedeli_eur:118, yukleme_tarihi:104, durum:118 };
+
+function normalizeColWidths(widths) {
+  return COL_KEYS.reduce((acc, key) => {
+    const min = Math.min(COL_DEFAULTS[key], 54);
+    const max = COL_MAX[key] || COL_DEFAULTS[key];
+    const raw = Number(widths?.[key]);
+    acc[key] = Number.isFinite(raw) ? Math.min(Math.max(raw, min), max) : COL_DEFAULTS[key];
+    return acc;
+  }, {});
+}
 
 function loadColWidths() {
   try {
     const saved = localStorage.getItem('shipments_col_widths');
-    return saved ? { ...COL_DEFAULTS, ...JSON.parse(saved) } : { ...COL_DEFAULTS };
+    return saved ? normalizeColWidths({ ...COL_DEFAULTS, ...JSON.parse(saved) }) : { ...COL_DEFAULTS };
   } catch(e) { return { ...COL_DEFAULTS }; }
 }
 
@@ -73,7 +84,7 @@ function initColResize() {
 
       const onMove = e => {
         isDragging = true;
-        const newW = Math.max(40, startW + e.clientX - startX);
+        const newW = Math.min(260, Math.max(40, startW + e.clientX - startX));
         th.style.width = newW + 'px';
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
@@ -88,7 +99,7 @@ function initColResize() {
       };
 
       const onUp = e => {
-        const newW = Math.max(40, startW + e.clientX - startX);
+        const newW = Math.min(260, Math.max(40, startW + e.clientX - startX));
         if (isDragging) {
           colWidths[colKey] = newW;
           saveColWidths(colWidths);
@@ -256,16 +267,16 @@ function ozetHtml({ toplam, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEu
 
 // Sıralama ok ikonu
 function sortIcon(col) {
-  if (sortColumn !== col) return '<span style="opacity:0.3;font-size:10px;margin-left:3px;">⇅</span>';
+  if (sortColumn !== col) return '<i class="ti ti-arrows-sort shipments-sort-icon muted" aria-hidden="true"></i>';
   return sortDir === 'asc'
-    ? '<span style="font-size:10px;margin-left:3px;color:var(--accent);">▲</span>'
-    : '<span style="font-size:10px;margin-left:3px;color:var(--accent);">▼</span>';
+    ? '<i class="ti ti-arrow-up shipments-sort-icon active" aria-hidden="true"></i>'
+    : '<i class="ti ti-arrow-down shipments-sort-icon active" aria-hidden="true"></i>';
 }
 
 // Tıklanabilir başlık hücresi
 function thCell(label, col, extraStyle = '') {
-  return `<th onclick="onSort('${col}')" style="padding:6px 8px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;user-select:none;border-right:1px solid rgba(255,255,255,0.08);overflow:hidden;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;${extraStyle}">
-    <span>${label}${sortIcon(col)}</span>
+  return `<th class="shipments-th" onclick="onSort('${col}')" style="${extraStyle}">
+    <span class="shipments-th-inner">${label}${sortIcon(col)}</span>
   </th>`;
 }
 
@@ -327,7 +338,7 @@ async function loadShipments(ulke = '', durum = '') {
     if (wrapper) wrapper.parentNode.insertBefore(ozet, wrapper);
   }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     let url = '/api/shipments';
     const params = [];
     if (ulke)  params.push(`ulke=${encodeURIComponent(ulke)}`);
@@ -502,11 +513,11 @@ function renderShipments(list, fullList) {
 
   // Tablo — Varış sütunu yok
   wrapper.innerHTML = `
-    <table style="width:max-content;min-width:100%;border-collapse:collapse;table-layout:fixed;">
-      <thead style="position:sticky;top:0;z-index:5;">
-        <tr style="background:#2d3f55;border-bottom:1.5px solid var(--border2);">
-          <th style="padding:6px 8px;width:32px;border-right:1px solid rgba(255,255,255,0.08);">
-            <input type="checkbox" id="chk-all" onclick="toggleTumSatirlar(this)"
+    <table class="shipments-modern-table" style="width:100%;min-width:0;table-layout:fixed;">
+      <thead>
+        <tr>
+          <th class="shipments-th shipments-check-th" style="width:36px;">
+            <input type="checkbox" id="chk-all" onclick="toggleTumSatirlar(this)" class="role-write-only"
               style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
           </th>
           ${thCell('Dosya No',        'ihracat_dosya_no', `width:${colWidths.ihracat_dosya_no}px;`)}
@@ -529,34 +540,30 @@ function renderShipments(list, fullList) {
               const durumNorm = normalizeDurum(s.durum);
               const isAnt    = s.fatura_no?.startsWith('ANT');
               const depoTag  = isAnt
-                ? `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#FAEEDA;color:#633806;">ANT</span>`
-                : `<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;background:#E6F1FB;color:#0C447C;">IHR</span>`;
-              const rowBg = idx % 2 === 1 ? 'var(--surface2)' : 'var(--surface)';
+                ? `<span class="shipment-pill shipment-pill-ant">ANT</span>`
+                : `<span class="shipment-pill shipment-pill-ihr">IHR</span>`;
               return `
-                <tr data-id="${s.id}" style="border-bottom:1px solid var(--border2);cursor:pointer;background:${rowBg};transition:background 0.1s;"
-                    onclick="openShipmentDetail(${s.id})"
-                    onmouseover="this.style.background='var(--accent-dim)'"
-                    onmouseout="this.style.background='${rowBg}'">
-                  <td style="padding:5px 8px;width:32px;border-right:1px solid var(--border2);" onclick="event.stopPropagation()">
-                    <input type="checkbox" data-id="${s.id}"
+                <tr class="shipments-row" data-id="${s.id}" onclick="openShipmentDetail(${s.id})">
+                  <td class="shipments-td shipments-check-td" onclick="event.stopPropagation()">
+                    <input type="checkbox" data-id="${s.id}" class="role-write-only"
                       ${seciliSatirlar.has(s.id) ? 'checked' : ''}
                       onclick="toggleSatirSec(event, ${s.id})"
                       style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
                   </td>
-                  <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${escapeHtml(s.ihracat_dosya_no) || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-family:var(--mono);border-right:1px solid var(--border2);">${escapeHtml(s.fatura_no) || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;text-align:center;border-right:1px solid var(--border2);">${escapeHtml(s.palet) || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;border-right:1px solid var(--border2);">${depoTag}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;border-right:1px solid var(--border2);">${escapeHtml(s.ulke) || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;border-right:1px solid var(--border2);">${escapeHtml(s.nakliye_firmasi) || '-'}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;border-right:1px solid var(--border2);">${escapeHtml(s.plaka) || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;width:70px;border-right:1px solid var(--border2);">
-                    ${s.sefer_id ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#EEF2FF;color:#4338CA;">🔗 Grup ${escapeHtml(s.sefer_id)}</span>` : '<span style="color:var(--text3);font-size:11px;">-</span>'}
+                  <td class="shipments-td shipments-cell-strong">${escapeHtml(s.ihracat_dosya_no) || '-'}</td>
+                  <td class="shipments-td shipments-cell-mono shipments-cell-clip">${escapeHtml(s.fatura_no) || '-'}</td>
+                  <td class="shipments-td shipments-cell-center">${escapeHtml(s.palet) || '-'}</td>
+                  <td class="shipments-td">${depoTag}</td>
+                  <td class="shipments-td shipments-cell-clip">${escapeHtml(s.ulke) || '-'}</td>
+                  <td class="shipments-td shipments-cell-clip">${escapeHtml(s.nakliye_firmasi) || '-'}</td>
+                  <td class="shipments-td shipments-cell-clip shipments-cell-plate">${escapeHtml(s.plaka) || '-'}</td>
+                  <td class="shipments-td shipments-cell-group">
+                    ${s.sefer_id ? `<span class="shipment-pill shipment-pill-group"><i class="ti ti-link" aria-hidden="true"></i>Grup ${escapeHtml(s.sefer_id)}</span>` : '<span class="shipments-empty">-</span>'}
                   </td>
-                  <td style="padding:5px 8px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;border-right:1px solid var(--border2);">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td style="padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;border-right:1px solid var(--border2);">${escapeHtml(s.yukleme_tarihi) || '-'}</td>
-                  <td style="padding:5px 8px;white-space:nowrap;">
-                    <span style="font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;${durumStyle(durumNorm)}">${durumNorm}</span>
+                  <td class="shipments-td shipments-cell-money">${formatEUR(s.fatura_bedeli_eur)}</td>
+                  <td class="shipments-td shipments-cell-date">${escapeHtml(s.yukleme_tarihi) || '-'}</td>
+                  <td class="shipments-td">
+                    <span class="shipment-pill" style="${durumStyle(durumNorm)}">${durumNorm}</span>
                   </td>
                 </tr>`;
             }).join('')}
@@ -625,7 +632,7 @@ async function repairShipmentFreightIfNeeded(shipment, token) {
 }
 
 async function openShipmentDetail(id) {
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const res = await fetch(`/api/shipments?id=${id}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
@@ -740,7 +747,7 @@ function closeShipmentDetail() {
 }
 
 async function saveShipmentDetail() {
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const id    = document.getElementById('detail-id').value;
   const isNew = !id;
 
@@ -813,7 +820,7 @@ async function saveShipmentDetail() {
 }
 
 async function downloadMaliyetRaporu() {
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
 
   // Tüm filtrelenmiş listeyi kullan (sadece mevcut sayfa değil)
   const allFilteredIds = filteredList.map(s => s.id);
@@ -892,7 +899,7 @@ function deleteShipment() {
     [
       { label: 'Vazgeç', style: 'ghost', action: null },
       { label: '🗑 Evet, Sil', style: 'danger', action: async () => {
-        const token = sessionStorage.getItem('fa_auth_token');
+        const token = localStorage.getItem('fa_auth_token');
         const res   = await fetch('/api/shipments', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1135,7 +1142,7 @@ async function saveGruplama() {
     return;
   }
 
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const ids   = [...gruplaSecilen];
 
   const res  = await fetch('/api/shipments/group', {
@@ -1159,7 +1166,7 @@ async function ungroupShipment() {
   const id    = document.getElementById('detail-id').value;
   if (!id) return;
   if (!confirm('Bu sevkiyatı gruptan çıkarmak istiyor musunuz?')) return;
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   await fetch('/api/shipments/ungroup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1225,13 +1232,13 @@ function updateSecimToolbar() {
     `;
     toolbar.innerHTML = `
       <span id="secim-count"></span>
-      <button onclick="topluGrupla()"
+      <button onclick="topluGrupla()" class="role-write-only"
         style="padding:7px 16px;border-radius:8px;border:none;
                background:#7C3AED;color:#fff;font-family:var(--font);
                font-size:12px;font-weight:600;cursor:pointer;">
         🔗 Grupla
       </button>
-      <button onclick="topluSil()"
+      <button onclick="topluSil()" class="role-write-only"
         style="padding:7px 16px;border-radius:8px;border:none;
                background:#EF4444;color:#fff;font-family:var(--font);
                font-size:12px;font-weight:600;cursor:pointer;">
@@ -1266,7 +1273,7 @@ async function topluSil() {
 
   const seciliListesi = [...seciliSatirlar].map(id => {
     const s = allShipments.find(x => x.id === id);
-    return s ? `<span style="font-family:var(--mono);font-size:12px;color:#EF4444;">${s.ihracat_dosya_no || s.fatura_no}</span>` : '';
+    return s ? `<span style="font-family:var(--mono);font-size:12px;color:#EF4444;">${escapeHtml(s.ihracat_dosya_no || s.fatura_no)}</span>` : '';
   }).filter(Boolean).join(', ');
 
   showMiniModal('🗑 Kalıcı Silme', `
@@ -1291,7 +1298,7 @@ async function topluSil() {
     [
       { label: 'Vazgeç', style: 'ghost', action: null },
       { label: '🗑 Evet, Kalıcı Sil', style: 'danger', action: async () => {
-        const token = sessionStorage.getItem('fa_auth_token');
+        const token = localStorage.getItem('fa_auth_token');
         try {
           const resp = await fetch('/api/shipments/bulk-delete', {
             method:  'POST',
@@ -1327,7 +1334,7 @@ function topluGrupla() {
   // Seçili satırların dosya no listesi
   const seciliListesi = [...seciliSatirlar].map(id => {
     const s = allShipments.find(x => x.id === id);
-    return s ? `<span style="font-family:var(--mono);font-size:12px;color:var(--accent);">${s.ihracat_dosya_no || s.fatura_no}</span>` : '';
+    return s ? `<span style="font-family:var(--mono);font-size:12px;color:var(--accent);">${escapeHtml(s.ihracat_dosya_no || s.fatura_no)}</span>` : '';
   }).filter(Boolean).join(', ');
 
   showMiniModal('🔗 Grupla', `
@@ -1341,7 +1348,7 @@ function topluGrupla() {
     [
       { label: 'İptal', style: 'ghost', action: null },
       { label: '🔗 Grupla', style: 'primary', action: async () => {
-        const token = sessionStorage.getItem('fa_auth_token');
+        const token = localStorage.getItem('fa_auth_token');
         try {
           const resp = await fetch('/api/shipments/group', {
             method:  'POST',
@@ -1442,7 +1449,7 @@ function fileToBase64(file) {
 
 async function parseVergiPdf(file) {
   const pdf_b64 = await fileToBase64(file);
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const resp  = await fetch('/api/shipments/parse-vergi-pdf', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1499,7 +1506,7 @@ async function meLoadRsShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res  = await fetch('/api/shipments?ulke=SIRBİSTAN', { headers: { 'Authorization': `Bearer ${token}` } });
     const data = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -1513,7 +1520,7 @@ async function meLoadRsShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -1576,7 +1583,7 @@ async function meHandleRsPdf(file) {
     `<div id="me-rs-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Sevkiyata yazılıyor...</div>`;
 
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -1636,7 +1643,7 @@ async function meLoadGeShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments?ulke=G%C3%9CRC%C4%B0STAN', { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -1650,7 +1657,7 @@ async function meLoadGeShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -1670,7 +1677,7 @@ async function meHandleGePdf(file) {
   let data;
   try {
     const b64 = await fileToBase64(file);
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments/parse-ge-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1711,7 +1718,7 @@ async function meHandleGePdf(file) {
 
   // Seçili sevkiyatı ve varsa sefer grubunu getir
   try {
-    const token   = sessionStorage.getItem('fa_auth_token');
+    const token   = localStorage.getItem('fa_auth_token');
     const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData   = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -1853,7 +1860,7 @@ async function meLoadKoShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments?ulke=KOSOVA', { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -1867,7 +1874,7 @@ async function meLoadKoShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -1887,7 +1894,7 @@ async function meHandleKoPdf(file) {
   let data;
   try {
     const b64 = await fileToBase64(file);
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments/parse-ko-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1919,7 +1926,7 @@ async function meHandleKoPdf(file) {
 
   // Seçili sevkiyatı ve varsa sefer grubunu getir
   try {
-    const token   = sessionStorage.getItem('fa_auth_token');
+    const token   = localStorage.getItem('fa_auth_token');
     const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData   = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -2028,7 +2035,7 @@ async function meLoadKzShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('KAZAKİSTAN')}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -2042,7 +2049,7 @@ async function meLoadKzShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -2062,7 +2069,7 @@ async function meHandleKzPdf(file) {
   let data;
   try {
     const b64 = await fileToBase64(file);
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments/parse-kz-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -2108,7 +2115,7 @@ async function meHandleKzPdf(file) {
 
   // Seçili sevkiyata uygula — her fatura/beyanname 1 sevke eşittir, gruplu araçlarda orantılı dağıtım yapılmaz
   try {
-    const token   = sessionStorage.getItem('fa_auth_token');
+    const token   = localStorage.getItem('fa_auth_token');
     const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData   = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -2212,7 +2219,7 @@ async function meLoadDeShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('ALMANYA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -2226,7 +2233,7 @@ async function meLoadDeShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -2246,7 +2253,7 @@ async function meHandleDePdf(file) {
   let data;
   try {
     const b64 = await fileToBase64(file);
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments/parse-de-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -2286,7 +2293,7 @@ async function meHandleDePdf(file) {
 
   // Seçili sevkiyata uygula — tek evrak tek sevkiyat, oranlama yapılmaz
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -2360,7 +2367,7 @@ async function meLoadNlShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('HOLLANDA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -2374,7 +2381,7 @@ async function meLoadNlShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -2394,7 +2401,7 @@ async function meHandleNlPdf(file) {
   let data;
   try {
     const b64 = await fileToBase64(file);
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch('/api/shipments/parse-nl-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -2430,7 +2437,7 @@ async function meHandleNlPdf(file) {
 
   // Seçili sevkiyata uygula — tek evrak tek sevkiyat, oranlama yapılmaz
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -2502,7 +2509,7 @@ async function meLoadBaShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('BOSNA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -2516,7 +2523,7 @@ async function meLoadBaShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -2576,7 +2583,7 @@ async function meBaManualSave() {
 
   if (statusEl) { statusEl.textContent = '⏳ Kaydediliyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData = await sRes.json();
     if (!sData.success) throw new Error(sData.error);
@@ -2602,7 +2609,7 @@ async function meLoadMkShipments() {
   if (!sel) return;
   if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('MAKEDONYA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const data  = await res.json();
     if (!data.success) throw new Error(data.error);
@@ -2616,7 +2623,7 @@ async function meLoadMkShipments() {
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
         const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
-        return `<option value="${s.id}">${label}</option>`;
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
     if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
@@ -2669,7 +2676,7 @@ async function meMkManualSave() {
 
   if (statusEl) { statusEl.textContent = '⏳ Kaydediliyor...'; statusEl.style.color = 'var(--text3)'; }
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
     const sData = await sRes.json();
     if (!sData.success) throw new Error(sData.error);

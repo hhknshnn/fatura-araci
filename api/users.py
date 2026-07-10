@@ -4,7 +4,7 @@
 import time
 from flask import request, jsonify
 from api.db import get_conn
-from api.auth import hash_password, require_admin, get_session_from_headers
+from api.auth import hash_password, require_admin, get_session_from_headers, ROLES
 
 
 # ── KULLANICI İŞLEMLERİ ───────────────────────────────────────────────────────
@@ -75,11 +75,11 @@ def users_post():
     action = body.get('action', 'create')
 
     if action == 'create':
-        return _handle_create(body)
+        return _handle_create(body, session)
     elif action == 'reset_password':
-        return _handle_reset_password(body)
+        return _handle_reset_password(body, session)
     elif action == 'update_role':
-        return _handle_update_role(body)
+        return _handle_update_role(body, session)
     else:
         return jsonify({'success': False, 'error': 'Bilinmeyen action'}), 400
 
@@ -100,29 +100,33 @@ def users_delete():
         return jsonify({'success': False, 'error': 'Kullanıcı bulunamadı'}), 404
 
     delete_user(username)
+    from api.audit import log_action
+    log_action(session, 'user_delete', f"Kullanıcı sildi: {username}")
     return jsonify({'success': True})
 
 
-def _handle_create(body):
+def _handle_create(body, session=None):
     username     = str(body.get('username', '')).strip().lower()
     password     = str(body.get('password', '')).strip()
     display_name = str(body.get('displayName', '')).strip()
-    role         = str(body.get('role', 'user')).strip()
+    role         = str(body.get('role', 'editor')).strip()
 
     if not username or not password or not display_name:
         return jsonify({'success': False, 'error': 'username, password, displayName gerekli'}), 400
     if len(password) < 4:
         return jsonify({'success': False, 'error': 'Şifre en az 4 karakter olmalı'}), 400
-    if role not in ('admin', 'user'):
-        role = 'user'
+    if role not in ROLES:
+        role = 'editor'
     if user_exists(username):
         return jsonify({'success': False, 'error': 'Bu kullanıcı adı zaten mevcut'}), 400
 
     from api.auth import create_user
     create_user(username, password, display_name, role)
+    from api.audit import log_action
+    log_action(session, 'user_create', f"Kullanıcı oluşturdu: {username} ({role})")
     return jsonify({'success': True, 'user': {'username': username, 'displayName': display_name, 'role': role}})
 
-def _handle_reset_password(body):
+def _handle_reset_password(body, session=None):
     username     = str(body.get('username', '')).strip().lower()
     new_password = str(body.get('newPassword', '')).strip()
 
@@ -133,17 +137,21 @@ def _handle_reset_password(body):
     if not reset_password(username, new_password):
         return jsonify({'success': False, 'error': 'Kullanıcı bulunamadı'}), 404
 
+    from api.audit import log_action
+    log_action(session, 'user_reset_password', f"Şifre sıfırladı: {username}")
     return jsonify({'success': True})
 
-def _handle_update_role(body):
+def _handle_update_role(body, session=None):
     username = str(body.get('username', '')).strip().lower()
-    new_role = str(body.get('role', 'user')).strip()
+    new_role = str(body.get('role', 'editor')).strip()
 
     if not username:
         return jsonify({'success': False, 'error': 'username gerekli'}), 400
-    if new_role not in ('admin', 'user'):
-        return jsonify({'success': False, 'error': 'Rol admin veya user olmalı'}), 400
+    if new_role not in ROLES:
+        return jsonify({'success': False, 'error': 'Rol admin, editor veya viewer olmalı'}), 400
     if not update_role(username, new_role):
         return jsonify({'success': False, 'error': 'Kullanıcı bulunamadı'}), 404
 
+    from api.audit import log_action
+    log_action(session, 'user_update_role', f"Rol değiştirdi: {username} -> {new_role}")
     return jsonify({'success': True})

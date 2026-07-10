@@ -2,7 +2,7 @@
 # Nebim v3 entegrasyonu icin sevkiyat/fatura bazli hazirlik kayitlari.
 
 import time
-from flask import jsonify, request
+from flask import jsonify, request, g
 from api.db import get_conn
 
 
@@ -88,6 +88,26 @@ def nebim_delivery_put():
                 'error': 'Nebim onayı için fatura ref no ve plaka zorunlu',
             }), 400
 
+        # Editor sadece işaretleyebilir; daha önce onaylanmış bir kaydın onayını
+        # veya fatura ref no'sunu sadece admin değiştirebilir/kaldırabilir.
+        session = getattr(g, 'user', None)
+        role    = (session or {}).get('role')
+        cur.execute('SELECT ready_for_nebim, fatura_ref_no FROM nebim_delivery_refs WHERE shipment_id = %s', (int(shipment_id),))
+        existing = cur.fetchone()
+        existing_ready   = bool(existing[0]) if existing else False
+        existing_ref_no  = (existing[1] or '') if existing else ''
+        if role != 'admin' and existing_ready:
+            if not ready_for_nebim:
+                return jsonify({
+                    'success': False,
+                    'error': 'Onaylanmış bir Nebim kaydının işaretini sadece admin kaldırabilir',
+                }), 403
+            if fatura_ref_no != existing_ref_no:
+                return jsonify({
+                    'success': False,
+                    'error': 'Onaylanmış bir Nebim kaydının fatura ref no\'sunu sadece admin değiştirebilir',
+                }), 403
+
         cur.execute('''
             INSERT INTO nebim_delivery_refs (
                 shipment_id, fatura_no, fatura_ref_no, ready_for_nebim,
@@ -110,5 +130,17 @@ def nebim_delivery_put():
     finally:
         cur.close()
         conn.close()
+
+    from api.audit import log_action
+    label = fatura_no or shipment_id
+    if ready_for_nebim and not existing_ready:
+        log_action(session, 'nebim_approve', f"Nebim onayı verdi: {label}")
+    elif not ready_for_nebim and existing_ready:
+        log_action(session, 'nebim_unapprove', f"Nebim onayını kaldırdı: {label}")
+    if fatura_ref_no != existing_ref_no:
+        log_action(
+            session, 'nebim_ref_update',
+            f"Fatura ref no değiştirdi ({label}): '{existing_ref_no}' → '{fatura_ref_no}'"
+        )
 
     return jsonify({'success': True})

@@ -2,7 +2,7 @@ import json
 import io
 import os
 import re
-import pdfplumber
+from pypdf import PdfReader
 import openpyxl
 
 _ULKE_KODU_RE = re.compile(r'^[a-z]{2,4}$')
@@ -50,69 +50,68 @@ def _extract_amount_near_keywords(text, keywords, window=140):
 def parse_pdf_fields(pdf_bytes):
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0, 'kur': 0.0}
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            all_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages]
-            texts_to_try = [
-                ' '.join(part for part in all_texts[-2:] if part).strip(),
-                ' '.join(part for part in all_texts if part).strip(),
-            ]
-            text = ''
-            for candidate_text in texts_to_try:
-                if not candidate_text:
-                    continue
-                text = candidate_text
-                if result['navlun'] <= 0:
-                    result['navlun'] = _extract_pdf_amount(text, [
-                        r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                        r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                    ]) or _extract_amount_near_keywords(text, [
-                        r'\bNAVLUN\b',
-                        r'\bFREIGHT\b',
-                        r'\bTA[SŞ]IMA\b',
-                    ])
-                if result['sigorta'] <= 0:
-                    result['sigorta'] = _extract_pdf_amount(text, [
-                        r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                        r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-                    ]) or _extract_amount_near_keywords(text, [
-                        r'\bS[İI]GORTA\b',
-                        r'\bSIGORTA\b',
-                        r'\bINSURANCE\b',
-                    ])
-                if result['navlun'] > 0 and result['sigorta'] > 0:
-                    break
-            if not text:
-                return result
-            # Kap sayısı
-            kap_patterns = [
-                r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-            ]
-            for p in kap_patterns:
-                m = re.search(p, text, re.IGNORECASE)
-                if m:
-                    result['kap'] = m.group(1).strip()
-                    break
-            # Kur bilgisi
-            result['kur'] = _extract_pdf_amount(text, [
-                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
-            ])
-            # BRÜT kilo
-            result['brutKg'] = _extract_pdf_amount(text, [
-                r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
-                r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
-                r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-                r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
-            ])
-            # NET kilo
-            result['netKg'] = _extract_pdf_amount(text, [
-                r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
-                r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
-                r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-                r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
-            ])
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        page_count = len(reader.pages)
+
+        def _page_text(i):
+            return _normalize_pdf_text(reader.pages[i].extract_text() or '')
+
+        last_two_text = ' '.join(
+            t for t in (_page_text(i) for i in range(max(0, page_count - 2), page_count)) if t
+        ).strip()
+
+        # NAVLUN/SİGORTA özet bloğu faturalarda hep son sayfa altbilgisinde
+        # yer alır — tüm sayfaları taramak (pdfplumber/pypdf fark etmez) çok
+        # pahalıdır ve pratikte hiçbir zaman ek veri bulmaz.
+        text = last_two_text
+        if not text:
+            return result
+        result['navlun'] = _extract_pdf_amount(text, [
+            r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+            r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+        ]) or _extract_amount_near_keywords(text, [
+            r'\bNAVLUN\b',
+            r'\bFREIGHT\b',
+            r'\bTA[SŞ]IMA\b',
+        ])
+        result['sigorta'] = _extract_pdf_amount(text, [
+            r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+            r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+        ]) or _extract_amount_near_keywords(text, [
+            r'\bS[İI]GORTA\b',
+            r'\bSIGORTA\b',
+            r'\bINSURANCE\b',
+        ])
+        # Kap sayısı
+        kap_patterns = [
+            r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+            r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        ]
+        for p in kap_patterns:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                result['kap'] = m.group(1).strip()
+                break
+        # Kur bilgisi
+        result['kur'] = _extract_pdf_amount(text, [
+            r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+        ])
+        # BRÜT kilo
+        result['brutKg'] = _extract_pdf_amount(text, [
+            r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
+            r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
+            r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+            r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
+        ])
+        # NET kilo
+        result['netKg'] = _extract_pdf_amount(text, [
+            r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
+            r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
+            r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+            r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
+        ])
     except Exception:
         pass
     return result
@@ -168,12 +167,13 @@ def doldur_kibris(taslak_bytes, config, form_data):
     buf.seek(0)
     return buf.getvalue(), dosya_adi
 
-def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
+def doldur_taslak(taslak_bytes, config, form_data, mense_data=None, depo_tipi=None):
     """
     Taslak Excel'e form ve menşe verilerini yaz.
-    
+
     form_data: {referansNo, navlun, sigorta, kap, brutKg, netKg}
     mense_data: {yabanciKg, trKg} — opsiyonel, menşe adımında gelir
+    depo_tipi: 'serbest' (IHR) | 'antrepo' (ANT) — antrepo'da menşe ayrımı olmaz
     """
     wb = openpyxl.load_workbook(io.BytesIO(taslak_bytes))
     sheet_name = config.get('sheet', wb.sheetnames[0])
@@ -235,6 +235,11 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
             if tip == 'sayi':
                 try:    ws[hucre] = float(deger)
                 except: ws[hucre] = deger
+
+    # ── ANTREPO (ANT): menşe ayrımı yok ────────────────────────────────────────
+    if depo_tipi == 'antrepo':
+        for hucre in config.get('menseTemizle', []):
+            ws[hucre] = None
 
     # ── DOSYA ADI ─────────────────────────────────────────────────────────────
     ref_no  = form_data.get('referansNo', '')

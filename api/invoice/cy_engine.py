@@ -19,6 +19,66 @@ from openpyxl.utils  import get_column_letter
 
 DS = 9   # Data start satırı
 
+# INV belgesinde silinecek kolonlar (IHR ve ANT fatura tipine göre değişir)
+_INV_DELETE_COLS_ORTAK = [
+    'Açıklama',
+    'Renk Açıkmalası EN',
+    'Ürün Açıklaması EN',
+    'Ürün Ana Grubu - EN',
+    'Ürün Ara Grubu - EN',
+    'MATERYAL -EN',
+    'MENŞEİ -EN',
+    'MATERYAL Açıklama',
+    'ALT GRUBU -EN',
+    'EBAT DETAY Açıklama',
+    'MATERYAL -RU',
+    'Ürün Ana Grubu - RU',
+    'Ürün Ara Grubu - RU',
+    'ALT GRUBU -RU',
+    'Ürün Açıklaması RU',
+    'MENŞEİ -RU',
+    'Ürün Açıklaması XS',
+    'Renk Açıkmalası XS',
+    'MATERYAL -XS',
+]
+INV_DELETE_COLS_IHR = _INV_DELETE_COLS_ORTAK + ['YURT DIŞI TEDARİKÇİ Açıklama']
+INV_DELETE_COLS_ANT = _INV_DELETE_COLS_ORTAK + ['YURT İÇİ  TEDARİKÇİ Açıklama']
+
+
+def generate_inv_excel(df_raw, fatura_no):
+    """
+    Ham yüklenen fatura Excel'inden INV belgesi üretir.
+    - IHR/ANT fatura tipine göre belirli kolonlar silinir.
+    - Veri satırlarının yüksekliği 15 olur.
+
+    Dönüş: (excel_bytes, dosya_adi)
+    """
+    is_ant     = fatura_no.upper().startswith('ANT')
+    delete_cols = INV_DELETE_COLS_ANT if is_ant else INV_DELETE_COLS_IHR
+    prefix      = 'ANT' if is_ant else 'IHR'
+    son_3       = fatura_no[-3:]
+    dosya_adi   = f'INV-{prefix}{son_3}.xlsx'
+
+    df = df_raw.drop(columns=[c for c in delete_cols if c in df_raw.columns])
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'INV'
+
+    headers = list(df.columns)
+    for c_idx, h in enumerate(headers, start=1):
+        ws.cell(row=1, column=c_idx, value=h)
+
+    for r_idx, row in enumerate(df.itertuples(index=False), start=2):
+        ws.row_dimensions[r_idx].height = 15
+        for c_idx, val in enumerate(row, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=val)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue(), dosya_adi
+
 
 def _parse_cy_pdf(pdf_bytes):
     """Kıbrıs PDF'inden BRÜT/NET kg ve kap bilgisini çıkarır."""
@@ -67,12 +127,14 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
     for f in faturalar:
         excel_bytes = base64.b64decode(f['excel'])
         df = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
+        df_raw = df.copy()
 
         # PDF'ten ağırlık ve kap bilgisi
         pdf_fields = {'brutKg': 0.0, 'netKg': 0.0, 'kap': ''}
+        raw_pdf_bytes = None
         if f.get('pdf'):
-            pdf_bytes  = base64.b64decode(f['pdf'])
-            pdf_fields = _parse_cy_pdf(pdf_bytes)
+            raw_pdf_bytes = base64.b64decode(f['pdf'])
+            pdf_fields    = _parse_cy_pdf(raw_pdf_bytes)
 
         hedef_brut = float(pdf_fields.get('brutKg', 0) or 0)
         hedef_net  = float(pdf_fields.get('netKg',  0) or 0)
@@ -91,12 +153,15 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
                                     'antrepo' if hedef_net > 0 else 'serbest')
 
         fatura_list.append({
-            'df':          df,
-            'brut_list':   brut_list,
-            'net_list':    net_list,
-            'fatura_no':   fatura_no,
-            'fatura_date': fatura_date,
-            'kap':         pdf_fields.get('kap', ''),
+            'df':           df,
+            'df_raw':       df_raw,
+            'brut_list':    brut_list,
+            'net_list':     net_list,
+            'fatura_no':    fatura_no,
+            'fatura_date':  fatura_date,
+            'kap':          pdf_fields.get('kap', ''),
+            'raw_pdf_bytes': raw_pdf_bytes,
+            'tekstil_disi': bool(f.get('tekstilDisi')),
         })
 
     # Fatura no'ya göre sırala
@@ -191,4 +256,50 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
         )
         master_list.append({'fatura_no': f['fatura_no'], 'bytes': mb, 'kap': f.get('kap', '')})
 
-    return pl_bytes, master_list
+    # INV belgesi — her fatura için ayrı üret (IHR/ANT'a göre kolon farklı)
+    inv_list = []
+    for f in fatura_list:
+        inv_bytes, inv_dosya_adi = generate_inv_excel(f['df_raw'], f['fatura_no'])
+        inv_list.append({
+            'fatura_no': f['fatura_no'],
+            'bytes':     inv_bytes,
+            'dosya_adi': inv_dosya_adi,
+        })
+
+    # Tekstil dışı faturalar — yüklenen orijinal PDF'e Üretici sütunu eklenir
+    from .cy_uretici_pdf import generate_uretici_pdf
+
+    # Fatura tipine göre yurt dışı/içi tedarikçi sütunlarından hangisi doluysa
+    # o kullanılır (INV Excel'de silinmeyip tutulan sütunla aynı mantık).
+    TEDARIKCI_COLS = ['YURT DIŞI TEDARİKÇİ Açıklama', 'YURT İÇİ  TEDARİKÇİ Açıklama']
+
+    uretici_pdf_list = []
+    for f in fatura_list:
+        if not f['tekstil_disi'] or not f['raw_pdf_bytes']:
+            continue
+        df_raw = f['df_raw']
+        # PDF'teki "Ürün Kodu" ham excel'deki 'Madde Kodu' ile eşleşir
+        # ('SKU' sütunu renk kodu gibi ek karakterler içerir).
+        sku_col = 'Madde Kodu' if 'Madde Kodu' in df_raw.columns else 'SKU'
+        cols = [c for c in TEDARIKCI_COLS if c in df_raw.columns]
+        if not cols:
+            continue
+        sku_to_uretici = {}
+        for _, row in df_raw.iterrows():
+            sku = str(row.get(sku_col, '')).strip()
+            if not sku:
+                continue
+            for c in cols:
+                val = str(row.get(c, '') or '').strip()
+                if val and val.lower() != 'nan':
+                    sku_to_uretici[sku] = val
+                    break
+
+        uretici_pdf_bytes = generate_uretici_pdf(f['raw_pdf_bytes'], sku_to_uretici)
+        uretici_pdf_list.append({
+            'fatura_no': f['fatura_no'],
+            'bytes':     uretici_pdf_bytes,
+            'dosya_adi': f"{f['fatura_no']} - TEKSTİL DIŞI ONAYLI.pdf",
+        })
+
+    return pl_bytes, master_list, inv_list, uretici_pdf_list

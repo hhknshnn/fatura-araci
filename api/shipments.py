@@ -194,6 +194,14 @@ def update_shipment(shipment_id, data):
         float(data.get('other_costs_eur', 0) or 0)
     )
 
+    # Varış tarihi veya gümrükleme bitiş tarihi doluysa (maliyet-evrak akışından
+    # ya da manuel girişten) durumu otomatik TESLİM EDİLDİ yap.
+    varis_tarihi = data.get('varis_tarihi') or None
+    gumrukleme_bitis = data.get('gumrukleme_bitis') or None
+    durum = _normalize_durum(data.get('durum', 'YOLDA'))
+    if (varis_tarihi or gumrukleme_bitis) and durum != 'TESLİM EDİLDİ':
+        durum = 'TESLİM EDİLDİ'
+
     cur.execute('''
         UPDATE shipments SET
             ihracat_dosya_no      = %s,
@@ -242,9 +250,9 @@ def update_shipment(shipment_id, data):
         data.get('kdv_eur', 0),
         data.get('other_costs_eur', 0),
         toplam,
-        data.get('varis_tarihi') or None,
-        data.get('gumrukleme_bitis') or None,
-        _normalize_durum(data.get('durum', 'YOLDA')),
+        varis_tarihi,
+        gumrukleme_bitis,
+        durum,
         data.get('palet') or None,
         shipment_id,
     ))
@@ -461,6 +469,13 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+
+    try:
+        from api.storage import save_record
+        tarih_str = time.strftime('%Y-%m-%d %H:%M')
+        save_record('genel', f'Maliyet Raporu {tarih_str}', 'shipment_report', excel_bytes=buf.getvalue())
+    except Exception:
+        pass
 
     return send_file(
         buf,
@@ -1174,9 +1189,9 @@ def bulk_import_shipments(rows):
                 to_float(row.get('usd_kuru')),
                 to_date(row.get('yukleme_tarihi')),
                 to_date(row.get('gumruk_tarihi')),
-                to_date(row.get('varis_tarihi')),
-                to_date(row.get('gumrukleme_bitis')),
-                _normalize_durum(_otomatik_durum(to_str(row.get('durum', '')), to_date(row.get('varis_tarihi')))),
+                (to_date(row.get('gumruk_tarihi')) or to_date(row.get('varis_tarihi'))) if musteri_tipi in ('franchise', 'toptan', 'devir') else to_date(row.get('varis_tarihi')),
+                (to_date(row.get('gumruk_tarihi')) or to_date(row.get('gumrukleme_bitis'))) if musteri_tipi in ('franchise', 'toptan', 'devir') else to_date(row.get('gumrukleme_bitis')),
+                'TESLİM EDİLDİ' if musteri_tipi in ('franchise', 'toptan', 'devir') else _normalize_durum(_otomatik_durum(to_str(row.get('durum', '')), to_date(row.get('varis_tarihi')))),
                 musteri_tipi,
             ))
             conn.commit()

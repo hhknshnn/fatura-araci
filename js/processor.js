@@ -130,8 +130,11 @@ function handlePdf(file) {
     lastPdfData = e.target.result;
     try {
       const b = new Uint8Array(lastPdfData);
+      const chunkSize = 8192;
       let s = '';
-      for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+      for (let i = 0; i < b.byteLength; i += chunkSize) {
+        s += String.fromCharCode(...b.subarray(i, i + chunkSize));
+      }
       const pdfB64 = btoa(s);
       const resp = await fetch('/api/taslak', {
         method: 'POST',

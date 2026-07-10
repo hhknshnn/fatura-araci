@@ -327,12 +327,5 @@ function showEvrakStatus(type, html) {
 }
 
 // ── HTML ESCAPE ───────────────────────────────────────────────────────────────
-function escapeHtmlEvrak(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// Ortak escapeHtml (js/utils.js) kullanılıyor; isim uyumluluğu için alias.
+const escapeHtmlEvrak = escapeHtml;

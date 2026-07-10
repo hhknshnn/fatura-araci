@@ -579,7 +579,7 @@ async function indirTaslak() {
     const resp = await fetch('/api/taslak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ulkeKodu: taslakUlke, taslak: taslakB64, formData })
+      body: JSON.stringify({ ulkeKodu: taslakUlke, taslak: taslakB64, formData, depoTipi: taslakDepoTipi })
     });
     const data = JSON.parse(await resp.text());
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');

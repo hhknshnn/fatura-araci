@@ -77,6 +77,20 @@ def init_db():
         )
     ''')
 
+    # İşlem kaydı (audit log): kim, ne zaman, ne yaptı — admin panelinde görüntülenir.
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id           SERIAL PRIMARY KEY,
+            username     TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            role         TEXT NOT NULL,
+            action       TEXT NOT NULL,
+            description  TEXT NOT NULL,
+            created_at   BIGINT NOT NULL
+        )
+    ''')
+    cur.execute('CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC)')
+
     # NOT: `shipments` ve `taslak_dosyalar` tabloları burada CREATE EDİLMEZ —
     # mevcut prod veritabanında zaten var ve şeması (kolon sayısı/tipleri) bu
     # dosyanın dışında yönetiliyor. Sıfırdan bir ortam kurulacaksa bu iki tablo

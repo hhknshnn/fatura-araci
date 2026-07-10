@@ -194,7 +194,7 @@ function renderHbar(container, ulkeler) {
     return `
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:12px;color:#475569;font-weight:500;">${u.ulke}</span>
+          <span style="font-size:12px;color:#475569;font-weight:500;">${escapeHtml(u.ulke)}</span>
           <span style="font-size:11px;color:#94A3B8;">${u.sayi}</span>
         </div>
         <div style="height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
@@ -241,27 +241,28 @@ function renderSonSevkiyatlar(container, shipments) {
              animation:dashFadeIn 0.3s ease both;animation-delay:${0.3 + i * 0.06}s;opacity:0;"
       onmouseenter="this.style.background='#EFF6FF';this.style.borderColor='#BFDBFE';this.style.transform='translateX(3px)'"
       onmouseleave="this.style.background='#FAFAFA';this.style.borderColor='rgba(0,0,0,0.07)';this.style.transform='translateX(0)'">
-      <div style="font-size:12px;font-weight:600;color:#0F172A;min-width:72px;">${s.ihracat_dosya_no || '-'}</div>
-      <div style="font-size:11px;color:#94A3B8;flex:1;">${s.ulke || '-'}</div>
-      <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;${durumStyle(s.durum)}">${durumLabel(s.durum)}</span>
+      <div style="font-size:12px;font-weight:600;color:#0F172A;min-width:72px;">${escapeHtml(s.ihracat_dosya_no) || '-'}</div>
+      <div style="font-size:11px;color:#94A3B8;flex:1;">${escapeHtml(s.ulke) || '-'}</div>
+      <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;${durumStyle(s.durum)}">${escapeHtml(durumLabel(s.durum))}</span>
       <div style="font-size:12px;font-weight:500;color:#475569;min-width:72px;text-align:right;">${formatEur(s.fatura_bedeli_eur)}</div>
     </div>`).join('');
 }
 
 // ── ANA FONKSİYON ─────────────────────────────────────────────────────────────
 async function loadDashboard() {
+  if (!window.currentUser) return;
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const authHeaders = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
 
     // İstatistikler
     const statsRes = await fetch('/api/shipments?mode=dashboard', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: authHeaders
     });
     const statsData = await statsRes.json();
 
     // Son sevkiyatlar
     const listRes = await fetch('/api/shipments', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: authHeaders
     });
     const listData = await listRes.json();
 

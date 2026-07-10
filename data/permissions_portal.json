@@ -1,0 +1,100 @@
+{
+  "title": "Admin Portalı",
+  "subtitle": "",
+  "roles": [
+    {
+      "key": "viewer",
+      "label": "Görüntüleyici",
+      "subtitle": "",
+      "icon": "",
+      "description": ""
+    },
+    {
+      "key": "editor",
+      "label": "Düzenleyici",
+      "subtitle": "",
+      "icon": "",
+      "description": ""
+    },
+    {
+      "key": "admin",
+      "label": "Admin",
+      "subtitle": "",
+      "icon": "",
+      "description": ""
+    }
+  ],
+  "features": [
+    {
+      "title": "Dashboard ve raporları görüntüleme",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "viewer",
+        "editor",
+        "admin"
+      ]
+    },
+    {
+      "title": "Fatura ve evrak üretme",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "editor",
+        "admin"
+      ]
+    },
+    {
+      "title": "Sevkiyat oluşturma ve güncelleme",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "editor",
+        "admin"
+      ]
+    },
+    {
+      "title": "Sevkiyat silme ve toplu gruplama",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "editor",
+        "admin"
+      ]
+    },
+    {
+      "title": "Nebim irsaliye hazırlığı",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "viewer",
+        "editor",
+        "admin"
+      ]
+    },
+    {
+      "title": "Toplu içe aktarım",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "title": "Kullanıcı yönetimi",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "title": "İşlem kayıtları",
+      "detail": "",
+      "icon": "",
+      "roles": [
+        "admin"
+      ]
+    }
+  ]
+}

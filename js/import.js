@@ -631,7 +631,7 @@ async function doImport() {
   btn.disabled = true;
 
   try {
-    const token   = sessionStorage.getItem('fa_auth_token');
+    const token   = localStorage.getItem('fa_auth_token');
     const url     = importMode === 'guncelle'
       ? '/api/shipments/bulk-update'
       : '/api/shipments/bulk-import';
@@ -820,7 +820,7 @@ async function parseFrFiles() {
         pdfs.push({ name: file.name, data: b64 });
       }
 
-      const token = sessionStorage.getItem('fa_auth_token');
+      const token = localStorage.getItem('fa_auth_token');
       const resp  = await fetch('/api/shipments/parse-fr-pdf', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1003,7 +1003,7 @@ async function handleFrPdfDrop(files) {
   }
 
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/shipments/parse-fr-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1129,7 +1129,7 @@ async function doFrImport() {
       sigorta_eur:      s.sigorta_eur      || 0,
     }));
 
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/shipments/bulk-import-fr', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1158,7 +1158,7 @@ async function doFrImport() {
 
 async function loadFrEurKuru() {
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/kur', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -1213,7 +1213,7 @@ async function handlePaletPdfDrop(files) {
   }
 
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/shipments/parse-fr-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1287,7 +1287,7 @@ async function doPaletImport() {
 
   try {
     const rows  = aktarilacak.map(s => ({ fatura_no: s.fatura_no, palet: s.palet }));
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/shipments/bulk-update-palet', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -1338,7 +1338,7 @@ async function handleAksuPdf(file) {
     for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
     const pdf_b64 = btoa(s);
 
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const resp  = await fetch('/api/shipments/parse-aksu-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

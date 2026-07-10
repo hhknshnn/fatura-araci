@@ -843,14 +843,14 @@ async function downloadRS() {
         const freight = navlunSigortaToEur(eur_kuru);
         navlun_eur = freight.navlun;
         sigorta_eur = freight.sigorta;
-        // PDF'te TL toplamı doğrudan yazılıyorsa (örn. Ödenecek Tutar (TL)),
-        // faturayla birebir eşleşmesi için o kullanılır; yoksa mal bedeli üzerinden hesaplanır.
-        const mal_toplam_tl = pdf_fatura_tl > 0
-          ? Math.max(pdf_fatura_tl - freight.tl, 0)
-          : mal_toplam_ham * tryUsdKuru;
+        // pdf_fatura_tl güvenilmez: USD faturalarda PDF'teki "Ödenecek Tutar" /
+        // "Genel Toplam" gibi alanlar TRY etiketi olmadan USD tutarını da eşleştirebiliyor
+        // (bkz. helpers.py parse_pdf — TRY|TL|₺ eki opsiyonel). Bu yüzden USD ülkelerinde
+        // TL karşılığı her zaman mal bedeli × kur üzerinden hesaplanır, PDF'teki değer kullanılmaz.
+        const mal_toplam_tl = mal_toplam_ham * tryUsdKuru;
         mal_bedeli_eur = eur_kuru > 0 ? mal_toplam_tl / eur_kuru : 0;
         fatura_bedeli_eur = mal_bedeli_eur + navlun_eur + sigorta_eur;
-        fatura_bedeli_tl = pdf_fatura_tl > 0 ? pdf_fatura_tl : mal_toplam_tl + freight.tl;
+        fatura_bedeli_tl = mal_toplam_tl + freight.tl;
 
       } else if (sevkiyatKurKaynagi === 'pdf_eur') {
         eur_kuru = pdfKur > 0 ? pdfKur : apiEurKuru;
@@ -911,7 +911,7 @@ async function downloadRS() {
 
       const sevkRes = await fetch('/api/shipments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fa_auth_token')}` },
         body: JSON.stringify({
           ihracat_dosya_no: ihracatDosyaNo,
           fatura_no: data.faturaNo,
@@ -968,6 +968,79 @@ function _downloadBlob(b64, fileName, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+function _isTekstilDisiFromName(name) {
+  const norm = String(name || '').toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
+  if (norm.includes('TEKSTILDISI') || norm.includes('TEKSILDISI')) return true;
+  return null;
+}
+
+function _askTekstilDisiSecim(items) {
+  return new Promise(resolve => {
+    document.getElementById('cy-tekstil-modal-overlay')?.remove();
+
+    const rowsHtml = items.map((it, i) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;
+                     border-bottom:0.5px solid var(--border2);cursor:pointer;">
+        <input type="checkbox" data-idx="${i}" ${it.checked ? 'checked' : ''}
+               style="width:16px;height:16px;flex-shrink:0;">
+        <span style="font-size:13px;color:var(--text);">${it.faturaNo || '(fatura no bulunamadı)'}</span>
+      </label>`).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cy-tekstil-modal-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;
+      display:flex;align-items:center;justify-content:center;
+      animation:fadeIn 0.15s ease;
+    `;
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:0.5px solid var(--border2);
+                  border-radius:var(--radius-xl);padding:28px 32px;
+                  max-width:440px;width:90%;
+                  box-shadow:0 8px 40px rgba(0,0,0,0.18);
+                  animation:slideUp 0.2s ease;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">
+          Tekstil Dışı Faturaları Seçin
+        </div>
+        <div style="font-size:12.5px;color:var(--text2);margin-bottom:14px;">
+          Aşağıdaki faturalardan TEKSTİL DIŞI olanları işaretleyin.
+        </div>
+        <div style="margin-bottom:18px;max-height:320px;overflow-y:auto;">${rowsHtml}</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="cy-tekstil-cancel" style="padding:9px 20px;border-radius:var(--radius-md);
+            font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;
+            background:transparent;color:var(--text2);border:0.5px solid var(--border2);">İptal</button>
+          <button id="cy-tekstil-ok" style="padding:9px 20px;border-radius:var(--radius-md);
+            font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;
+            background:var(--accent);color:#fff;border:none;">Devam Et</button>
+        </div>
+      </div>
+      <style>
+        @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+        @keyframes slideUp { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+      </style>
+    `;
+
+    overlay.querySelector('#cy-tekstil-ok').addEventListener('click', () => {
+      const checked = new Set();
+      overlay.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        if (cb.checked) checked.add(Number(cb.dataset.idx));
+      });
+      overlay.remove();
+      resolve(items.map((_, i) => checked.has(i)));
+    });
+    overlay.querySelector('#cy-tekstil-cancel').addEventListener('click', () => {
+      overlay.remove();
+      resolve(null);
+    });
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) { overlay.remove(); resolve(null); }
+    });
+
+    document.body.appendChild(overlay);
+  });
+}
+
 async function downloadCY() {
   if (cyExcelFiles.length === 0) { showStatus('error', '⚠ En az 1 Excel dosyası seçin.'); return; }
   const btn = document.getElementById('downloadBtn');
@@ -988,9 +1061,20 @@ async function downloadCY() {
           break;
         }
       }
-      faturalar.push({ excel: excelB64, pdf: pdfB64, faturaNo });
+      const autoTekstilDisi = _isTekstilDisiFromName(excelFile.name);
+      faturalar.push({ excel: excelB64, pdf: pdfB64, faturaNo, tekstilDisi: !!autoTekstilDisi });
     }
     faturalar.sort((a, b) => a.faturaNo.localeCompare(b.faturaNo));
+
+    const secim = await _askTekstilDisiSecim(
+      faturalar.map(f => ({ faturaNo: f.faturaNo, checked: f.tekstilDisi }))
+    );
+    if (secim === null) {
+      showStatus('info', 'İşlem iptal edildi.');
+      return;
+    }
+    faturalar.forEach((f, i) => { f.tekstilDisi = secim[i]; });
+
     showStatus('info', `<div class="stat">⏳ ${faturalar.length} fatura gönderiliyor...</div>`);
     const resp = await fetch('/api/generate', {
       method: 'POST',
@@ -1014,6 +1098,17 @@ async function downloadCY() {
       for (const m of data.masterList) {
         _downloadBlob(m.data, `${m.fatura_no}.xlsx`,
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      }
+    }
+    if (data.invList && data.invList.length > 0) {
+      for (const inv of data.invList) {
+        _downloadBlob(inv.data, inv.dosyaAdi,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      }
+    }
+    if (data.ureticiPdfList && data.ureticiPdfList.length > 0) {
+      for (const up of data.ureticiPdfList) {
+        _downloadBlob(up.data, up.dosyaAdi, 'application/pdf');
       }
     }
     // ── SEVKİYAT TABLOSUNA OTOMATIK KAYDET ───────────────────────────────────
@@ -1050,7 +1145,7 @@ async function downloadCY() {
 
         const sevkRes = await fetch('/api/shipments', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('fa_auth_token')}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fa_auth_token')}` },
           body: JSON.stringify({
             fatura_no:         f.faturaNo,
             ihracat_dosya_no:  document.getElementById('ihracatDosyaNo')?.value?.trim() ? '2026-' + document.getElementById('ihracatDosyaNo').value.trim() : '',
@@ -1143,7 +1238,7 @@ async function checkDosyaNoAndProceed() {
   const dosyaNo = dosyaNoEl?.value?.trim();
 
   try {
-    const token = sessionStorage.getItem('fa_auth_token');
+    const token = localStorage.getItem('fa_auth_token');
     const res = await fetch('/api/shipments', {
       headers: { 'Authorization': `Bearer ${token}` }
     });

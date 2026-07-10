@@ -411,7 +411,7 @@ function clearLandedCostFilters() {
 
 async function loadLandedCost() {
   const params = getLandedCostParams();
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const res = await fetch('/api/landed-cost?' + params.toString(), {
     cache: 'no-store',
     headers: { 'Authorization': `Bearer ${token}` },
@@ -673,7 +673,7 @@ function toggleLcPendingRows() {
 
 async function downloadLandedCostReport() {
   const params = getLandedCostParams();
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   const res = await fetch('/api/landed-cost/export?' + params.toString(), {
     headers: { 'Authorization': `Bearer ${token}` },
   });

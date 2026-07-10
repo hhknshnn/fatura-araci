@@ -430,16 +430,6 @@ function gtipMenseEvet() {
   if (typeof initMensePanel === 'function') initMensePanel();
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   try {
     const dz = document.getElementById('gtipDropZone');

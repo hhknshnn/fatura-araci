@@ -60,9 +60,10 @@ function hideAllPanels() {
   const contentArea = document.getElementById('contentArea');
   contentArea.style.padding = '';
   contentArea.classList.remove('fu-content-area');
+  contentArea.classList.remove('ops-content-area');
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
-    'stepGecmis', 'stepUsers', 'stepDashboard', 'stepSevkiyatlar',
+    'stepGecmis', 'stepUsers', 'stepPermissions', 'stepAudit', 'stepDashboard', 'stepSevkiyatlar',
     'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
@@ -72,13 +73,6 @@ function hideAllPanels() {
 
 // ── SIDEBAR NAVİGASYON ────────────────────────────────────────────────────────
 function sidebarSelect(mod) {
-  if (mod === 'nebim-delivery' && typeof initNebimDeliveryPanel === 'function') {
-    initNebimDeliveryPanel();
-    const newPath = '/' + mod;
-    if (location.pathname !== newPath) history.pushState(null, '', newPath);
-    return;
-  }
-
   // Tüm nav-item'lardan active'i kaldır
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -89,6 +83,10 @@ function sidebarSelect(mod) {
   if (mod === 'gecmis' && navGecmis) navGecmis.classList.add('active');
   const navUsers = document.getElementById('nav-users-item');
   if (mod === 'users' && navUsers) navUsers.classList.add('active');
+  const navPermissions = document.getElementById('nav-permissions-item');
+  if (mod === 'permissions' && navPermissions) navPermissions.classList.add('active');
+  const navAudit = document.getElementById('nav-audit-item');
+  if (mod === 'audit' && navAudit) navAudit.classList.add('active');
 
   hideAllPanels();
 
@@ -99,7 +97,9 @@ function sidebarSelect(mod) {
     gtip: 'GTİP Kontrol',
     evrak: 'Ek Evrak Üret',
     gecmis: 'Son İşlemler',
+    permissions: 'Admin Portalı',
     users: 'Kullanıcılar',
+    audit: 'İşlem Kayıtları',
     dashboard: 'Dashboard',
     sevkiyatlar: 'Sevkiyatlar',
     'fatura-uret': 'Fatura Üret',
@@ -139,25 +139,44 @@ function sidebarSelect(mod) {
     document.getElementById('stepGecmis').style.display = 'flex';
     if (typeof initGecmisPanel === 'function') initGecmisPanel();
 
+  } else if (mod === 'permissions') {
+    if (window.currentUser?.role !== 'admin') {
+      sidebarSelect('dashboard');
+      return;
+    }
+    document.getElementById('stepPermissions').style.display = 'block';
+    if (typeof initPermissionsPanel === 'function') initPermissionsPanel();
+
   } else if (mod === 'users') {
+    if (window.currentUser?.role !== 'admin') {
+      sidebarSelect('dashboard');
+      return;
+    }
+    window.permissionsAdminTab = 'users';
+    sidebarSelect('permissions');
+    return;
+
+  } else if (mod === 'audit') {
     if (window.currentUser?.role !== 'admin') {
       sidebarSelect('sonrasi');
       return;
     }
-    document.getElementById('stepUsers').style.display = 'flex';
-    if (typeof initUsersPanel === 'function') initUsersPanel();
+    document.getElementById('stepAudit').style.display = 'flex';
+    if (typeof initAuditPanel === 'function') initAuditPanel();
 
   } else if (mod === 'dashboard') {
     document.getElementById('stepDashboard').style.display = 'block';
-    if (typeof loadDashboard === 'function') loadDashboard();
+    if (window.currentUser && typeof loadDashboard === 'function') loadDashboard();
 
   } else if (mod === 'sevkiyatlar') {
     document.getElementById('stepSevkiyatlar').style.display = 'block';
     document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
     if (typeof loadShipments === 'function') loadShipments();
 
   } else if (mod === 'fatura-uret') {
     document.getElementById('contentArea').classList.add('fu-content-area');
+    document.getElementById('contentArea').classList.add('ops-content-area');
     // Hub'a her yeni girişte INV+PL sekmesi ilk açılışında bir kez sıfırlansın
     _fuInvplOpened = false;
     // Fatura Üret — sekme yapısı (Taslak, GTİP & Menşe, INV+PL, Ek Evrak)
@@ -224,6 +243,7 @@ function sidebarSelect(mod) {
 
   } else if (mod === 'maliyet-evrak') {
     document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
     const panel = document.getElementById('stepMaliyetEvrak');
     panel.style.display = 'block';
     initMaliyetEvrakAccordion(panel);
@@ -297,6 +317,7 @@ function sidebarSelect(mod) {
     if (typeof meLoadNlShipments === 'function') meLoadNlShipments();
   } else if (mod === 'landed-cost') {
     document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
     let panel = document.getElementById('stepLandedCost');
     if (!panel) {
       panel = document.createElement('div');
@@ -307,6 +328,8 @@ function sidebarSelect(mod) {
     panel.style.display = 'block';
     if (typeof initLandedCostPanel === 'function') initLandedCostPanel();
   } else if (mod === 'nebim-delivery') {
+    document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
     let panel = document.getElementById('stepNebimDelivery');
     if (!panel) {
       panel = document.createElement('div');
@@ -528,13 +551,23 @@ function switchFaturaUretTab(tab) {
   // }
 }
 
-// ── INIT ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
+async function startAppAtDashboard() {
   await initYilAyari();
   await loadCountriesConfig();
   updateYilSelects();
-  const initMod = location.pathname.replace(/^\//, '') || 'dashboard';
+  const initMod = 'dashboard';
+  if (location.pathname !== '/dashboard') {
+    history.replaceState(null, '', '/dashboard');
+  }
   sidebarSelect(initMod);
   if (typeof checkGecmisCount === 'function') checkGecmisCount();
   if (typeof checkNebimWarningCount === 'function') checkNebimWarningCount();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // window.currentUser'ın rol kontrollerinden (bkz. sidebarSelect) önce
+  // kesin belirlenmiş olması için oturum kontrolünü bekle.
+  if (window.authReadyPromise) await window.authReadyPromise;
+  await startAppAtDashboard();
 });

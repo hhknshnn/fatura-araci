@@ -2,6 +2,7 @@
 # Dosya kayıtları — local disk + PostgreSQL tabanlı
 
 import os
+import re
 import time
 import json
 import base64
@@ -16,13 +17,28 @@ def ensure_storage_dir():
     os.makedirs(STORAGE_DIR, exist_ok=True)
 
 
+_UNSAFE_CHARS_RE = re.compile(r'[^A-Za-z0-9_.\-]+')
+
+def _safe_key_part(value):
+    """Dosya adına giren kullanıcı girdisini path traversal'a kapatır."""
+    value = str(value).replace('/', '_').replace('\\', '_')
+    value = _UNSAFE_CHARS_RE.sub('_', value)
+    value = value.replace('..', '_')
+    return value or 'x'
+
+
 # ── KAYDET ────────────────────────────────────────────────────────────────────
 def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None,
                 master_bytes=None, price_list_bytes=None, mill_test_bytes=None):
     ensure_storage_dir()
     timestamp = int(time.time())
-    key_base  = f'{ulke}_{fatura_no}_{dosya_turu}_{timestamp}'
+    ulke_s      = _safe_key_part(ulke)
+    fatura_no_s = _safe_key_part(fatura_no)
+    dosya_turu_s = _safe_key_part(dosya_turu)
+    key_base  = f'{ulke_s}_{fatura_no_s}_{dosya_turu_s}_{timestamp}'
     file_paths = {}
+
+    storage_root = os.path.realpath(STORAGE_DIR)
 
     # Her dosyayı diske yaz
     dosyalar = {
@@ -35,7 +51,9 @@ def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None,
 
     for dosya_turu_key, (data, filename) in dosyalar.items():
         if data:
-            filepath = os.path.join(STORAGE_DIR, filename)
+            filepath = os.path.realpath(os.path.join(STORAGE_DIR, filename))
+            if os.path.commonpath([filepath, storage_root]) != storage_root:
+                raise ValueError('Geçersiz dosya yolu')
             with open(filepath, 'wb') as f:
                 f.write(data)
             file_paths[dosya_turu_key] = filepath

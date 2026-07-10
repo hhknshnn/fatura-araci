@@ -22,34 +22,80 @@
 
   <!-- ── LOGIN OVERLAY ─────────────────────────────────────────────────────── -->
   <div class="login-overlay" id="loginOverlay" style="display:none;">
-    <div class="login-box">
-      <div class="login-logo">
-        <div class="logo-mark">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
-          </svg>
+    <div class="login-shell">
+
+      <!-- Sol: tanıtım paneli — gerçek/canlı veri içermez, sadece görsel/temsili öğeler -->
+      <div class="login-brand">
+        <div class="login-brand-logo">
+          <div class="logo-mark">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
+            </svg>
+          </div>
+          <span>Fatura Aracı</span>
         </div>
-        <div>
-          <div class="login-title">Fatura Aracı</div>
-          <div class="login-sub">v2.0 · Lojistik Evrak</div>
+
+        <div class="login-brand-headline">
+          İhracat evrak ve<br>sevkiyat operasyonunuz<br><span>tek panelde.</span>
+        </div>
+        <div class="login-brand-sub">
+          Fatura, taslak, ek evrak ve sevkiyat takibini tek yerden yönetin.
+        </div>
+
+        <div class="login-feature-list">
+          <div class="login-feature"><i class="ti ti-file-invoice"></i><span>Ülkeye özel fatura &amp; PL üretimi</span></div>
+          <div class="login-feature"><i class="ti ti-truck"></i><span>Sevkiyat ve gümrükleme takibi</span></div>
+          <div class="login-feature"><i class="ti ti-shield-check"></i><span>Rol bazlı yetkilendirme ve işlem kaydı</span></div>
+        </div>
+
+        <!-- Temsili görsel — sabit/örnek şekiller, gerçek veriye bağlı değildir -->
+        <div class="login-decor-chart" aria-hidden="true">
+          <div class="login-decor-bar" style="--h:38%;"></div>
+          <div class="login-decor-bar" style="--h:62%;"></div>
+          <div class="login-decor-bar" style="--h:48%;"></div>
+          <div class="login-decor-bar" style="--h:80%;"></div>
+          <div class="login-decor-bar" style="--h:56%;"></div>
+          <div class="login-decor-bar" style="--h:70%;"></div>
+          <div class="login-decor-bar" style="--h:44%;"></div>
         </div>
       </div>
-      <div class="login-field">
-        <label>Kullanıcı Adı</label>
-        <input class="login-input" id="loginUsername" type="text" placeholder="kullanıcı adınız"
-          autocomplete="username">
+
+      <!-- Sağ: giriş formu -->
+      <div class="login-box">
+        <div class="login-logo login-logo-mobile">
+          <div class="logo-mark">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
+            </svg>
+          </div>
+          <div>
+            <div class="login-title">Fatura Aracı</div>
+            <div class="login-sub">v2.0 · Lojistik Evrak</div>
+          </div>
+        </div>
+        <div class="login-form-title">Giriş Yap</div>
+        <div class="login-field">
+          <label>Kullanıcı Adı</label>
+          <input class="login-input" id="loginUsername" type="text" placeholder="kullanıcı adınız"
+            autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label>Şifre</label>
+          <input class="login-input" id="loginPassword" type="password" placeholder="••••••••"
+            autocomplete="current-password">
+        </div>
+        <label class="login-remember">
+          <input id="rememberMe" type="checkbox">
+          <span>Beni hatırla</span>
+        </label>
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
+        <div class="login-error" id="loginError"></div>
       </div>
-      <div class="login-field">
-        <label>Şifre</label>
-        <input class="login-input" id="loginPassword" type="password" placeholder="••••••••"
-          autocomplete="current-password">
-      </div>
-      <button class="login-btn" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
-      <div class="login-error" id="loginError"></div>
+
     </div>
   </div>
 
-  <div class="app-shell" id="app-shell">
+  <div class="app-shell" id="app-shell" style="display:none;">
 
     <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
     <aside class="sidebar" id="mainSidebar">
@@ -143,9 +189,17 @@
           <i class="ti ti-history" aria-hidden="true"></i>
           <span class="nav-label">Son İşlemler</span>
         </div>
+        <div class="nav-item" id="nav-permissions-item" onclick="sidebarSelect('permissions')" style="display:none;">
+          <i class="ti ti-shield-check" aria-hidden="true"></i>
+          <span class="nav-label">Admin Portalı</span>
+        </div>
         <div class="nav-item" id="nav-users-item" onclick="sidebarSelect('users')" style="display:none;">
           <i class="ti ti-users" aria-hidden="true"></i>
           <span class="nav-label">Kullanıcılar</span>
+        </div>
+        <div class="nav-item" id="nav-audit-item" onclick="sidebarSelect('audit')" style="display:none;">
+          <i class="ti ti-list-details" aria-hidden="true"></i>
+          <span class="nav-label">İşlem Kayıtları</span>
         </div>
 
         <div id="nav-sonrasi" style="display:none;"></div>
@@ -736,15 +790,15 @@
 
               <!-- Sağ taraf: butonlar -->
               <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-                <button onclick="openImportModal()"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">⬆
-                  İçe Aktar</button>
+                <button onclick="openImportModal()" class="role-admin-only"
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-upload" aria-hidden="true"></i>İçe Aktar</button>
                 <button onclick="downloadMaliyetRaporu()"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">⬇
-                  Maliyet Raporu</button>
-                <button onclick="openNewShipmentForm()"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#0e9f6e;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">+
-                  Yeni Sevkiyat</button>
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-download" aria-hidden="true"></i>Maliyet Raporu</button>
+                <button onclick="openNewShipmentForm()" class="role-write-only"
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#0e9f6e;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-plus" aria-hidden="true"></i>Yeni Sevkiyat</button>
               </div>
 
             </div>
@@ -902,10 +956,10 @@
             </div>
           </div>
           <div class="detail-footer">
-            <button id="delete-shipment-btn" onclick="deleteShipment()"
+            <button id="delete-shipment-btn" onclick="deleteShipment()" class="role-write-only"
               style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--error);background:transparent;color:var(--error);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;margin-right:auto;">🗑
               Sil</button>
-            <button id="grupla-btn" onclick="openGruplaModal()"
+            <button id="grupla-btn" onclick="openGruplaModal()" class="role-write-only"
               style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--accent);background:transparent;color:var(--accent);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;">🔗
               Grupla</button>
             <button class="btn-ghost" onclick="closeShipmentDetail()">İptal</button>
@@ -1882,65 +1936,28 @@
         </div>
 
         <!-- ── KULLANICILAR ────────────────────────────────────────────────── -->
-        <div class="panel" id="stepUsers" style="display:none;">
+        <div class="panel" id="stepUsers" style="display:none;"></div>
+
+        <div class="panel" id="stepPermissions" style="display:none;"></div>
+
+        <div class="panel" id="stepAudit" style="display:none;">
           <div class="panel-label">Yönetim</div>
-          <div class="panel-title">Kullanıcılar</div>
-          <div class="panel-desc">Kullanıcı ekle, sil veya şifre sıfırla.</div>
-          <div class="status-box" id="usersStatus"></div>
-          <div class="card" style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <div class="card-title" style="margin-bottom:0;">Şifremi Değiştir</div>
-              <button class="btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="showSelfChangePassForm()">🔑
-                Değiştir</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div class="panel-title">İşlem Kayıtları</div>
+              <div class="panel-desc">Kim, ne zaman, hangi işlemi yaptı — sadece admin görebilir.</div>
             </div>
-            <div id="selfChangePassForm" style="display:none;margin-top:12px;">
-              <div class="users-field"><label>Mevcut Şifre</label><input class="users-input" id="selfOldPass"
-                  type="password" placeholder="••••••"></div>
-              <div class="users-field"><label>Yeni Şifre</label><input class="users-input" id="selfNewPass"
-                  type="password" placeholder="en az 4 karakter"></div>
-              <div class="users-form-btns">
-                <button class="btn-secondary" onclick="submitSelfChangePass()">Kaydet</button>
-                <button class="btn-ghost"
-                  onclick="document.getElementById('selfChangePassForm').style.display='none'">İptal</button>
-              </div>
-            </div>
+            <button class="btn-secondary" onclick="downloadAuditLogExcel()">⬇ Excel indir</button>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div class="section-lbl" style="margin-bottom:0;">Kullanıcı Listesi</div>
-            <button class="btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="showAddUserForm()">+
-              Kullanıcı Ekle</button>
-          </div>
-          <div class="users-add-form" id="usersAddForm" style="display:none;">
-            <div class="users-form-title">Yeni Kullanıcı</div>
-            <div class="users-field"><label>Ad Soyad</label><input class="users-input" id="newUserName" type="text"
-                placeholder="örn: Ayşe Kaya"></div>
-            <div class="users-field"><label>Kullanıcı Adı</label><input class="users-input" id="newUserUsername"
-                type="text" placeholder="örn: ayse (küçük harf)"></div>
-            <div class="users-field"><label>Şifre</label><input class="users-input" id="newUserPassword" type="password"
-                placeholder="en az 4 karakter"></div>
-            <div class="users-field"><label>Rol</label><select class="users-select" id="newUserRole">
-                <option value="user">Kullanıcı</option>
-                <option value="admin">Admin</option>
-              </select></div>
-            <div class="users-form-btns"><button class="btn-secondary" onclick="submitAddUser()">Ekle</button><button
-                class="btn-ghost" onclick="showAddUserForm()">İptal</button></div>
-          </div>
-          <div class="users-change-pass-form" id="usersChangePassForm" style="display:none;">
-            <div class="users-form-title">Şifre Sıfırla — <span id="resetPassDisplayName"></span></div>
-            <input type="hidden" id="resetPassUsername">
-            <div class="users-field"><label>Yeni Şifre</label><input class="users-input" id="resetPassNew"
-                type="password" placeholder="en az 4 karakter"></div>
-            <div class="users-form-btns"><button class="btn-secondary"
-                onclick="submitResetPass()">Kaydet</button><button class="btn-ghost"
-                onclick="hideResetPassForm()">İptal</button></div>
-          </div>
-          <div id="usersListContainer"></div>
+          <div class="status-box" id="auditStatus"></div>
+          <div id="auditLogContainer"></div>
         </div>
 
       </div><!-- /content-area -->
     </div><!-- /main-area -->
   </div><!-- /app-shell -->
 
+  <script src="js/utils.js"></script>
   <script src="js/countries.js"></script>
   <script src="js/processor.js"></script>
   <script src="js/sku.js"></script>
@@ -1949,12 +1966,14 @@
   <script src="js/gtip.js"></script>
   <script src="js/evrak.js"></script>
   <script src="js/mense.js"></script>
-  <script src="js/nebim-delivery.js?v=20260703-pill-headings"></script>
-  <script src="js/shell.js?v=20260703-pill-headings"></script>
+  <script src="js/nebim-delivery.js?v=20260710-start-dashboard"></script>
+  <script src="js/shell.js?v=20260710-start-dashboard"></script>
   <script src="js/gecmis.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/users.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="js/auth.js?v=20260710-login-refresh"></script>
+  <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
+  <script src="js/users.js?v=20260710-admin-portal"></script>
+  <script src="js/audit-log.js"></script>
+  <script src="js/dashboard.js?v=20260710-login-refresh"></script>
   <script src="js/shipments.js?v=20260702-makedonya-maliyet-evrak"></script>
   <script src="js/landed-cost.js?v=20260703-modern-lc"></script>
   <script src="js/import.js"></script>

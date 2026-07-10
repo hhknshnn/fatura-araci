@@ -19,3 +19,8 @@ git
 # OS / editor
 .DS_Store
 *.swp
+
+# Kök dizine kazara düşen üretilmiş fatura/müşteri dosyaları
+/*.pdf
+/*.xlsx
+/*.xls

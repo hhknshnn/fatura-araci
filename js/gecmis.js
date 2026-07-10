@@ -5,13 +5,14 @@ const ULKE_LABELS = {
   rs:'Sırbistan', ba:'Bosna', ge:'Gürcistan', xk:'Kosova', mk:'Makedonya',
   be:'Belçika', de:'Almanya', nl:'Hollanda', kz:'Kazakistan', cy:'Kıbrıs',
   iq:'Irak', ly:'Libya', lr:'Liberya', lb:'Lübnan', uz:'Özbekistan', ru:'Rusya',
-  abh:'Abhazya', jo:'Ürdün', mu:'Mauritius'
+  abh:'Abhazya', jo:'Ürdün', mu:'Mauritius', genel:'Genel'
 };
 
 const DOSYA_TURU_LABELS = {
-  inv_pl: 'INV + PL',
-  taslak: 'Taslak',
-  mense:  'Menşe',
+  inv_pl:         'INV + PL',
+  taslak:         'Taslak',
+  mense:          'Menşe',
+  shipment_report:'Maliyet Raporu',
 };
 
 // ── PANELİ BAŞLAT ─────────────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ async function initGecmisPanel() {
     renderGecmisList(records);
 
   } catch(err) {
-    showGecmisStatus('error', '<div class="stat">⚠ ' + err.message + '</div>');
+    showGecmisStatus('error', '<div class="stat">⚠ ' + escapeHtml(err.message) + '</div>');
   }
 }
 
@@ -54,10 +55,10 @@ function renderGecmisList(records) {
     const tarihStr  = tarih.toLocaleString('tr-TR');
     const kalanMs   = (rec.expiresAt * 1000) - Date.now();
     const kalanSaat = Math.max(0, Math.floor(kalanMs / 3600000));
-    const ulkeLabel = ULKE_LABELS[rec.ulke] || rec.ulke;
-    const turlabel  = DOSYA_TURU_LABELS[rec.dosyaTuru] || rec.dosyaTuru;
+    const ulkeLabel = escapeHtml(ULKE_LABELS[rec.ulke] || rec.ulke);
+    const turlabel  = escapeHtml(DOSYA_TURU_LABELS[rec.dosyaTuru] || rec.dosyaTuru);
     // Kullanıcı adı — yeni kayıtlarda gelir, eskilerinde boş olabilir
-    const userLabel = rec.user ? `👤 ${rec.user}` : '';
+    const userLabel = rec.user ? `👤 ${escapeHtml(rec.user)}` : '';
 
     const card = document.createElement('div');
     card.className = 'card';
@@ -72,20 +73,20 @@ function renderGecmisList(records) {
         <span style="font-size:10px;color:var(--text3);">⏱ ${kalanSaat}s kaldı</span>
       </div>
       <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">
-        ${rec.faturaNo}
+        ${escapeHtml(rec.faturaNo)}
       </div>
       <div style="font-size:11px;color:var(--text3);display:flex;justify-content:space-between;">
-        <span>${tarihStr}</span>
-        <span style="color:var(--error);cursor:pointer;" onclick="silGecmisKayit(event, '${rec.key}', this)">🗑 Sil</span>
+        <span>${escapeHtml(tarihStr)}</span>
+        <span style="color:var(--error);cursor:pointer;" onclick="silGecmisKayit(event, '${escapeHtml(rec.key)}', this)">🗑 Sil</span>
       </div>`;
 
-    card.addEventListener('click', () => indirGecmisKayit(rec.key, rec.faturaNo));
+    card.addEventListener('click', () => indirGecmisKayit(rec.key, rec.faturaNo, rec.dosyaTuru));
     container.appendChild(card);
   });
 }
 
 // ── İNDİR ────────────────────────────────────────────────────────────────────
-async function indirGecmisKayit(key, faturaNo) {
+async function indirGecmisKayit(key, faturaNo, dosyaTuru) {
   showGecmisStatus('info', '<div class="stat">⏳ Dosyalar indiriliyor...</div>');
   try {
     const resp = await fetch('/api/storage?key=' + encodeURIComponent(key));
@@ -96,7 +97,10 @@ async function indirGecmisKayit(key, faturaNo) {
     let count = 0;
 
     if (files.excel) {
-      _downloadB64(files.excel, `INV-PL-${faturaNo}.xlsx`,
+      const excelName = dosyaTuru === 'shipment_report'
+        ? `${faturaNo}.xlsx`
+        : `INV-PL-${faturaNo}.xlsx`;
+      _downloadB64(files.excel, excelName,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       count++;
     }
@@ -122,7 +126,7 @@ async function indirGecmisKayit(key, faturaNo) {
       `<div class="stat">✓ ${count} dosya indirildi: <span>${faturaNo}</span></div>`);
 
   } catch(err) {
-    showGecmisStatus('error', '<div class="stat">⚠ ' + err.message + '</div>');
+    showGecmisStatus('error', '<div class="stat">⚠ ' + escapeHtml(err.message) + '</div>');
   }
 }
 
@@ -142,7 +146,7 @@ async function silGecmisKayit(event, key, el) {
       showGecmisStatus('info', '<div class="stat">Henüz kayıtlı işlem yok.</div>');
     }
   } catch(err) {
-    showGecmisStatus('error', '<div class="stat">⚠ ' + err.message + '</div>');
+    showGecmisStatus('error', '<div class="stat">⚠ ' + escapeHtml(err.message) + '</div>');
   }
 }
 

@@ -36,8 +36,16 @@ function saveNebimColWidths(widths) {
 let nebimColWidths = loadNebimColWidths();
 
 function nebimAuthHeaders() {
-  const token = sessionStorage.getItem('fa_auth_token');
+  const token = localStorage.getItem('fa_auth_token');
   return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+function nebimReadOnly() {
+  return window.currentUser?.role === 'viewer';
+}
+
+function nebimIsAdmin() {
+  return window.currentUser?.role === 'admin';
 }
 
 function nebimEscape(value) {
@@ -292,11 +300,8 @@ function ensureNebimDeliveryPanel() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (location.pathname.replace(/^\//, '') !== 'nebim-delivery') return;
-  setTimeout(() => {
-    if (document.getElementById('nebim-delivery-table')) return;
-    initNebimDeliveryPanel();
-  }, 0);
+  // İlk açılış rotası shell.js tarafından her zaman dashboard'a normalize edilir.
+  // Nebim paneli sadece kullanıcı menüden seçtiğinde sidebarSelect() üzerinden başlar.
 });
 
 function nebimSetCountryFilter(value) {
@@ -488,6 +493,8 @@ function nebimTh(label) {
 function nebimDeliveryRow(item, idx) {
   const bg = idx % 2 ? '#F8FAFC' : '#FFFFFF';
   const disabled = !String(item.plaka || '').trim();
+  const refLocked = nebimReadOnly() || (item.ready_for_nebim && !nebimIsAdmin());
+  const checkLocked = disabled || nebimReadOnly() || (item.ready_for_nebim && !nebimIsAdmin());
   const countryFlag = String(item.ulke || '').toUpperCase().includes('KAZ') ? 'kz' : 'rs';
   return `
     <tr style="background:${bg};border-bottom:1px solid rgba(15,23,42,0.08);">
@@ -497,14 +504,16 @@ function nebimDeliveryRow(item, idx) {
       <td style="${nebimTdStyle()}">${nebimEscape(item.plaka || '-')}</td>
       <td style="${nebimTdStyle()}">
         <input id="nebim-ref-${item.shipment_id}" value="${nebimEscape(item.fatura_ref_no || '')}" placeholder="Fatura ref no"
+          ${refLocked ? 'readonly' : ''}
+          title="${refLocked ? (nebimReadOnly() ? 'Görüntüleme yetkisiyle değiştirilemez' : 'Onaylanmış kaydın ref no\'sunu sadece admin değiştirebilir') : ''}"
           onblur="saveNebimDeliveryRef(${item.shipment_id}, false, this)"
-          style="width:100%;height:28px;box-sizing:border-box;padding:0 8px;border:0.5px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font:12px var(--font);">
+          style="width:100%;height:28px;box-sizing:border-box;padding:0 8px;border:0.5px solid var(--border2);border-radius:6px;background:${refLocked ? 'var(--surface2, #F1F5F9)' : 'var(--surface)'};color:var(--text);font:12px var(--font);cursor:${refLocked ? 'not-allowed' : 'text'};">
       </td>
       <td style="${nebimTdStyle()}text-align:center;">
-        <input type="checkbox" ${item.ready_for_nebim ? 'checked' : ''} ${disabled ? 'disabled' : ''}
-          title="${disabled ? 'Plaka olmadan Nebim onayı verilemez' : 'Nebim aktarımına hazır'}"
+        <input type="checkbox" ${item.ready_for_nebim ? 'checked' : ''} ${checkLocked ? 'disabled' : ''}
+          title="${nebimReadOnly() ? 'Görüntüleme yetkisiyle değiştirilemez' : disabled ? 'Plaka olmadan Nebim onayı verilemez' : (item.ready_for_nebim && !nebimIsAdmin()) ? 'Onaylanmış kaydın işaretini sadece admin kaldırabilir' : 'Nebim aktarımına hazır'}"
           onchange="saveNebimDeliveryRef(${item.shipment_id}, true, this)"
-          style="width:15px;height:15px;accent-color:var(--accent);cursor:${disabled ? 'not-allowed' : 'pointer'};">
+          style="width:15px;height:15px;accent-color:var(--accent);cursor:${checkLocked ? 'not-allowed' : 'pointer'};">
       </td>
       <td style="${nebimTdStyle()}">${nebimStatusBadge(item, disabled)}</td>
     </tr>`;
@@ -690,7 +699,11 @@ async function saveNebimDeliveryRef(shipmentId, fromCheckbox, trigger) {
       }),
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Kaydedilemedi');
+    if (!res.ok || !data.success) {
+      const err = new Error(data.error || 'Kaydedilemedi');
+      err.status = res.status;
+      throw err;
+    }
     if (status) {
       status.textContent = fromCheckbox ? 'Nebim hazırlık durumu kaydedildi.' : 'Fatura ref no kaydedildi.';
       status.style.color = 'var(--text3)';
@@ -698,7 +711,10 @@ async function saveNebimDeliveryRef(shipmentId, fromCheckbox, trigger) {
     await loadNebimDeliveryItems();
   } catch (err) {
     if (checkbox) checkbox.checked = !checkbox.checked;
-    if (status) {
+    if (input) input.value = (row && row.fatura_ref_no) || '';
+    if (err.status === 403) {
+      showMiniModal('🚫 Yasak İşlem', err.message || 'Bu işlem için yetkiniz yok.', [{ label: 'Tamam', style: 'primary', action: null }]);
+    } else if (status) {
       status.textContent = err.message || 'Kaydedilemedi';
       status.style.color = 'var(--error)';
     }
