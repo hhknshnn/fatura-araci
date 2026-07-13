@@ -10,6 +10,14 @@ from api.db import get_conn
 SESSION_TTL = 8 * 60 * 60  # 8 saat
 REMEMBER_SESSION_TTL = 30 * 24 * 60 * 60  # 30 gün
 
+# ── GEÇİCİ: LOGIN DEVRE DIŞI ─────────────────────────────────────────────────
+# True iken tüm istekler otomatik admin oturumuyla çalışır (login gerekmez).
+# Login'i tekrar aktifleştirmek için False yap ve js/auth.js içindeki
+# AUTH_DISABLED bayrağını da false yap.
+AUTH_DISABLED = True
+
+_BYPASS_SESSION = {'username': 'admin', 'displayName': 'Admin', 'role': 'admin', 'expiresAt': None}
+
 ROLES = ('admin', 'editor', 'viewer')
 
 
@@ -106,7 +114,10 @@ def get_token_from_headers(headers):
 
 def get_session_from_headers(headers):
     token = get_token_from_headers(headers)
-    return get_session(token)
+    session = get_session(token)
+    if session is None and AUTH_DISABLED:
+        return dict(_BYPASS_SESSION)
+    return session
 
 def require_roles(headers, allowed_roles):
     session = get_session_from_headers(headers)
@@ -152,6 +163,8 @@ def auth_get():
     """GET /api/auth — oturum kontrolü"""
     token   = get_token_from_headers(dict(request.headers))
     session = get_session(token)
+    if not session and AUTH_DISABLED:
+        session = dict(_BYPASS_SESSION)
     if not session:
         return jsonify({'success': False, 'error': 'Oturum geçersiz'}), 401
     return jsonify({

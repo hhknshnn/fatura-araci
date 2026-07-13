@@ -29,6 +29,14 @@ from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_sto
 from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 from api.nebim import nebim_delivery_get, nebim_delivery_put
 from api.audit import log_action, audit_log_get, audit_log_export
+from api.maliyet.meta import maliyet_meta_get, maliyet_kalem_post, maliyet_kalem_put, maliyet_kalem_delete, maliyet_depo_ayar_put
+from api.maliyet.tarife import maliyet_tarife_get, maliyet_tarife_post, maliyet_tarife_delete
+from api.maliyet.hareket import maliyet_hareket_get, maliyet_hareket_bulk_post, maliyet_hareket_import_post, maliyet_hareket_delete
+from api.maliyet.hesap import maliyet_beklenen_get, maliyet_karsilastirma_get, maliyet_analiz_get
+from api.maliyet.fatura import (maliyet_fatura_get, maliyet_fatura_post,
+    maliyet_fatura_put, maliyet_fatura_delete, maliyet_fatura_pdf_post,
+    maliyet_gercek_get)
+from api.maliyet.rapor import maliyet_rapor_get
 
 def read_port():
     try:
@@ -612,6 +620,140 @@ def api_landed_cost_export():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return landed_cost_export()
+
+
+# ── MALİYET TAKİP (dış depo 3PL maliyetleri) ─────────────────────────────────
+
+@app.route('/api/maliyet/meta', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_meta():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_meta_get()
+
+
+@app.route('/api/maliyet/kalem', methods=['POST', 'OPTIONS'])
+@app.route('/api/maliyet/kalem/<int:kalem_id>', methods=['PUT', 'DELETE', 'OPTIONS'])
+@require_auth()
+def api_maliyet_kalem(kalem_id=None):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'POST':
+        return maliyet_kalem_post()
+    if request.method == 'PUT':
+        return maliyet_kalem_put(kalem_id)
+    return maliyet_kalem_delete(kalem_id)
+
+
+@app.route('/api/maliyet/tarife', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/maliyet/tarife/<int:tarife_id>', methods=['DELETE', 'OPTIONS'])
+@require_auth()
+def api_maliyet_tarife(tarife_id=None):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return maliyet_tarife_get()
+    if request.method == 'POST':
+        return maliyet_tarife_post()
+    return maliyet_tarife_delete(tarife_id)
+
+
+@app.route('/api/maliyet/depo-ayar', methods=['PUT', 'OPTIONS'])
+@require_auth()
+def api_maliyet_depo_ayar():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_depo_ayar_put()
+
+
+@app.route('/api/maliyet/hareket', methods=['GET', 'OPTIONS'])
+@app.route('/api/maliyet/hareket/<int:hareket_id>', methods=['DELETE', 'OPTIONS'])
+@require_auth()
+def api_maliyet_hareket(hareket_id=None):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return maliyet_hareket_get()
+    return maliyet_hareket_delete(hareket_id)
+
+
+@app.route('/api/maliyet/hareket/bulk', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_hareket_bulk():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_hareket_bulk_post()
+
+
+@app.route('/api/maliyet/hareket/import', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_hareket_import():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_hareket_import_post()
+
+
+@app.route('/api/maliyet/beklenen', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_beklenen():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_beklenen_get()
+
+
+@app.route('/api/maliyet/karsilastirma', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_karsilastirma():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_karsilastirma_get()
+
+
+@app.route('/api/maliyet/analiz', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_analiz():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_analiz_get()
+
+
+@app.route('/api/maliyet/rapor', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_rapor():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_rapor_get()
+
+
+@app.route('/api/maliyet/fatura', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/maliyet/fatura/<int:fatura_id>', methods=['PUT', 'DELETE', 'OPTIONS'])
+@require_auth()
+def api_maliyet_fatura(fatura_id=None):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return maliyet_fatura_get()
+    if request.method == 'POST':
+        return maliyet_fatura_post()
+    if request.method == 'PUT':
+        return maliyet_fatura_put(fatura_id)
+    return maliyet_fatura_delete(fatura_id)
+
+
+@app.route('/api/maliyet/fatura/pdf-oku', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_fatura_pdf_oku():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_fatura_pdf_post()
+
+
+@app.route('/api/maliyet/gercek', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_gercek():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_gercek_get()
 
 @app.route('/api/taslak-store/kaydet', methods=['POST', 'OPTIONS'])
 @require_auth()

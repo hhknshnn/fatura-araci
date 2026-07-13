@@ -64,7 +64,7 @@ function hideAllPanels() {
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
     'stepGecmis', 'stepUsers', 'stepPermissions', 'stepAudit', 'stepDashboard', 'stepSevkiyatlar',
-    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery'].forEach(id => {
+    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery', 'stepMaliyetTakip'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -106,6 +106,7 @@ function sidebarSelect(mod) {
     'maliyet-evrak': 'Maliyet Evrak',
     'landed-cost': 'Landed Cost',
     'nebim-delivery': 'Nebim İrsaliye',
+    'maliyet-takip': 'Maliyet Takip',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -339,6 +340,18 @@ function sidebarSelect(mod) {
     }
     panel.style.display = 'block';
     if (typeof initNebimDeliveryPanel === 'function') initNebimDeliveryPanel();
+  } else if (mod === 'maliyet-takip') {
+    document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
+    let panel = document.getElementById('stepMaliyetTakip');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepMaliyetTakip';
+      panel.className = 'panel';
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
+    if (typeof initMaliyetPanel === 'function') initMaliyetPanel();
   }
 
   // ── URL GÜNCELLEMESİ ───────────────────────────────────────────────────────

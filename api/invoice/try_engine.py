@@ -528,9 +528,8 @@ def generate_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
     musteri_adres = 'Ulica Vrbanja Br. 1 (SCC)-Saraybosna, Saraybosna Centar'
     destination   = 'Bosnia and Herzegovina'
     incoterm      = 'CIP'
-    packages_str  = str((pdf_fields or {}).get('kap', '') or '')
-    freight_value   = parse_num((pdf_fields or {}).get('navlun', 0))
-    insurance_value = parse_num((pdf_fields or {}).get('sigorta', 0))
+    packages_str = str((pdf_fields or {}).get('kap', '') or '')
+    pdf_toplam   = parse_num((pdf_fields or {}).get('fatura_tl', 0))
 
     brut_list = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)[0]
     net_list  = get_net_list(brut_list, hedef_net, depo_tipi)
@@ -570,15 +569,22 @@ def generate_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
             else:
                 dat(ws_inv, er, cn, row.get(src_col, ''), bg=bg, align='left')
 
+    # Bosna (IHR/ANT): Freight/Insurance/GRAND TOTAL yok; TOTAL = PDF toplam tutarı.
     last_inv = DS + len(df)
-    gr_row = _footer_try(
-        ws_inv, last_inv, inv_total_col=8,
-        inv_fmt=TRY_FMT, grand_total_label='GRAND TOTAL TRY',
-        freight_value=freight_value, insurance_value=insurance_value,
-        has_freight=True, label_col=7,
-    )
+    tr = last_inv + 1
+    ws_inv.row_dimensions[tr].height = 22
+    total_val = pdf_toplam if pdf_toplam > 0 else f'=SUM(H{DS+1}:H{last_inv})'
+    for col, val, align, fmt in [(7, 'TOTAL', 'center', None),
+                                 (8, total_val, 'right', TRY_FMT)]:
+        c = ws_inv.cell(row=tr, column=col, value=val)
+        c.font      = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+        c.fill      = PatternFill('solid', fgColor=DARK_BLUE)
+        c.alignment = Alignment(horizontal=align, vertical='center')
+        c.border    = brd()
+        if fmt:
+            c.number_format = fmt
 
-    set_print(ws_inv, f'A1:H{gr_row}')
+    set_print(ws_inv, f'A1:H{tr}')
 
     # PL
     for col, w in [('A',16),('B',14),('C',13),('D',18.18),('E',33),

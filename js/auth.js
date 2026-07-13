@@ -2,6 +2,12 @@
 // Login overlay, session yönetimi, token saklama.
 // Mevcut hiçbir koda dokunmaz — sadece sayfa açılışında devreye girer.
 
+// ── GEÇİCİ: LOGIN DEVRE DIŞI ──────────────────────────────────────────────────
+// true iken login ekranı atlanır, otomatik admin oturumu açılır.
+// Login'i tekrar aktifleştirmek için false yap ve api/auth.py içindeki
+// AUTH_DISABLED bayrağını da False yap.
+const AUTH_DISABLED = true;
+
 const AUTH_TOKEN_KEY = 'fa_auth_token';
 const AUTH_REMEMBER_KEY = 'fa_auth_remember';
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 dakika işlemsizlikte oturumu sonlandır
@@ -85,6 +91,13 @@ function clearSessionAndShowLogin() {
 
 // ── MEVCUT OTURUMU KONTROL ET ─────────────────────────────────────────────────
 async function authCheck() {
+  if (AUTH_DISABLED) {
+    applySession({ username: 'admin', displayName: 'Admin', role: 'admin', expiresAt: null });
+    if (window.currentUser) window.currentUser.remembered = true; // idle logout devre dışı
+    if (idleTimer) clearTimeout(idleTimer);
+    hideLoginOverlay();
+    return;
+  }
   const token = getStoredToken();
   if (!token) {
     showLoginOverlay();
