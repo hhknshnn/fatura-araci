@@ -12,7 +12,8 @@ BEGIN;
 -- ── Kalem tanımları ──────────────────────────────────────────────────────────
 -- tip:
 --   'hareket' : dönem içi miktar × birim fiyat
---   'storage' : palet bakiyesi × birim fiyat (birim: palet_hafta | palet_ay)
+--   'storage' : palet/box bakiyesi × birim fiyat
+--               (palet_gun | palet_hafta | palet_ay | box_gun)
 --   'sabit'   : aylık sabit ücret (miktar girilmez)
 --   'minimum' : Minimum Monthly Fee — ay toplamı bunun altındaysa bu uygulanır
 CREATE TABLE IF NOT EXISTS maliyet_kalemleri (
@@ -59,7 +60,7 @@ CREATE INDEX IF NOT EXISTS ix_maliyet_hareket_ulke_tarih ON maliyet_hareketleri 
 
 -- ── Depo ayarları (ülke başına) ──────────────────────────────────────────────
 -- Storage periyodu (hafta/ay) ayrıca tutulmaz; storage tarife satırının
--- birimi (palet_hafta / palet_ay) tek kaynak olarak kullanılır.
+-- birimi (palet_gun / palet_hafta / palet_ay / box_gun) tek kaynak olarak kullanılır.
 CREATE TABLE IF NOT EXISTS maliyet_depo_ayarlari (
     ulke            TEXT PRIMARY KEY,
     acilis_tarihi   DATE,
@@ -91,7 +92,7 @@ INSERT INTO maliyet_kalemleri (kod, ad, birim_secenekleri, tip, sira) VALUES
     ('box_out',          'Box Out',                            '{koli}',                 'hareket',  40),
     ('handling',         'Handling',                           '{palet,koli}',           'hareket',  50),
     ('store_transfer',   'Store Transfer per Pallet',          '{palet}',                'hareket',  60),
-    ('storage',          'Storage',                            '{palet_hafta,palet_ay}', 'storage',  70),
+    ('storage',          'Storage',                            '{palet_gun,palet_hafta,palet_ay,box_gun}', 'storage',  70),
     ('order_processing', 'Order Processing Fee',               '{siparis}',              'hareket',  80),
     ('picking_line',     'Picking per Line',                   '{satir}',                'hareket',  90),
     ('labeling',         'Labeling / Relabeling',              '{adet}',                 'hareket', 100),

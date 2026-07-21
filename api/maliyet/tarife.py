@@ -54,45 +54,54 @@ def fiyat_bul(versiyonlar, tarih):
 
 def maliyet_tarife_get():
     """GET /api/maliyet/tarife?ulke=de — ülkenin tüm tarife satırları
-    (güncel versiyon işaretli) kalem bilgisiyle birlikte."""
+    (güncel versiyon işaretli) kalem bilgisiyle birlikte.
+
+    ``?all=1`` ülke karşılaştırma tablosu için tüm ülkeleri tek çağrıda
+    döndürür. Mevcut ülke bazlı çağrı geriye dönük uyumlu kalır.
+    """
     ulke = str(request.args.get('ulke') or '').strip().lower()
-    if ulke not in gecerli_ulke_kodlari():
+    tumu = str(request.args.get('all') or '').strip().lower() in ('1', 'true', 'yes')
+    if not tumu and ulke not in gecerli_ulke_kodlari():
         return jsonify({'success': False, 'error': f'Geçersiz ülke: {ulke}'}), 400
 
     bugun = datetime.date.today()
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute('''
+        cur.execute(f'''
             SELECT t.id, t.kalem_id, k.kod, k.ad, t.birim, t.birim_fiyat,
                    t.para_birimi, t.gecerli_baslangic, t.notlar
+                   {', t.ulke' if tumu else ''}
             FROM maliyet_tarifeleri t
             JOIN maliyet_kalemleri k ON k.id = t.kalem_id
-            WHERE t.ulke = %s
-            ORDER BY k.sira, k.id, t.gecerli_baslangic DESC
-        ''', (ulke,))
+            {'WHERE t.ulke = %s' if not tumu else ''}
+            ORDER BY {('t.ulke, ' if tumu else '')}k.sira, k.id, t.gecerli_baslangic DESC
+        ''', (ulke,) if not tumu else ())
         rows = cur.fetchall()
     finally:
         cur.close()
         conn.close()
 
-    # Kalem başına, bugüne göre geçerli olan en yeni versiyonu işaretle
+    # Ülke + kalem başına, bugüne göre geçerli olan en yeni versiyonu işaretle
     guncel_ids = {}
     for r in rows:
         tid, kalem_id, baslangic = r[0], r[1], r[7]
-        if kalem_id not in guncel_ids and baslangic <= bugun:
-            guncel_ids[kalem_id] = tid
+        satir_ulke = r[9] if tumu else ulke
+        anahtar = (satir_ulke, kalem_id)
+        if anahtar not in guncel_ids and baslangic <= bugun:
+            guncel_ids[anahtar] = tid
 
     tarifeler = [
         {
             'id': r[0], 'kalem_id': r[1], 'kalem_kod': r[2], 'kalem_ad': r[3],
             'birim': r[4], 'birim_fiyat': float(r[5]), 'para_birimi': r[6],
             'gecerli_baslangic': r[7].isoformat(), 'notlar': r[8],
-            'guncel': guncel_ids.get(r[1]) == r[0],
+            'ulke': r[9] if tumu else ulke,
+            'guncel': guncel_ids.get(((r[9] if tumu else ulke), r[1])) == r[0],
         }
         for r in rows
     ]
-    return jsonify({'success': True, 'ulke': ulke, 'tarifeler': tarifeler})
+    return jsonify({'success': True, 'ulke': None if tumu else ulke, 'tarifeler': tarifeler})
 
 
 def maliyet_tarife_post():

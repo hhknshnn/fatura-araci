@@ -43,6 +43,26 @@ def _parse_date(value):
         return None
 
 
+def _tarife_donemi(value):
+    """2026-Y veya 2026-Q1 biçimindeki tarife dönemini tarih aralığına çevirir."""
+    match = re.fullmatch(r'(\d{4})-(Y|Q[1-4])', str(value or '').strip().upper())
+    if not match:
+        return None
+    yil = int(match.group(1))
+    parca = match.group(2)
+    if parca == 'Y':
+        return datetime.date(yil, 1, 1), datetime.date(yil, 12, 31), f'{yil} / Tüm Yıl'
+    ceyrek = int(parca[1])
+    baslangic_ayi = (ceyrek - 1) * 3 + 1
+    bitis_ayi = ceyrek * 3
+    bitis_gunu = 31 if bitis_ayi in (3, 12) else 30
+    return (
+        datetime.date(yil, baslangic_ayi, 1),
+        datetime.date(yil, bitis_ayi, bitis_gunu),
+        f'{yil} / {ceyrek}. Dönem',
+    )
+
+
 def _sheet_adi(label):
     """Excel sheet adı: yasak karakterler temizlenir, 31 karaktere kısaltılır."""
     return re.sub(r'[\[\]:*?/\\]', '', str(label))[:31] or 'Sayfa'
@@ -85,6 +105,122 @@ def _kolon_genislikleri(ws):
                 max_len = max(max_len, len(str(cell.value)))
         if letter:
             ws.column_dimensions[letter].width = max(10, min(42, max_len + 2))
+
+
+def maliyet_tarife_rapor_get():
+    """GET /api/maliyet/tarife/export?donem=2026-Y&ulke=nl — seçilen dönem sonu
+    tarife matrisini ve dönem içindeki fiyat değişimlerini Excel olarak indirir."""
+    donem_key = str(request.args.get('donem') or '').strip().upper()
+    donem = _tarife_donemi(donem_key)
+    if not donem:
+        return jsonify({'success': False, 'error': 'Geçerli dönem girin (örn. 2026-Y veya 2026-Q1)'}), 400
+    start, end, donem_label = donem
+    tum_ulkeler = kurumsal_ulkeler()
+    ulke_kodu = str(request.args.get('ulke') or '').strip().lower()
+    ulkeler = [u for u in tum_ulkeler if u['kod'] == ulke_kodu] if ulke_kodu else tum_ulkeler
+    if not ulkeler:
+        return jsonify({'success': False, 'error': 'Geçerli bir ülke seçin'}), 400
+    ulke_kodlari = {u['kod'] for u in ulkeler}
+    ulke_labels = {u['kod']: u['label'] for u in ulkeler}
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute('''
+            SELECT id, kod, ad, sira
+            FROM maliyet_kalemleri
+            WHERE aktif
+            ORDER BY sira, id
+        ''')
+        kalemler = cur.fetchall()
+        cur.execute('''
+            SELECT t.ulke, t.kalem_id, k.kod, k.ad, t.birim,
+                   t.birim_fiyat, t.para_birimi, t.gecerli_baslangic, t.notlar
+            FROM maliyet_tarifeleri t
+            JOIN maliyet_kalemleri k ON k.id = t.kalem_id
+            WHERE t.gecerli_baslangic <= %s AND k.aktif
+            ORDER BY t.ulke, k.sira, k.id, t.gecerli_baslangic DESC
+        ''', (end,))
+        tum_satirlar = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    gecerli = {}
+    for row in tum_satirlar:
+        gecerli.setdefault((row[0], row[1]), row)
+    donem_degisimleri = [
+        row for row in tum_satirlar
+        if row[0] in ulke_kodlari and start <= row[7] <= end
+    ]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Tarife Matrisi'
+    ws.cell(row=1, column=1, value=f'Tarife Raporu — {donem_label}').font = _title_font
+    ws.cell(row=2, column=1, value=f'{end.strftime("%d.%m.%Y")} tarihinde geçerli fiyatlar').font = Font(
+        name='Arial', size=9, italic=True, color='64748B')
+    headers = ['Maliyet Kalemi'] + [u['label'] for u in ulkeler]
+    matrix_rows = []
+    for kalem_id, _kod, ad, _sira in kalemler:
+        row = [ad]
+        for ulke in ulkeler:
+            tarife = gecerli.get((ulke['kod'], kalem_id))
+            row.append(
+                f'{float(tarife[5]):.2f} {tarife[6]} / {tarife[4]}' if tarife else None
+            )
+        matrix_rows.append(row)
+    son = _tablo_yaz(ws, 4, headers, matrix_rows)
+    ws.freeze_panes = 'B5'
+    ws.auto_filter.ref = f'A4:{get_column_letter(len(headers))}{son}'
+    _kolon_genislikleri(ws)
+
+    ws_detay = wb.create_sheet('Dönem Sonu Detay')
+    detay_headers = [
+        'Ülke', 'Maliyet Kalemi', 'Kalem Kodu', 'Birim Fiyat',
+        'Para Birimi', 'Birim', 'Geçerlilik Başlangıcı', 'Notlar',
+    ]
+    detay_rows = []
+    for ulke in ulkeler:
+        for kalem_id, _kod, _ad, _sira in kalemler:
+            row = gecerli.get((ulke['kod'], kalem_id))
+            if row:
+                detay_rows.append([
+                    ulke['label'], row[3], row[2], float(row[5]), row[6], row[4], row[7], row[8],
+                ])
+    son = _tablo_yaz(ws_detay, 1, detay_headers, detay_rows)
+    ws_detay.freeze_panes = 'A2'
+    ws_detay.auto_filter.ref = f'A1:{get_column_letter(len(detay_headers))}{son}'
+    _kolon_genislikleri(ws_detay)
+
+    ws_degisim = wb.create_sheet('Dönem Değişimleri')
+    degisim_headers = [
+        'Ülke', 'Maliyet Kalemi', 'Kalem Kodu', 'Birim Fiyat',
+        'Para Birimi', 'Birim', 'Geçerlilik Başlangıcı', 'Notlar',
+    ]
+    degisim_rows = [[
+        ulke_labels.get(row[0], row[0]), row[3], row[2], float(row[5]),
+        row[6], row[4], row[7], row[8],
+    ] for row in donem_degisimleri]
+    son = _tablo_yaz(ws_degisim, 1, degisim_headers, degisim_rows)
+    ws_degisim.freeze_panes = 'A2'
+    ws_degisim.auto_filter.ref = f'A1:{get_column_letter(len(degisim_headers))}{max(son, 1)}'
+    _kolon_genislikleri(ws_degisim)
+
+    for sheet in (ws_detay, ws_degisim):
+        for row in sheet.iter_rows(min_row=2):
+            if len(row) >= 7 and isinstance(row[6].value, datetime.date):
+                row[6].number_format = 'dd.mm.yyyy'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'tarife_raporu_{donem_key}{f"_{ulke_kodu}" if ulke_kodu else ""}.xlsx',
+    )
 
 
 def maliyet_rapor_get():
@@ -207,7 +343,8 @@ def maliyet_rapor_get():
     birim_adlari = {
         'palet': 'palet', 'koli': 'koli', 'siparis': 'sipariş', 'satir': 'satır',
         'adet': 'adet', 'konteyner': 'konteyner', 'islem': 'işlem', 'ay': 'ay',
-        'palet_hafta': 'palet/hafta', 'palet_ay': 'palet/ay',
+        'palet_gun': 'palet/gün', 'palet_hafta': 'palet/hafta', 'palet_ay': 'palet/ay',
+        'box_gun': 'box/gün',
     }
     for u, kalemler, beklenen, faturalar, fatura_beklenen, eslesen, uyarilar in detaylar:
         ws = wb.create_sheet(_sheet_adi(u['label']))

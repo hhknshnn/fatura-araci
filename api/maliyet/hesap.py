@@ -15,7 +15,8 @@ from api.db import get_conn
 from api.kur import get_tcmb_kurlar
 from api.maliyet.meta import kurumsal_ulkeler, gecerli_ulke_kodlari
 from api.maliyet.tarife import tarife_haritasi, fiyat_bul
-from api.maliyet.hareket import depo_ayar, palet_bakiye, PALLET_IN_KOD, PALLET_OUT_KOD
+from api.maliyet.hareket import (depo_ayar, palet_bakiye, box_bakiye,
+    PALLET_IN_KOD, PALLET_OUT_KOD, BOX_IN_KOD, BOX_OUT_KOD)
 
 
 def _parse_date(value):
@@ -33,6 +34,112 @@ def to_eur(tutar, para, kurlar):
     if kur <= 0:
         return None
     return float(tutar) / kur
+
+
+def maliyet_depolama_get():
+    """GET /api/maliyet/depolama?tarih=YYYY-AA-GG — ülke bazında güncel palet
+    veya box bakiyesi × geçerli Storage tarifesiyle dönem beklentisini döner.
+    Aylık görünüm karşılaştırılabilir bir 30 günlük dönem olarak hesaplanır."""
+    tarih = _parse_date(request.args.get('tarih')) if request.args.get('tarih') else datetime.date.today()
+    if not tarih:
+        return jsonify({'success': False, 'error': 'Geçerli tarih girin (YYYY-AA-GG)'}), 400
+
+    kurlar = get_tcmb_kurlar()
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, ad FROM maliyet_kalemleri WHERE aktif AND tip = 'storage' ORDER BY sira, id")
+        storage_kalemler = cur.fetchall()
+        rows = []
+        for ulke in kurumsal_ulkeler():
+            palet_bakiye_ham = palet_bakiye(cur, ulke['kod'], tarih)
+            box_bakiye_ham = box_bakiye(cur, ulke['kod'], tarih)
+            palet_stok = max(float(palet_bakiye_ham), 0.0)
+            box_stok = max(float(box_bakiye_ham), 0.0)
+            harita = tarife_haritasi(cur, ulke['kod'])
+            tarifeler = []
+            toplamlar = {'gunluk': 0.0, 'haftalik': 0.0, 'aylik': 0.0}
+            eur_eksik = False
+
+            for kalem_id, kalem_ad in storage_kalemler:
+                tarife = fiyat_bul(harita.get(kalem_id), tarih)
+                if not tarife or tarife['birim'] not in ('palet_gun', 'palet_hafta', 'palet_ay', 'box_gun'):
+                    continue
+                fiyat = float(tarife['birim_fiyat'])
+                stok_birimi = 'box' if tarife['birim'] == 'box_gun' else 'palet'
+                bakiye = box_stok if stok_birimi == 'box' else palet_stok
+                if tarife['birim'] == 'palet_hafta':
+                    birim_gunluk = fiyat / 7
+                    birim_haftalik = fiyat
+                    birim_aylik = birim_gunluk * 30
+                elif tarife['birim'] == 'palet_ay':
+                    birim_aylik = fiyat
+                    birim_gunluk = fiyat / 30
+                    birim_haftalik = birim_gunluk * 7
+                else:  # palet_gun veya box_gun
+                    birim_gunluk = fiyat
+                    birim_haftalik = fiyat * 7
+                    birim_aylik = fiyat * 30
+
+                maliyet = {
+                    'gunluk': bakiye * birim_gunluk,
+                    'haftalik': bakiye * birim_haftalik,
+                    'aylik': bakiye * birim_aylik,
+                }
+                maliyet_eur = {}
+                for key, value in maliyet.items():
+                    eur = 0.0 if value == 0 else to_eur(value, tarife['para_birimi'], kurlar)
+                    maliyet_eur[key] = eur
+                    if eur is None:
+                        eur_eksik = True
+                    else:
+                        toplamlar[key] += eur
+
+                tarifeler.append({
+                    'kalem_ad': kalem_ad,
+                    'birim': tarife['birim'],
+                    'birim_fiyat': round(fiyat, 4),
+                    'para_birimi': tarife['para_birimi'],
+                    'bekleyen_miktar': round(bakiye, 2),
+                    'stok_birimi': stok_birimi,
+                    'gecerli_baslangic': tarife['gecerli_baslangic'].isoformat(),
+                    'maliyet': {k: round(v, 2) for k, v in maliyet.items()},
+                    'maliyet_eur': {k: (round(v, 2) if v is not None else None) for k, v in maliyet_eur.items()},
+                })
+
+            rows.append({
+                'ulke': ulke['kod'],
+                'label': ulke['label'],
+                'palet_bakiye': round(palet_stok, 2),
+                'palet_bakiye_ham': round(float(palet_bakiye_ham), 2),
+                'box_bakiye': round(box_stok, 2),
+                'box_bakiye_ham': round(float(box_bakiye_ham), 2),
+                'tarifeler': tarifeler,
+                'tarifeli': bool(tarifeler),
+                'gunluk_eur': None if (not tarifeler or eur_eksik) else round(toplamlar['gunluk'], 2),
+                'haftalik_eur': None if (not tarifeler or eur_eksik) else round(toplamlar['haftalik'], 2),
+                'aylik_eur': None if (not tarifeler or eur_eksik) else round(toplamlar['aylik'], 2),
+            })
+    finally:
+        cur.close()
+        conn.close()
+
+    tarifeli_rows = [r for r in rows if r['tarifeli']]
+    return jsonify({
+        'success': True,
+        'tarih': tarih.isoformat(),
+        'ay_gun': 30,
+        'rows': rows,
+        'ozet': {
+            'palet_toplam': round(sum(r['palet_bakiye'] for r in rows), 2),
+            'box_toplam': round(sum(r['box_bakiye'] for r in rows), 2),
+            'tarifeli_ulke': len(tarifeli_rows),
+            'gunluk_eur': round(sum((r['gunluk_eur'] or 0) for r in tarifeli_rows), 2),
+            'haftalik_eur': round(sum((r['haftalik_eur'] or 0) for r in tarifeli_rows), 2),
+            'aylik_eur': round(sum((r['aylik_eur'] or 0) for r in tarifeli_rows), 2),
+            'kur_eksik': any(r['tarifeli'] and r['gunluk_eur'] is None for r in rows),
+        },
+    })
 
 
 def bakiye_serisi(cur, ulke, start, end):
@@ -63,6 +170,37 @@ def bakiye_serisi(cur, ulke, start, end):
         seri[gun] = bakiye
         gun += datetime.timedelta(days=1)
     return seri
+
+
+def box_bakiye_serisi(cur, ulke, start, end):
+    """start..end (dahil) her gün için gün sonu box bakiyesi."""
+    onceki = box_bakiye(cur, ulke, start - datetime.timedelta(days=1))
+    cur.execute('''
+        SELECT h.tarih, SUM(CASE WHEN k.kod = %s THEN h.miktar ELSE -h.miktar END)
+        FROM maliyet_hareketleri h
+        JOIN maliyet_kalemleri k ON k.id = h.kalem_id
+        WHERE h.ulke = %s AND k.kod IN (%s, %s) AND h.tarih BETWEEN %s AND %s
+        GROUP BY h.tarih
+    ''', (BOX_IN_KOD, ulke, BOX_IN_KOD, BOX_OUT_KOD, start, end))
+    gunluk_net = {r[0]: float(r[1]) for r in cur.fetchall()}
+    seri = {}
+    bakiye = onceki
+    gun = start
+    while gun <= end:
+        bakiye += gunluk_net.get(gun, 0.0)
+        seri[gun] = bakiye
+        gun += datetime.timedelta(days=1)
+    return seri
+
+
+def _gun_dilimleri(start, end):
+    """Aralıktaki her günü tek günlük storage dilimi olarak döner."""
+    out = []
+    gun = start
+    while gun <= end:
+        out.append((gun, gun))
+        gun += datetime.timedelta(days=1)
+    return out
 
 
 def _hafta_dilimleri(start, end):
@@ -150,12 +288,28 @@ def beklenen_hesapla(cur, ulke, start, end, kurlar):
     # ── 2) Storage: bakiye yöntemi × periyot (tarife biriminden) ─────────────
     storage_kalemler = [kid for kid, k in kalemler.items() if k['tip'] == 'storage' and kid in harita]
     if storage_kalemler:
-        seri = bakiye_serisi(cur, ulke, start, end)
+        palet_seri = None
+        box_seri = None
         for kalem_id in storage_kalemler:
             guncel = fiyat_bul(harita[kalem_id], end)
             if not guncel:
                 continue  # tarife aralık sonunda henüz başlamamış
-            dilimler = _ay_dilimleri(start, end) if guncel['birim'] == 'palet_ay' else _hafta_dilimleri(start, end)
+            if guncel['birim'] == 'box_gun':
+                if box_seri is None:
+                    box_seri = box_bakiye_serisi(cur, ulke, start, end)
+                seri = box_seri
+            else:
+                if palet_seri is None:
+                    palet_seri = bakiye_serisi(cur, ulke, start, end)
+                seri = palet_seri
+            if guncel['birim'] == 'palet_ay':
+                dilimler = _ay_dilimleri(start, end)
+            elif guncel['birim'] == 'palet_hafta':
+                dilimler = _hafta_dilimleri(start, end)
+            elif guncel['birim'] in ('palet_gun', 'box_gun'):
+                dilimler = _gun_dilimleri(start, end)
+            else:
+                continue
             for p_start, p_end in dilimler:
                 k_start, k_end = max(p_start, start), min(p_end, end)
                 v = fiyat_bul(harita[kalem_id], k_end)

@@ -67,7 +67,6 @@
       "detail": "",
       "icon": "",
       "roles": [
-        "viewer",
         "editor",
         "admin"
       ]

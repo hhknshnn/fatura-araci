@@ -172,16 +172,21 @@ def update_shipment(shipment_id, data):
     cur  = conn.cursor()
 
     # USD alanları formdan gelmiyorsa mevcut DB değerini koru (veri kaybını önler)
-    cur.execute('SELECT navlun_usd, sigorta_usd, usd_kuru, yukleme_tarihi FROM shipments WHERE id = %s', (shipment_id,))
-    existing = cur.fetchone() or (0, 0, 0, None)
+    cur.execute('''
+        SELECT navlun_usd, sigorta_usd, usd_kuru, yukleme_tarihi,
+               gumruk_tarihi, varis_tarihi, gumrukleme_bitis
+        FROM shipments WHERE id = %s
+    ''', (shipment_id,))
+    existing = cur.fetchone() or (0, 0, 0, None, None, None, None)
 
     navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
     sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
     usd_kuru    = data.get('usd_kuru',    existing[2]) or 0
+    yukleme_tarihi = data.get('yukleme_tarihi', existing[3]) or None
+    gumruk_tarihi = data.get('gumruk_tarihi', existing[4]) or None
 
     # USD kuru elle/faturadan gelmediyse yükleme tarihine göre otomatik çek
     if not usd_kuru:
-        yukleme_tarihi = data.get('yukleme_tarihi') or existing[3]
         if yukleme_tarihi:
             usd_kuru = _get_usd_kuru_for_date(str(yukleme_tarihi))
 
@@ -196,8 +201,8 @@ def update_shipment(shipment_id, data):
 
     # Varış tarihi veya gümrükleme bitiş tarihi doluysa (maliyet-evrak akışından
     # ya da manuel girişten) durumu otomatik TESLİM EDİLDİ yap.
-    varis_tarihi = data.get('varis_tarihi') or None
-    gumrukleme_bitis = data.get('gumrukleme_bitis') or None
+    varis_tarihi = data.get('varis_tarihi', existing[5]) or None
+    gumrukleme_bitis = data.get('gumrukleme_bitis', existing[6]) or None
     durum = _normalize_durum(data.get('durum', 'YOLDA'))
     if (varis_tarihi or gumrukleme_bitis) and durum != 'TESLİM EDİLDİ':
         durum = 'TESLİM EDİLDİ'
@@ -227,7 +232,9 @@ def update_shipment(shipment_id, data):
             varis_tarihi          = %s,
             gumrukleme_bitis      = %s,
             durum                 = %s,
-            palet                 = %s
+            palet                 = %s,
+            yukleme_tarihi        = %s,
+            gumruk_tarihi         = %s
         WHERE id = %s
     ''', (
         data.get('ihracat_dosya_no', ''),
@@ -254,6 +261,8 @@ def update_shipment(shipment_id, data):
         gumrukleme_bitis,
         durum,
         data.get('palet') or None,
+        yukleme_tarihi,
+        gumruk_tarihi,
         shipment_id,
     ))
     conn.commit()

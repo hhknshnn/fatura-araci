@@ -572,16 +572,17 @@ function applyWeightAdjust() {
   const res = document.getElementById('adjustResult');
   res.className = 'adjust-result visible';
   if (selectedDepo === 'antrepo') {
+    // Antrepo'da NET henüz PDF'ten/elle onaylanmadı — İndir/menşe adımını
+    // burada AÇMA. applyNetAdjust() gerçek NET uygulanınca kendi açacak.
     res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: Hedef NET girin`;
     document.getElementById('antrepoSection').style.display = 'block';
   } else {
     res.innerHTML = `✓ BRÜT: ${round2(finalBrut)} kg &nbsp;|&nbsp; NET: ${round2(finalNet)} kg`;
-  }
-
-  if (selectedMod === 'oncesi') {
-    showMenseAyrim();
-  } else {
-    buildAndDownloadReady();
+    if (selectedMod === 'oncesi') {
+      showMenseAyrim();
+    } else {
+      buildAndDownloadReady();
+    }
   }
 }
 
@@ -774,8 +775,18 @@ async function downloadRS() {
       const kurlar = kurData.kurlar || {};
 
       // ── KUR HESAPLAMA — tamamen countries.json config'e göre ──────────────
-      const countryCfg = window.COUNTRIES_CACHE?.[currentCountry] || {};
-      const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi || 'api_eur';
+      // Cache açılışta yüklenememiş olabilir; kayıt anında tekrar dene.
+      let countriesAll = window.COUNTRIES_CACHE;
+      if (!countriesAll || !countriesAll[currentCountry]) {
+        try { countriesAll = await loadCountriesConfig(); } catch (e) { countriesAll = countriesAll || {}; }
+      }
+      const countryCfg = countriesAll?.[currentCountry] || {};
+
+      // Config gelmezse USD ülkeleri asla TRY dalına düşmesin (bkz. IHR2026000000239 vakası).
+      const USD_ULKELER = ['iq', 'ly', 'lr', 'lb', 'uz', 'abh', 'jo', 'mu'];
+      const isUsdUlke = USD_ULKELER.includes(currentCountry);
+      const sevkiyatKurKaynagi = countryCfg.sevkiyatKurKaynagi
+        || (isUsdUlke ? 'api_usd_to_eur' : 'api_eur');
       const navlunSigortaParaBirimi = (
         countryCfg.navlunSigortaParaBirimi || 'TRY'
       ).toUpperCase();
@@ -807,7 +818,8 @@ async function downloadRS() {
 
       // ── USD TARAFI — PDF'in kuru hangi para birimindeyse o kullanılır,
       // karşı para birimi her zaman API'den gelir ──────────────────────────
-      const pdfKurParaBirimi = (countryCfg.pdfKurParaBirimi || 'EUR').toUpperCase();
+      const pdfKurParaBirimi = (countryCfg.pdfKurParaBirimi
+        || (isUsdUlke ? 'USD' : 'EUR')).toUpperCase();
       const usd_kuru = pdfKurParaBirimi === 'USD'
         ? (pdfKur > 0 ? pdfKur : apiTryUsd)
         : apiTryUsd;

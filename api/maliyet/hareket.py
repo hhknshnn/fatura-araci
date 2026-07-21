@@ -14,6 +14,8 @@ from api.maliyet.meta import gecerli_ulke_kodlari
 # Bakiye hesabında kullanılan sabit kalem kodları (migration seed'i ile aynı)
 PALLET_IN_KOD = 'pallet_in'
 PALLET_OUT_KOD = 'pallet_out'
+BOX_IN_KOD = 'box_in'
+BOX_OUT_KOD = 'box_out'
 
 
 def _parse_date(value):
@@ -55,6 +57,21 @@ def palet_bakiye(cur, ulke, tarih=None):
           + ([ayar['acilis_tarihi']] if ayar['acilis_tarihi'] else [])))
     net = float(cur.fetchone()[0])
     return ayar['acilis_bakiye'] + net
+
+
+def box_bakiye(cur, ulke, tarih=None):
+    """Verilen tarihe kadar Box In − Box Out bakiyesi. Box için ayrı açılış
+    bakiyesi tanımı bulunmadığından hareket kayıtları sıfırdan kümüle edilir."""
+    if tarih is None:
+        tarih = datetime.date.today()
+    cur.execute('''
+        SELECT COALESCE(SUM(CASE WHEN k.kod = %s THEN h.miktar
+                                 WHEN k.kod = %s THEN -h.miktar END), 0)
+        FROM maliyet_hareketleri h
+        JOIN maliyet_kalemleri k ON k.id = h.kalem_id
+        WHERE h.ulke = %s AND k.kod IN (%s, %s) AND h.tarih <= %s
+    ''', (BOX_IN_KOD, BOX_OUT_KOD, ulke, BOX_IN_KOD, BOX_OUT_KOD, tarih))
+    return float(cur.fetchone()[0])
 
 
 def maliyet_hareket_get():

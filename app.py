@@ -32,11 +32,11 @@ from api.audit import log_action, audit_log_get, audit_log_export
 from api.maliyet.meta import maliyet_meta_get, maliyet_kalem_post, maliyet_kalem_put, maliyet_kalem_delete, maliyet_depo_ayar_put
 from api.maliyet.tarife import maliyet_tarife_get, maliyet_tarife_post, maliyet_tarife_delete
 from api.maliyet.hareket import maliyet_hareket_get, maliyet_hareket_bulk_post, maliyet_hareket_import_post, maliyet_hareket_delete
-from api.maliyet.hesap import maliyet_beklenen_get, maliyet_karsilastirma_get, maliyet_analiz_get
+from api.maliyet.hesap import maliyet_beklenen_get, maliyet_karsilastirma_get, maliyet_analiz_get, maliyet_depolama_get
 from api.maliyet.fatura import (maliyet_fatura_get, maliyet_fatura_post,
     maliyet_fatura_put, maliyet_fatura_delete, maliyet_fatura_pdf_post,
     maliyet_gercek_get)
-from api.maliyet.rapor import maliyet_rapor_get
+from api.maliyet.rapor import maliyet_rapor_get, maliyet_tarife_rapor_get
 
 def read_port():
     try:
@@ -666,6 +666,14 @@ def api_maliyet_depo_ayar():
     return maliyet_depo_ayar_put()
 
 
+@app.route('/api/maliyet/tarife/export', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_tarife_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_tarife_rapor_get()
+
+
 @app.route('/api/maliyet/hareket', methods=['GET', 'OPTIONS'])
 @app.route('/api/maliyet/hareket/<int:hareket_id>', methods=['DELETE', 'OPTIONS'])
 @require_auth()
@@ -707,6 +715,14 @@ def api_maliyet_karsilastirma():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return maliyet_karsilastirma_get()
+
+
+@app.route('/api/maliyet/depolama', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_depolama():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_depolama_get()
 
 
 @app.route('/api/maliyet/analiz', methods=['GET', 'OPTIONS'])

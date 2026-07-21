@@ -10,7 +10,8 @@ async function loadCountriesConfig() {
     return window.COUNTRIES_CACHE;
   } catch(e) {
     console.error('countries.json yükleme hatası:', e);
-    window.COUNTRIES_CACHE = {};
+    // Cache'i {} olarak bırakma: bir sonraki çağrıda yeniden denenebilsin.
+    window.COUNTRIES_CACHE = null;
     return {};
   }
 }

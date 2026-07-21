@@ -8,8 +8,12 @@ let mtState = {
   ulke: null,          // seçili ülke kodu
   tab: 'karsilastirma',
   tarifeler: [],       // seçili ülkenin tarife satırları
+  tumTarifeler: [],    // ülke karşılaştırma matrisi için tüm tarife satırları
+  tarifeUlke: 'all',   // tarife matrisi filtresi: all veya tek ülke kodu
+  tarifeDonem: '',     // karşılaştırma matrisi için YYYY-Qn
   historyOpen: {},     // { kalem_id: bool } — geçmiş versiyonlar açık mı
   kalemFormOpen: false,
+  kalemEditId: null,
   hareket: {           // Hareketler sekmesi
     data: null,        // { hareketler, bakiye }
     formTarih: new Date().toISOString().slice(0, 10),
@@ -28,13 +32,24 @@ let mtState = {
     list: null,
     editId: null,      // düzenleme modundaki fatura id'si
     draft: null,       // manuel veya PDF'den gelen, henüz kaydedilmemiş kırılım
+    filterStart: '',
+    filterEnd: '',
   },
   analiz: {            // Analiz sekmesi
     start: '',         // boşsa ilk açılışta son 6 ay atanır
     end: '',
+    hizliDonem: '',    // hızlı dönem seçimi yeniden çizimde görünür kalsın
+    ulke: 'all',       // all veya tek ülke kodu
     data: null,
     chart: null,       // Chart.js instance — re-render'da destroy edilir
     charts: [],        // Gerçek maliyet analizindeki çoklu grafikler
+    tarifeKalemId: null,
+    requestId: 0,      // hızlı filtre değişimlerinde eski API yanıtını yok saymak için
+  },
+  depolama: {
+    ulke: 'all',
+    data: null,
+    requestId: 0,
   },
   rapor: {             // Rapor sekmesi
     start: '',         // boşsa ilk açılışta geçen ay atanır
@@ -61,8 +76,9 @@ const MT_YONTEM_LABELS = {
 };
 
 const MT_TABS = [
-  { id: 'karsilastirma', label: 'Gerçek Maliyet', icon: 'ti-wallet' },
+  { id: 'karsilastirma', label: 'Maliyet', icon: 'ti-wallet' },
   { id: 'tarifeler',     label: 'Tarifeler',     icon: 'ti-list-details' },
+  { id: 'depolama',      label: 'Depolama',      icon: 'ti-building-warehouse' },
   { id: 'faturalar',     label: 'Faturalar',     icon: 'ti-receipt' },
   { id: 'analiz',        label: 'Analiz',        icon: 'ti-chart-dots-3' },
 ];
@@ -75,7 +91,8 @@ const MT_ULKE_COLORS = {
 const MT_BIRIM_LABELS = {
   palet: 'palet', koli: 'koli', siparis: 'sipariş', satir: 'satır',
   adet: 'adet', konteyner: 'konteyner', islem: 'işlem', ay: 'ay (sabit)',
-  palet_hafta: 'palet / hafta', palet_ay: 'palet / ay',
+  palet_gun: 'palet / gün', palet_hafta: 'palet / hafta', palet_ay: 'palet / ay',
+  box_gun: 'box / gün',
 };
 
 function mtBirimLabel(birim) {
@@ -165,6 +182,9 @@ function initMaliyetPanel() {
           color:var(--text);
           box-shadow:0 16px 30px color-mix(in srgb, var(--ulke-color) 16%, transparent);
         }
+        .mt-ulke-pill.all::before {
+          background:linear-gradient(135deg,#2563EB,#7C3AED,#F59E0B);
+        }
         .mt-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:12px; align-items:start; }
         .mt-card {
           border:1px solid rgba(15,23,42,0.08); border-radius:18px;
@@ -185,6 +205,83 @@ function initMaliyetPanel() {
         .mt-table tbody tr:hover td { background:#F0F9FF; }
         .mt-table tr.mt-history-row td { background:var(--bg); color:var(--text3); font-size:11.5px; }
         .mt-kalem-ad { font-weight:750; color:var(--text); white-space:nowrap; }
+        .mt-tarife-overview { padding:0; overflow:hidden; margin-bottom:12px; }
+        .mt-tarife-overview-head {
+          display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+          padding:20px 20px 16px; border-bottom:1px solid rgba(15,23,42,0.07);
+          background:linear-gradient(135deg,rgba(239,246,255,.82),rgba(240,253,250,.55) 58%,rgba(255,255,255,.9));
+        }
+        .mt-tarife-overview-title { display:flex; align-items:center; gap:12px; }
+        .mt-tarife-overview-icon {
+          display:grid; place-items:center; width:38px; height:38px; flex:0 0 38px;
+          border-radius:12px; color:#fff; font-size:19px;
+          background:linear-gradient(135deg,#2563EB,#0F766E); box-shadow:0 10px 22px rgba(37,99,235,.22);
+        }
+        .mt-tarife-count {
+          display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
+          background:rgba(255,255,255,.8); border:1px solid rgba(15,23,42,.08);
+          color:var(--text2); font-size:10.5px; font-weight:800; white-space:nowrap;
+        }
+        .mt-tarife-periods { display:flex; align-items:center; gap:5px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--surface3); }
+        .mt-tarife-period-label { margin-right:5px; color:var(--text3); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+        .mt-tarife-period {
+          border:1px solid var(--surface3); border-radius:8px; background:#fff; color:var(--text2);
+          padding:5px 8px; font:750 10.5px var(--font); cursor:pointer;
+        }
+        .mt-tarife-period:hover { border-color:#93C5FD; color:#1D4ED8; }
+        .mt-tarife-period.active { color:#fff; border-color:#2563EB; background:#2563EB; box-shadow:0 5px 12px rgba(37,99,235,.2); }
+        .mt-tarife-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; padding:9px 14px; }
+        .mt-tarife-stat { padding:7px 10px; border-radius:10px; background:var(--bg); border:1px solid var(--surface3); }
+        .mt-tarife-stat strong { display:block; color:var(--text); font-size:15px; line-height:1.1; }
+        .mt-tarife-stat span { display:block; color:var(--text3); font-size:10.5px; font-weight:700; margin-top:4px; }
+        .mt-tarife-matrix-wrap { overflow:auto; border-top:1px solid var(--surface3); }
+        .mt-tarife-matrix { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; font-size:10px; }
+        .mt-tarife-matrix th {
+          position:sticky; top:0; z-index:2; padding:8px 7px; text-align:center;
+          background:linear-gradient(180deg,#F8FBFF 0%,#EDF4FB 100%); border-bottom:1px solid #D7E3F0; color:#475569;
+          font-size:9px; text-transform:uppercase; letter-spacing:.025em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        .mt-tarife-matrix th:first-child { left:0; z-index:3; width:132px; }
+        .mt-tarife-country-head { display:flex; align-items:center; justify-content:center; gap:5px; }
+        .mt-tarife-country-head::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--country-color); }
+        .mt-tarife-matrix td { padding:2px; height:38px; border-bottom:1px solid #E5EDF5; border-right:1px solid #E5EDF5; background:#fff; overflow:hidden; }
+        .mt-tarife-matrix tbody tr:last-child td { border-bottom:0; }
+        .mt-tarife-matrix td:first-child {
+          position:sticky; left:0; z-index:1; padding:6px 8px; background:#FAFCFF;
+          color:var(--text); font-size:9.5px; line-height:1.15; font-weight:780; text-align:center; box-shadow:8px 0 18px rgba(15,23,42,.025);
+        }
+        .mt-tarife-matrix tbody tr:nth-child(even) td { background:#F4F8FC; }
+        .mt-tarife-matrix tbody tr:nth-child(even) td:first-child { background:#ECF3FA; }
+        .mt-tarife-matrix tbody tr:hover td { background:#E8F3FF; }
+        .mt-tarife-matrix tbody tr:hover td:first-child { background:#DDEEFF; }
+        .mt-tarife-cell {
+          width:100%; min-width:0; border:1px solid rgba(37,99,235,.10); border-radius:8px; background:rgba(37,99,235,.045);
+          padding:4px 5px; text-align:center; cursor:pointer; color:var(--text); font-family:var(--font); overflow:hidden;
+          transition:background .14s ease,border-color .14s ease,transform .14s ease;
+        }
+        .mt-tarife-cell:hover { transform:translateY(-1px); background:#DBEAFE; border-color:#93C5FD; }
+        .mt-tarife-cell.is-selected { background:#DBEAFE; border-color:#60A5FA; box-shadow:inset 0 0 0 1px rgba(37,99,235,.08); }
+        .mt-tarife-cell-price { display:block; font-size:9.5px; font-weight:820; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mt-tarife-kalem-head { display:flex; align-items:center; justify-content:center; gap:6px; }
+        .mt-tarife-kalem-label { display:block; padding:0 18px; }
+        .mt-tarife-kalem-remove { position:absolute; right:5px; top:50%; transform:translateY(-50%); opacity:.45; }
+        .mt-tarife-matrix tr:hover .mt-tarife-kalem-remove { opacity:1; }
+        .mt-tarife-cell-empty { display:block; padding:7px 4px; color:#CBD5E1; text-align:center; }
+        .mt-tarife-delta { margin-left:3px; font-size:8px; font-weight:850; }
+        .mt-tarife-delta.up { color:#DC2626; }.mt-tarife-delta.down { color:#059669; }
+        .mt-tarife-future { color:#B45309; }
+        .mt-tarife-legend { display:flex; gap:14px; flex-wrap:wrap; padding:11px 20px 14px; color:var(--text3); font-size:10.5px; }
+        .mt-tarife-legend span { display:inline-flex; align-items:center; gap:6px; }
+        .mt-tarife-legend i { width:7px; height:7px; border-radius:50%; background:#2563EB; }
+        .mt-tarife-legend .future i { background:#F59E0B; }
+        .mt-kalem-list { display:grid; gap:5px; max-height:260px; overflow:auto; margin-top:10px; padding-right:2px; }
+        .mt-kalem-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; align-items:center; padding:7px 8px; border:1px solid var(--surface3); border-radius:10px; background:#fff; }
+        .mt-kalem-row.inactive { opacity:.6; background:var(--bg); }
+        .mt-kalem-row-name { color:var(--text); font-size:10.5px; font-weight:780; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-kalem-row-meta { color:var(--text3); font-size:8.5px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mt-kalem-actions { display:flex; gap:2px; }
+        .mt-kalem-presets { display:flex; flex-wrap:wrap; gap:5px; }
+        .mt-kalem-preset { border:1px dashed #93C5FD; border-radius:8px; background:#EFF6FF; color:#1D4ED8; padding:5px 7px; font:700 9px var(--font); cursor:pointer; }
         .mt-pill {
           display:inline-block; border-radius:999px; padding:3px 9px;
           font-size:10.5px; font-weight:750; white-space:nowrap;
@@ -295,6 +392,8 @@ function initMaliyetPanel() {
         @media (max-width: 640px) {
           .mt-shell { padding:12px 14px 16px; }
           .mt-form-row { grid-template-columns:1fr; }
+          .mt-tarife-overview-head { padding:16px; }
+          .mt-tarife-stats { grid-template-columns:1fr; padding:12px 16px; }
         }
       </style>
       <div class="mt-shell">
@@ -347,20 +446,57 @@ function mtRenderTabs() {
 function mtSelectTab(tab) {
   mtState.tab = tab;
   mtRenderTabs();
+  mtRenderUlkePills();
   mtRenderContent();
 }
 
 function mtRenderUlkePills() {
   const box = document.getElementById('mt-ulke-pills');
   if (!box || !mtState.meta) return;
-  box.innerHTML = mtState.meta.ulkeler.map(u => `
-    <button class="mt-ulke-pill ${mtState.ulke === u.kod ? 'active' : ''}"
+  const tumUlkeliTab = mtState.tab === 'analiz' || mtState.tab === 'depolama' || mtState.tab === 'tarifeler';
+  const secim = mtState.tab === 'depolama'
+    ? (mtState.depolama.ulke || 'all')
+    : mtState.tab === 'tarifeler'
+      ? (mtState.tarifeUlke || 'all')
+      : (mtState.analiz.ulke || 'all');
+  const tumu = tumUlkeliTab ? `
+    <button class="mt-ulke-pill all ${secim === 'all' ? 'active' : ''}"
+            style="--ulke-color:#2563EB;"
+            onclick="mtSelectUlke('all')">Tüm Ülkeler</button>` : '';
+  box.innerHTML = tumu + mtState.meta.ulkeler.map(u => `
+    <button class="mt-ulke-pill ${(tumUlkeliTab ? secim : mtState.ulke) === u.kod ? 'active' : ''}"
             style="--ulke-color:${mtUlkeColor(u.kod)};"
             onclick="mtSelectUlke('${u.kod}')">${mtEsc(u.label)}</button>
   `).join('');
 }
 
 function mtSelectUlke(kod) {
+  if (mtState.tab === 'tarifeler') {
+    if (mtState.tarifeUlke === kod) return;
+    mtState.tarifeUlke = kod;
+    if (kod !== 'all') {
+      mtState.ulke = kod;
+      mtState.historyOpen = {};
+      mtState.tarifeler = mtState.tumTarifeler.filter(r => r.ulke === kod);
+    }
+    mtRenderUlkePills();
+    mtRenderTarife();
+    return;
+  }
+  if (mtState.tab === 'depolama') {
+    if (mtState.depolama.ulke === kod) return;
+    mtState.depolama.ulke = kod;
+    mtRenderUlkePills();
+    mtRenderDepolama();
+    return;
+  }
+  if (mtState.tab === 'analiz') {
+    if (mtState.analiz.ulke === kod) return;
+    mtState.analiz.ulke = kod;
+    mtRenderUlkePills();
+    mtRenderAnaliz();
+    return;
+  }
   if (mtState.ulke === kod) return;
   mtState.ulke = kod;
   mtState.historyOpen = {};
@@ -376,6 +512,10 @@ function mtRenderContent() {
   if (!content || !mtState.meta) return;
   if (mtState.tab === 'tarifeler') {
     mtLoadTarife();
+    return;
+  }
+  if (mtState.tab === 'depolama') {
+    mtLoadDepolama();
     return;
   }
   if (mtState.tab === 'hareketler') {
@@ -407,6 +547,106 @@ function mtRenderContent() {
   `;
 }
 
+// ── DEPOLAMA SEKMESİ ────────────────────────────────────────────────────────
+
+async function mtLoadDepolama() {
+  const content = document.getElementById('mt-content');
+  if (!content) return;
+  const requestId = ++mtState.depolama.requestId;
+  content.innerHTML = '<div class="mt-empty">Depolama maliyetleri hesaplanıyor…</div>';
+  try {
+    const res = await fetch('/api/maliyet/depolama', { cache: 'no-store' });
+    const data = await res.json();
+    if (requestId !== mtState.depolama.requestId || mtState.tab !== 'depolama') return;
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    mtState.depolama.data = data;
+    mtRenderDepolama();
+  } catch (e) {
+    if (requestId !== mtState.depolama.requestId || mtState.tab !== 'depolama') return;
+    content.innerHTML = `<div class="mt-empty">Depolama maliyetleri alınamadı: ${mtEsc(e.message)}</div>`;
+  }
+}
+
+function mtDepolamaMaliyetHtml(row, period) {
+  if (!row.tarifeler?.length) return '<span class="mt-storage-missing">Tarife yok</span>';
+  return row.tarifeler.map(t => {
+    const native = mtFmtFiyat(t.maliyet?.[period], t.para_birimi);
+    const eur = t.maliyet_eur?.[period];
+    const eurAlt = t.para_birimi !== 'EUR' && eur != null ? `<span>≈ ${mtFmtEur(eur)}</span>` : '';
+    return `<div class="mt-storage-cost"><b>${native}</b>${eurAlt}</div>`;
+  }).join('');
+}
+
+function mtDepolamaStokHtml(row) {
+  if (row.tarifeler?.length) {
+    return row.tarifeler.map(t => `<div class="mt-storage-pallet">${mtFmtMiktar(t.bekleyen_miktar)} <small>${mtEsc(t.stok_birimi)}</small></div>`).join('');
+  }
+  const stoklar = [];
+  if (Number(row.palet_bakiye || 0)) stoklar.push(`${mtFmtMiktar(row.palet_bakiye)} palet`);
+  if (Number(row.box_bakiye || 0)) stoklar.push(`${mtFmtMiktar(row.box_bakiye)} box`);
+  return `<span class="mt-storage-pallet">${stoklar.join('<br>') || '0'}</span>`;
+}
+
+function mtRenderDepolama() {
+  const content = document.getElementById('mt-content');
+  const data = mtState.depolama.data;
+  if (!content || !data) return;
+  const rows = mtState.depolama.ulke === 'all'
+    ? (data.rows || [])
+    : (data.rows || []).filter(r => r.ulke === mtState.depolama.ulke);
+  const tarifeli = rows.filter(r => r.tarifeli);
+  const paletToplam = rows.reduce((s, r) => s + Number(r.palet_bakiye || 0), 0);
+  const boxToplam = rows.reduce((s, r) => s + Number(r.box_bakiye || 0), 0);
+  const toplam = key => tarifeli.reduce((s, r) => s + Number(r[key] || 0), 0);
+
+  content.innerHTML = `
+    <style>
+      .mt-storage-hero{overflow:hidden;background:linear-gradient(135deg,#0F172A 0%,#164E63 100%);color:#fff;border:0}
+      .mt-storage-hero .mt-card-title{color:#fff;font-size:18px}.mt-storage-hero .mt-card-sub{color:rgba(255,255,255,.68);margin-bottom:0}
+      .mt-storage-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:18px}
+      .mt-storage-kpi{padding:13px;border-radius:14px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.12)}
+      .mt-storage-kpi span{display:block;color:rgba(255,255,255,.62);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+      .mt-storage-kpi strong{display:block;color:#fff;font-size:19px;margin-top:6px;white-space:nowrap}
+      .mt-storage-table tbody tr:nth-child(even) td{background:#F5F9FC}.mt-storage-table td{vertical-align:middle}
+      .mt-storage-country{display:flex;align-items:center;gap:9px;font-weight:800;color:var(--text);white-space:nowrap}
+      .mt-storage-dot{width:9px;height:9px;border-radius:50%;background:var(--country-color);box-shadow:0 0 0 4px color-mix(in srgb,var(--country-color) 15%,transparent)}
+      .mt-storage-pallet{font-size:15px;font-weight:850;color:var(--text)}.mt-storage-pallet small{font-size:9.5px;color:var(--text3)}
+      .mt-storage-tariff b{display:block;color:var(--text);font-size:11.5px}.mt-storage-tariff span,.mt-storage-cost span{display:block;color:var(--text3);font-size:9.5px;margin-top:2px}
+      .mt-storage-cost b{color:var(--text);font-size:12px}.mt-storage-missing{display:inline-flex;padding:4px 8px;border-radius:999px;background:#FEF2F2;color:#B91C1C;font-size:10px;font-weight:800}
+      @media(max-width:1050px){.mt-storage-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:650px){.mt-storage-kpis{grid-template-columns:1fr 1fr}}
+    </style>
+    <div class="mt-card mt-storage-hero">
+      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div><div class="mt-card-title">Depolama Maliyetleri</div><div class="mt-card-sub">Bekleyen palet veya box × geçerli Storage tarifesi · aylık karşılaştırma 30 gün üzerinden hesaplanır.</div></div>
+        <span class="mt-tarife-count" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.18)"><i class="ti ti-calendar"></i>${mtFmtTarih(data.tarih)}</span>
+      </div>
+      <div class="mt-storage-kpis">
+        <div class="mt-storage-kpi"><span>Bekleyen Palet</span><strong>${mtFmtMiktar(paletToplam)}</strong></div>
+        <div class="mt-storage-kpi"><span>Bekleyen Box</span><strong>${mtFmtMiktar(boxToplam)}</strong></div>
+        <div class="mt-storage-kpi"><span>Günlük Beklenen</span><strong>${tarifeli.length ? mtFmtEur(toplam('gunluk_eur')) : '—'}</strong></div>
+        <div class="mt-storage-kpi"><span>Haftalık Beklenen</span><strong>${tarifeli.length ? mtFmtEur(toplam('haftalik_eur')) : '—'}</strong></div>
+        <div class="mt-storage-kpi"><span>Aylık Beklenen</span><strong>${tarifeli.length ? mtFmtEur(toplam('aylik_eur')) : '—'}</strong></div>
+        <div class="mt-storage-kpi"><span>Tarifeli Ülke</span><strong>${tarifeli.length}/${rows.length}</strong></div>
+      </div>
+    </div>
+    <div class="mt-card" style="margin-top:12px">
+      <div class="mt-card-title">Ülke Bazlı Depolama Beklentisi</div>
+      <div class="mt-card-sub">Güncel palet/box bakiyesi, seçili tarihte geçerli tarife ve tahmini dönem maliyetleri.</div>
+      <div class="mt-table-wrap"><table class="mt-table mt-storage-table">
+        <thead><tr><th>Ülke</th><th style="text-align:right">Bekleyen</th><th>Storage Tarifesi</th><th style="text-align:right">Günlük</th><th style="text-align:right">Haftalık</th><th style="text-align:right">Aylık (30 gün)</th></tr></thead>
+        <tbody>${rows.map(r => `<tr>
+          <td><div class="mt-storage-country"><span class="mt-storage-dot" style="--country-color:${mtUlkeColor(r.ulke)}"></span>${mtEsc(r.label)}</div></td>
+          <td style="text-align:right">${mtDepolamaStokHtml(r)}</td>
+          <td>${r.tarifeler?.length ? r.tarifeler.map(t => `<div class="mt-storage-tariff"><b>${mtFmtFiyat(t.birim_fiyat,t.para_birimi)} / ${mtEsc(mtBirimLabel(t.birim))}</b><span>${mtFmtTarih(t.gecerli_baslangic)} başlangıçlı</span></div>`).join('') : '<span class="mt-storage-missing">Storage tarifesi yok</span>'}</td>
+          <td style="text-align:right">${mtDepolamaMaliyetHtml(r,'gunluk')}</td>
+          <td style="text-align:right">${mtDepolamaMaliyetHtml(r,'haftalik')}</td>
+          <td style="text-align:right">${mtDepolamaMaliyetHtml(r,'aylik')}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      ${data.ozet?.kur_eksik ? '<div class="mt-uyari" style="margin-top:10px">Bazı para birimleri EUR kuruna çevrilemedi; ilgili ülkenin kendi para birimi gösterildi.</div>' : ''}
+    </div>`;
+}
+
 // ── TARİFELER SEKMESİ ────────────────────────────────────────────────────────
 
 async function mtLoadTarife() {
@@ -414,10 +654,11 @@ async function mtLoadTarife() {
   if (!content || !mtState.ulke) return;
   content.innerHTML = '<div class="mt-empty">Tarifeler yükleniyor…</div>';
   try {
-    const res = await fetch('/api/maliyet/tarife?ulke=' + encodeURIComponent(mtState.ulke), { cache: 'no-store' });
+    const res = await fetch('/api/maliyet/tarife?all=1', { cache: 'no-store' });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-    mtState.tarifeler = data.tarifeler || [];
+    mtState.tumTarifeler = data.tarifeler || [];
+    mtState.tarifeler = mtState.tumTarifeler.filter(r => r.ulke === mtState.ulke);
   } catch (e) {
     content.innerHTML = `<div class="mt-empty">Tarifeler alınamadı: ${mtEsc(e.message)}</div>`;
     return;
@@ -434,8 +675,11 @@ function mtRenderTarife() {
   if (!content) return;
   const ulke = mtUlkeObj();
   const aktifKalemler = (mtState.meta.kalemler || []).filter(k => k.aktif);
+  const ulkeSecili = mtState.tarifeUlke && mtState.tarifeUlke !== 'all';
 
   content.innerHTML = `
+    ${mtRenderTarifeMatrix()}
+    ${ulkeSecili ? `
     <div class="mt-grid">
       <div class="mt-card">
         <div class="mt-card-title">${mtEsc(ulke.label || '')} — Aktif Tarife</div>
@@ -490,10 +734,205 @@ function mtRenderTarife() {
         </div>
       </div>
     </div>
+    ` : ''}
   `;
+  if (!ulkeSecili) return;
   mtRenderTarifeTable();
   mtOnKalemChange();
   mtRenderKalemForm();
+}
+
+function mtTarifeDonemleri() {
+  const mevcutYil = new Date().getFullYear();
+  const tarifeYillari = mtState.tumTarifeler.map(r => Number(String(r.gecerli_baslangic).slice(0, 4))).filter(Boolean);
+  const ilkYil = 2025;
+  const sonYil = Math.max(2026, mevcutYil, ...tarifeYillari);
+  const donemler = [];
+  for (let yil = ilkYil; yil <= sonYil; yil += 1) {
+    donemler.push({ key: `${yil}-Y`, label: `${yil} / Tüm Yıl`, tip: 'yil' });
+    for (let q = 1; q <= 4; q += 1) {
+      donemler.push({ key: `${yil}-Q${q}`, label: `${yil} / ${q}. Dönem`, tip: 'ceyrek' });
+    }
+  }
+  return donemler;
+}
+
+function mtTarifeDonemSonu(key) {
+  if (/^\d{4}-Y$/.test(String(key))) return `${String(key).slice(0, 4)}-12-31`;
+  const [yil, qText] = String(key).split('-Q');
+  const q = Number(qText);
+  const ay = String(q * 3).padStart(2, '0');
+  const gun = q === 1 || q === 4 ? '31' : '30';
+  return `${yil}-${ay}-${gun}`;
+}
+
+function mtTarifeDonemBaslangici(key) {
+  if (/^\d{4}-Y$/.test(String(key))) return `${String(key).slice(0, 4)}-01-01`;
+  const [yil, qText] = String(key).split('-Q');
+  const ay = String((Number(qText) - 1) * 3 + 1).padStart(2, '0');
+  return `${yil}-${ay}-01`;
+}
+
+function mtTarifeOncekiDonemSonu(key) {
+  if (/^\d{4}-Y$/.test(String(key))) return `${Number(String(key).slice(0, 4)) - 1}-12-31`;
+  let [yil, q] = String(key).split('-Q').map(Number);
+  q -= 1;
+  if (q === 0) { yil -= 1; q = 4; }
+  return mtTarifeDonemSonu(`${yil}-Q${q}`);
+}
+
+function mtTarifeDonemSec(key) {
+  mtState.tarifeDonem = key;
+  mtRenderTarife();
+}
+
+function mtTarifeDonemLabel(key) {
+  return mtTarifeDonemleri().find(d => d.key === key)?.label || String(key);
+}
+
+async function mtExcelDosyaIndir(url, dosyaAdi, button) {
+  const onceki = button?.innerHTML;
+  if (button) { button.disabled = true; button.innerHTML = '<i class="ti ti-loader-2"></i> Hazırlanıyor…'; }
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get('Content-Type') || '';
+    if (!res.ok || contentType.includes('application/json')) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error || 'Sunucu hatası');
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = dosyaAdi;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert('Rapor indirilemedi: ' + e.message);
+  } finally {
+    if (button) { button.disabled = false; button.innerHTML = onceki; }
+  }
+}
+
+function mtTarifeRaporIndir(button) {
+  const donem = mtState.tarifeDonem;
+  const params = new URLSearchParams({ donem });
+  if (mtState.tarifeUlke && mtState.tarifeUlke !== 'all') {
+    params.set('ulke', mtState.tarifeUlke);
+  }
+  const ulkeEki = mtState.tarifeUlke && mtState.tarifeUlke !== 'all' ? `_${mtState.tarifeUlke}` : '';
+  return mtExcelDosyaIndir(
+    '/api/maliyet/tarife/export?' + params.toString(),
+    `tarife_raporu_${donem}${ulkeEki}.xlsx`,
+    button,
+  );
+}
+
+function mtTarifeGosterilecekVersiyon(rows, tarih) {
+  return rows.filter(r => r.gecerli_baslangic <= tarih)
+    .sort((a, b) => b.gecerli_baslangic.localeCompare(a.gecerli_baslangic))[0];
+}
+
+function mtRenderTarifeMatrix() {
+  const tumUlkeler = mtState.meta.ulkeler || [];
+  const ulkeler = mtState.tarifeUlke === 'all'
+    ? tumUlkeler
+    : tumUlkeler.filter(u => u.kod === mtState.tarifeUlke);
+  const aktifKalemler = (mtState.meta.kalemler || []).filter(k => k.aktif);
+  const donemler = mtTarifeDonemleri();
+  if (!mtState.tarifeDonem) {
+    const now = new Date();
+    mtState.tarifeDonem = `${now.getFullYear()}-Y`;
+  }
+  const donemSonu = mtTarifeDonemSonu(mtState.tarifeDonem);
+  const oncekiDonemSonu = mtTarifeOncekiDonemSonu(mtState.tarifeDonem);
+  const satirlar = aktifKalemler.map(kalem => {
+    const hucreler = {};
+    ulkeler.forEach(ulke => {
+      const rows = mtState.tumTarifeler.filter(r => r.ulke === ulke.kod && r.kalem_id === kalem.id);
+      hucreler[ulke.kod] = {
+        secili: mtTarifeGosterilecekVersiyon(rows, donemSonu),
+        onceki: mtTarifeGosterilecekVersiyon(rows, oncekiDonemSonu),
+      };
+    });
+    return { kalem, hucreler };
+  });
+
+  const donemSatirlari = satirlar.flatMap(s => Object.values(s.hucreler).map(h => h.secili).filter(Boolean));
+  const aktifUlkeler = new Set(donemSatirlari.map(r => r.ulke)).size;
+  const paraBirimleri = [...new Set(donemSatirlari.map(r => r.para_birimi))].sort();
+  const degisimSayisi = satirlar.reduce((toplam, s) => toplam + Object.values(s.hucreler).filter(h => h.secili && h.onceki && (h.secili.birim_fiyat !== h.onceki.birim_fiyat || h.secili.para_birimi !== h.onceki.para_birimi)).length, 0);
+
+  return `
+    <div class="mt-card mt-tarife-overview">
+      <div class="mt-tarife-overview-head">
+        <div class="mt-tarife-overview-title">
+          <span class="mt-tarife-overview-icon"><i class="ti ti-table"></i></span>
+          <div>
+            <div class="mt-card-title">Ülke Bazlı Maliyet Tablosu</div>
+            <div class="mt-card-sub" style="margin-bottom:0">Güncel birim maliyetleri tek tabloda karşılaştırın; bir hücreye tıklayarak tarifeyi düzenleyin.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="mt-btn secondary" style="height:34px" onclick="mtTarifeRaporIndir(this)"><i class="ti ti-file-spreadsheet"></i> Excel Raporu</button>
+          <span class="mt-tarife-count"><i class="ti ti-world"></i>${ulkeler.length} ülke</span>
+        </div>
+      </div>
+      <div class="mt-tarife-periods">
+        <label class="mt-field" style="width:210px"><span class="mt-field-label">Gösterilecek Dönem</span><select class="mt-select" style="height:34px" onchange="mtTarifeDonemSec(this.value)">${donemler.map(d => `<option value="${d.key}" ${d.key === mtState.tarifeDonem ? 'selected' : ''}>${d.label}</option>`).join('')}</select></label>
+        <span class="mt-hint" style="margin:0">Tablo seçtiğiniz dönemin sonunda geçerli olan fiyatları gösterir.</span>
+      </div>
+      <div class="mt-tarife-stats">
+        <div class="mt-tarife-stat"><strong>${donemSatirlari.length}</strong><span>${mtTarifeDonemLabel(mtState.tarifeDonem)} tarifesi</span></div>
+        <div class="mt-tarife-stat"><strong>${aktifUlkeler}/${ulkeler.length}</strong><span>Tarifeli ülke</span></div>
+        <div class="mt-tarife-stat"><strong>${degisimSayisi}</strong><span>Önceki döneme göre fiyat değişimi · ${paraBirimleri.join(' / ') || '—'}</span></div>
+      </div>
+      ${satirlar.length ? `
+        <div class="mt-tarife-matrix-wrap">
+          <table class="mt-tarife-matrix" style="width:${132 + ulkeler.length * 85}px;min-width:${132 + ulkeler.length * 85}px">
+            <colgroup><col style="width:132px">${ulkeler.map(() => '<col style="width:85px">').join('')}</colgroup>
+            <thead><tr>
+              <th><span class="mt-tarife-kalem-head">Maliyet kalemi<button class="mt-icon-btn" title="Yeni maliyet kalemi ekle" onclick="mtKalemYeniAc()"><i class="ti ti-plus"></i></button></span></th>
+              ${ulkeler.map(u => `<th><span class="mt-tarife-country-head" style="--country-color:${mtUlkeColor(u.kod)}">${mtEsc(u.label)}</span></th>`).join('')}
+            </tr></thead>
+            <tbody>${satirlar.map(s => `<tr>
+              <td><span class="mt-tarife-kalem-label">${mtEsc(s.kalem.ad)}</span><button class="mt-icon-btn mt-tarife-kalem-remove" title="Bu maliyet kalemini çıkar" onclick="mtKalemSil(${s.kalem.id})"><i class="ti ti-x"></i></button></td>
+              ${ulkeler.map(u => {
+                const h = s.hucreler[u.kod];
+                const r = h.secili;
+                if (!r) return '<td><span class="mt-tarife-cell-empty">—</span></td>';
+                const gelecek = r.gecerli_baslangic > new Date().toISOString().slice(0, 10);
+                const kiyaslanabilir = h.onceki && h.onceki.para_birimi === r.para_birimi && Number(h.onceki.birim_fiyat) !== 0;
+                const delta = kiyaslanabilir ? ((Number(r.birim_fiyat) - Number(h.onceki.birim_fiyat)) / Number(h.onceki.birim_fiyat) * 100) : 0;
+                const deltaHtml = Math.abs(delta) > .001 ? `<span class="mt-tarife-delta ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'}${Math.abs(delta).toFixed(1)}%</span>` : '';
+                return `<td><button class="mt-tarife-cell ${mtState.tarifeUlke !== 'all' && u.kod === mtState.tarifeUlke ? 'is-selected' : ''}" onclick="mtSelectTarifeCell('${u.kod}',${s.kalem.id})" title="${mtEsc(u.label)} · ${mtEsc(s.kalem.ad)} · ${mtFmtTarih(r.gecerli_baslangic)} başlangıçlı">
+                  <span class="mt-tarife-cell-price ${gelecek ? 'mt-tarife-future' : ''}">${mtFmtFiyat(r.birim_fiyat, r.para_birimi)}${deltaHtml}</span>
+                </button></td>`;
+              }).join('')}
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>
+        <div class="mt-tarife-legend"><span><i></i>Seçili dönemde geçerli</span><span class="future"><i></i>İleri başlangıçlı</span><span>▲/▼ Önceki çeyreğe göre değişim</span><span>— Tarife tanımlanmamış</span></div>
+      ` : '<div class="mt-empty" style="padding:20px">Henüz hiçbir ülke için tarife girilmedi.</div>'}
+    </div>
+  `;
+}
+
+function mtSelectTarifeCell(ulkeKod, kalemId) {
+  mtState.tarifeUlke = ulkeKod;
+  mtState.ulke = ulkeKod;
+  mtState.historyOpen = {};
+  mtState.tarifeler = mtState.tumTarifeler.filter(r => r.ulke === ulkeKod);
+  mtRenderUlkePills();
+  mtRenderTarife();
+  requestAnimationFrame(() => {
+    const select = document.getElementById('mt-f-kalem');
+    if (select) {
+      select.value = String(kalemId);
+      mtOnKalemChange();
+      select.closest('.mt-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      select.focus({ preventScroll: true });
+    }
+  });
 }
 
 function mtRenderTarifeTable() {
@@ -615,68 +1054,145 @@ async function mtDeleteTarife(id) {
 
 // ── KALEM TANIMLARI ──────────────────────────────────────────────────────────
 
+const MT_KALEM_ONERILERI = [
+  { ad: 'Pallet Out', birim: 'palet', tip: 'hareket' },
+  { ad: 'Box In', birim: 'koli', tip: 'hareket' },
+  { ad: 'Box Out', birim: 'koli', tip: 'hareket' },
+  { ad: 'Storage', birim: 'palet_gun,palet_hafta,palet_ay,box_gun', tip: 'storage' },
+  { ad: 'Order Processing Fee', birim: 'siparis', tip: 'hareket' },
+  { ad: 'Picking per Line', birim: 'satir', tip: 'hareket' },
+  { ad: 'Labeling / Relabeling', birim: 'adet', tip: 'hareket' },
+  { ad: 'Returns Handling', birim: 'palet,koli', tip: 'hareket' },
+  { ad: 'Transport / Delivery', birim: 'palet,islem', tip: 'hareket' },
+  { ad: 'Fuel Surcharge', birim: 'islem', tip: 'hareket' },
+];
+
+const MT_KALEM_TIP_LABELS = { hareket: 'Miktar × fiyat', sabit: 'Aylık sabit', storage: 'Depolama', minimum: 'Minimum ücret' };
+
 function mtRenderKalemForm() {
   const box = document.getElementById('mt-kalem-form-box');
   if (!box) return;
-  if (!mtState.kalemFormOpen) {
-    box.innerHTML = '<button class="mt-btn secondary" onclick="mtToggleKalemForm()">+ Yeni Kalem Ekle</button>';
-    return;
-  }
-  box.innerHTML = `
-    <div class="mt-form">
+  const kalemler = (mtState.meta.kalemler || []).slice().sort((a, b) => a.sira - b.sira || a.id - b.id);
+  const edit = kalemler.find(k => k.id === mtState.kalemEditId);
+  const form = !mtState.kalemFormOpen ? `
+    <button class="mt-btn secondary" style="width:100%;height:36px" onclick="mtToggleKalemForm()"><i class="ti ti-plus"></i> Yeni Maliyet Kalemi</button>
+  ` : `
+    <div class="mt-form" style="padding:10px;border:1px solid #BFDBFE;border-radius:12px;background:#F8FBFF">
+      ${edit ? '' : `<div><span class="mt-field-label">Hızlı ekle</span><div class="mt-kalem-presets" style="margin-top:5px">${MT_KALEM_ONERILERI.map((o, i) => `<button class="mt-kalem-preset" onclick="mtKalemOneriDoldur(${i})">+ ${mtEsc(o.ad)}</button>`).join('')}</div></div>`}
       <label class="mt-field">
         <span class="mt-field-label">Kalem Adı</span>
-        <input class="mt-input" id="mt-k-ad" type="text" maxlength="80" placeholder="ör. Kitting / Bundling">
+        <input class="mt-input" id="mt-k-ad" type="text" maxlength="80" value="${mtEsc(edit?.ad || '')}" placeholder="ör. Kitting / Bundling">
       </label>
       <div class="mt-form-row">
         <label class="mt-field">
           <span class="mt-field-label">Birim(ler) — virgülle</span>
-          <input class="mt-input" id="mt-k-birim" type="text" placeholder="ör. adet veya palet,koli">
+          <input class="mt-input" id="mt-k-birim" type="text" value="${mtEsc((edit?.birim_secenekleri || []).join(','))}" placeholder="ör. palet,koli">
         </label>
         <label class="mt-field">
-          <span class="mt-field-label">Tip</span>
+          <span class="mt-field-label">Hesaplama Tipi</span>
           <select class="mt-select" id="mt-k-tip">
-            <option value="hareket">Hareket (miktar × fiyat)</option>
-            <option value="sabit">Aylık sabit ücret</option>
-            <option value="storage">Storage (bakiye bazlı)</option>
-            <option value="minimum">Minimum aylık ücret</option>
+            <option value="hareket" ${edit?.tip === 'hareket' ? 'selected' : ''}>Hareket (miktar × fiyat)</option>
+            <option value="sabit" ${edit?.tip === 'sabit' ? 'selected' : ''}>Aylık sabit ücret</option>
+            <option value="storage" ${edit?.tip === 'storage' ? 'selected' : ''}>Storage (bakiye bazlı)</option>
+            <option value="minimum" ${edit?.tip === 'minimum' ? 'selected' : ''}>Minimum aylık ücret</option>
           </select>
         </label>
       </div>
       <div class="mt-form-row">
-        <button class="mt-btn" onclick="mtSubmitKalem()">Kalemi Ekle</button>
-        <button class="mt-btn secondary" onclick="mtToggleKalemForm()">Vazgeç</button>
+        <label class="mt-field"><span class="mt-field-label">Görünüm Sırası</span><input class="mt-input" id="mt-k-sira" type="number" min="0" step="10" value="${edit?.sira || ''}" placeholder="otomatik"></label>
+        <div class="mt-form-row" style="align-items:end"><button class="mt-btn" onclick="mtSubmitKalem()">${edit ? 'Güncelle' : 'Kalemi Ekle'}</button><button class="mt-btn secondary" onclick="mtToggleKalemForm()">Vazgeç</button></div>
       </div>
+    </div>`;
+
+  box.innerHTML = `
+    ${form}
+    <div class="mt-kalem-list">
+      ${kalemler.map(k => `<div class="mt-kalem-row ${k.aktif ? '' : 'inactive'}">
+        <div><div class="mt-kalem-row-name">${mtEsc(k.ad)}${k.aktif ? '' : ' · pasif'}</div><div class="mt-kalem-row-meta">${mtEsc(MT_KALEM_TIP_LABELS[k.tip] || k.tip)} · ${(k.birim_secenekleri || []).map(mtBirimLabel).map(mtEsc).join(', ')}</div></div>
+        <div class="mt-kalem-actions">
+          ${k.aktif ? `<button class="mt-icon-btn" style="color:var(--accent)" title="Düzenle" onclick="mtKalemDuzenle(${k.id})"><i class="ti ti-pencil"></i></button><button class="mt-icon-btn" title="Çıkar" onclick="mtKalemSil(${k.id})"><i class="ti ti-trash"></i></button>` : `<button class="mt-icon-btn" style="color:var(--success)" title="Tekrar etkinleştir" onclick="mtKalemAktifEt(${k.id})"><i class="ti ti-refresh"></i></button>`}
+        </div>
+      </div>`).join('')}
     </div>
   `;
 }
 
 function mtToggleKalemForm() {
   mtState.kalemFormOpen = !mtState.kalemFormOpen;
+  if (!mtState.kalemFormOpen) mtState.kalemEditId = null;
   mtRenderKalemForm();
+}
+
+function mtKalemYeniAc() {
+  mtState.kalemEditId = null;
+  mtState.kalemFormOpen = true;
+  mtRenderKalemForm();
+  const box = document.getElementById('mt-kalem-form-box');
+  box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.getElementById('mt-k-ad')?.focus(), 350);
+}
+
+function mtKalemOneriDoldur(index) {
+  const o = MT_KALEM_ONERILERI[index];
+  if (!o) return;
+  document.getElementById('mt-k-ad').value = o.ad;
+  document.getElementById('mt-k-birim').value = o.birim;
+  document.getElementById('mt-k-tip').value = o.tip;
+}
+
+function mtKalemDuzenle(id) {
+  mtState.kalemEditId = id;
+  mtState.kalemFormOpen = true;
+  mtRenderKalemForm();
+  document.getElementById('mt-k-ad')?.focus();
+}
+
+async function mtMetaTazele() {
+  const metaRes = await fetch('/api/maliyet/meta', { cache: 'no-store' });
+  const meta = await metaRes.json();
+  if (!meta.success) throw new Error(meta.error || 'Kalem listesi yenilenemedi');
+  mtState.meta = meta;
+}
+
+async function mtKalemSil(id) {
+  const k = (mtState.meta.kalemler || []).find(x => x.id === id);
+  if (!k || !confirm(`"${k.ad}" maliyet kalemi çıkarılsın mı?\n\nKullanılmış kalemler silinmez, geçmiş veriyi korumak için pasife alınır.`)) return;
+  const res = await fetch('/api/maliyet/kalem/' + id, { method: 'DELETE' });
+  const data = await res.json();
+  if (!data.success) return alert('Kalem çıkarılamadı: ' + (data.error || 'Sunucu hatası'));
+  await mtMetaTazele();
+  mtLoadTarife();
+}
+
+async function mtKalemAktifEt(id) {
+  const res = await fetch('/api/maliyet/kalem/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ aktif: true }) });
+  const data = await res.json();
+  if (!data.success) return alert('Kalem etkinleştirilemedi: ' + (data.error || 'Sunucu hatası'));
+  await mtMetaTazele();
+  mtLoadTarife();
 }
 
 async function mtSubmitKalem() {
   const ad = document.getElementById('mt-k-ad').value.trim();
   const birimler = document.getElementById('mt-k-birim').value.split(',').map(s => s.trim()).filter(Boolean);
   const tip = document.getElementById('mt-k-tip').value;
+  const sira = document.getElementById('mt-k-sira').value;
   if (!ad) { alert('Kalem adı girin.'); return; }
   if (!birimler.length) { alert('En az bir birim girin (ör. palet).'); return; }
 
-  const res = await fetch('/api/maliyet/kalem', {
-    method: 'POST',
+  const editId = mtState.kalemEditId;
+  const res = await fetch('/api/maliyet/kalem' + (editId ? '/' + editId : ''), {
+    method: editId ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad, birim_secenekleri: birimler, tip }),
+    body: JSON.stringify({ ad, birim_secenekleri: birimler, tip, ...(sira ? { sira: Number(sira) } : {}) }),
   });
   const data = await res.json();
-  if (!data.success) { alert('Kalem eklenemedi: ' + (data.error || 'Sunucu hatası')); return; }
+  if (!data.success) { alert('Kalem kaydedilemedi: ' + (data.error || 'Sunucu hatası')); return; }
 
   mtState.kalemFormOpen = false;
-  // Meta'yı tazele ki yeni kalem tüm select'lere düşsün
-  const metaRes = await fetch('/api/maliyet/meta', { cache: 'no-store' });
-  const meta = await metaRes.json();
-  if (meta.success) mtState.meta = meta;
-  mtRenderContent();
+  mtState.kalemEditId = null;
+  await mtMetaTazele();
+  mtLoadTarife();
 }
 
 // ── HAREKETLER SEKMESİ ───────────────────────────────────────────────────────
@@ -689,6 +1205,11 @@ function mtFmtMiktar(value) {
 async function mtLoadHareket() {
   const content = document.getElementById('mt-content');
   if (!content || !mtState.ulke) return;
+  if (!mtState.hareket.filterStart) {
+    const a = mtAnalizVarsayilanAralik();
+    mtState.hareket.filterStart = a.start;
+    mtState.hareket.filterEnd = a.end;
+  }
   content.innerHTML = '<div class="mt-empty">Hareketler yükleniyor…</div>';
 
   const params = new URLSearchParams({ ulke: mtState.ulke });
@@ -755,6 +1276,7 @@ function mtRenderHareket() {
               <span class="mt-field-label">Bitiş</span>
               <input class="mt-input" id="mt-h-f-end" type="date" value="${mtState.hareket.filterEnd}" style="height:38px;">
             </label>
+            <button class="mt-btn secondary" onclick="mtHareketSon6Ay()">Son 6 Ay</button>
             <button class="mt-btn secondary" onclick="mtHareketFiltre()">Uygula</button>
           </div>
           <div id="mt-hareket-table"></div>
@@ -911,6 +1433,11 @@ function mtHareketFiltre() {
   mtLoadHareket();
 }
 
+function mtHareketSon6Ay() {
+  const a = mtAnalizVarsayilanAralik();
+  mtState.hareket.filterStart = a.start; mtState.hareket.filterEnd = a.end; mtLoadHareket();
+}
+
 async function mtSubmitDepoAyar() {
   const body = {
     ulke: mtState.ulke,
@@ -992,9 +1519,9 @@ async function mtLoadKarsi() {
   const content = document.getElementById('mt-content');
   if (!content) return;
   if (!mtState.karsi.start) {
-    const gecenAy = mtAyAralik(-1);
-    mtState.karsi.start = gecenAy.start;
-    mtState.karsi.end = gecenAy.end;
+    const a = mtYilVarsayilanAralik();
+    mtState.karsi.start = a.start;
+    mtState.karsi.end = a.end;
   }
   content.innerHTML = '<div class="mt-empty">Gerçek maliyetler yükleniyor…</div>';
 
@@ -1050,7 +1577,7 @@ function mtRenderKarsi() {
 
   content.innerHTML = `
     <div class="mt-card">
-      <div class="mt-card-title">Gerçek Maliyetler</div>
+      <div class="mt-card-title">Maliyetler</div>
       <div class="mt-card-sub">Kaydedilen faturaların gerçekleşen tutarları ve maliyet kalemi dağılımı. Tarih filtresi fatura tarihini, fatura tarihi yoksa dönem bitişini esas alır. ${mtEsc(kurNotu)}</div>
       <div class="mt-filter-row">
         <label class="mt-field">
@@ -1061,8 +1588,7 @@ function mtRenderKarsi() {
           <span class="mt-field-label">Bitiş</span>
           <input class="mt-input" id="mt-c-end" type="date" value="${mtState.karsi.end}" style="height:38px;">
         </label>
-        <button class="mt-btn secondary" onclick="mtKarsiAy(0)">Bu Ay</button>
-        <button class="mt-btn secondary" onclick="mtKarsiAy(-1)">Geçen Ay</button>
+        <select class="mt-select" style="height:38px;width:145px" onchange="if(this.value)mtKarsiHazirDonem(this.value)"><option value="">Hızlı dönem seç</option><option value="son6">Son 6 Ay</option><option value="0">Bu Ay</option><option value="-1">Geçen Ay</option></select>
         <button class="mt-btn" onclick="mtKarsiUygula()">Uygula</button>
       </div>
       <div class="mt-kpis">
@@ -1110,6 +1636,13 @@ function mtKarsiAy(offset) {
   mtLoadKarsi();
 }
 
+function mtKarsiHazirDonem(tip) {
+  if (tip === 'son6') {
+    const a = mtAnalizVarsayilanAralik();
+    mtState.karsi.start = a.start; mtState.karsi.end = a.end; mtLoadKarsi();
+  } else mtKarsiAy(Number(tip));
+}
+
 function mtKarsiUygula() {
   const start = document.getElementById('mt-c-start').value;
   const end = document.getElementById('mt-c-end').value;
@@ -1131,7 +1664,7 @@ async function mtRenderKarsiDetay(kod) {
   const gercekUlke = (mtState.karsi.data.ulkeler || []).find(x => x.ulke === kod) || {};
   const gercekKalemler = gercekUlke.kalemler || [];
   box.innerHTML = `
-    <div style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Gerçek Maliyet Dağılımı</div>
+    <div style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Maliyet Dağılımı</div>
     ${gercekKalemler.length ? `
       <div class="mt-table-wrap"><table class="mt-table">
         <thead><tr><th>Maliyet Kalemi</th><th style="text-align:right;">Gerçek Tutar (EUR)</th></tr></thead>
@@ -1216,9 +1749,15 @@ async function mtRenderKarsiDetay(kod) {
 async function mtLoadFatura() {
   const content = document.getElementById('mt-content');
   if (!content || !mtState.ulke) return;
+  if (!mtState.fatura.filterStart) {
+    const a = mtYilVarsayilanAralik();
+    mtState.fatura.filterStart = a.start;
+    mtState.fatura.filterEnd = a.end;
+  }
   content.innerHTML = '<div class="mt-empty">Faturalar yükleniyor…</div>';
   try {
-    const res = await fetch('/api/maliyet/fatura?ulke=' + encodeURIComponent(mtState.ulke), { cache: 'no-store' });
+    const params = new URLSearchParams({ ulke: mtState.ulke, start: mtState.fatura.filterStart, end: mtState.fatura.filterEnd });
+    const res = await fetch('/api/maliyet/fatura?' + params.toString(), { cache: 'no-store' });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
     mtState.fatura.list = data.faturalar || [];
@@ -1417,7 +1956,12 @@ function mtRenderFatura() {
   content.innerHTML = `
     <div class="mt-card" style="margin-bottom:12px;">
       <div class="mt-card-title">${mtEsc(ulke.label || '')} — Gerçek Faturalar</div>
-      <div class="mt-card-sub">Her fatura satırı bir maliyet türüne bağlanır. Böylece gerçek maliyet dağılımı doğrudan faturadan oluşur.</div>
+      <div class="mt-card-sub">Her fatura satırı bir maliyet türüne bağlanır. Böylece maliyet dağılımı doğrudan faturadan oluşur.</div>
+      <div class="mt-filter-row">
+        <label class="mt-field"><span class="mt-field-label">Başlangıç</span><input class="mt-input" id="mt-fa-filter-start" type="date" value="${mtState.fatura.filterStart}" style="height:36px"></label>
+        <label class="mt-field"><span class="mt-field-label">Bitiş</span><input class="mt-input" id="mt-fa-filter-end" type="date" value="${mtState.fatura.filterEnd}" style="height:36px"></label>
+        <button class="mt-btn secondary" style="height:36px" onclick="mtFaturaSon6Ay()">Son 6 Ay</button><button class="mt-btn" style="height:36px" onclick="mtFaturaFiltre()">Uygula</button>
+      </div>
       ${rows.length ? `<div class="mt-table-wrap"><table class="mt-table">
         <thead><tr><th>Fatura No</th><th>Fatura Tarihi</th><th>Dönem</th><th style="text-align:right;">Gerçek Tutar</th><th>Dağılım</th><th></th></tr></thead>
         <tbody>${rows.map(f => `<tr style="${f.id === mtState.fatura.editId ? 'outline:2px solid var(--accent-mid);' : ''}">
@@ -1469,6 +2013,18 @@ function mtEditFatura(id) {
 }
 function mtFaturaVazgec() { mtState.fatura.editId=null; mtState.fatura.draft=mtBosFaturaDraft(); mtRenderFatura(); }
 
+function mtFaturaFiltre() {
+  const start = document.getElementById('mt-fa-filter-start')?.value;
+  const end = document.getElementById('mt-fa-filter-end')?.value;
+  if (!start || !end || start > end) return alert('Geçerli bir tarih aralığı seçin.');
+  mtState.fatura.filterStart = start; mtState.fatura.filterEnd = end; mtLoadFatura();
+}
+
+function mtFaturaSon6Ay() {
+  const a = mtAnalizVarsayilanAralik();
+  mtState.fatura.filterStart = a.start; mtState.fatura.filterEnd = a.end; mtLoadFatura();
+}
+
 async function mtSubmitFatura() {
   const body=mtCaptureFaturaDraft(); body.ulke=mtState.ulke;
   if(!body.fatura_no) return alert('Fatura no girin.');
@@ -1506,11 +2062,19 @@ function mtAnalizVarsayilanAralik() {
   return { start: iso(start), end: iso(end) };
 }
 
+function mtYilVarsayilanAralik() {
+  // Varsayılan ekran görünümü: yılın ilk günü → içinde bulunulan ayın sonu.
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { start: `${now.getFullYear()}-01-01`, end: iso(end) };
+}
+
 async function mtLoadAnaliz() {
   const content = document.getElementById('mt-content');
   if (!content || !mtState.ulke) return;
   if (!mtState.analiz.start) {
-    const a = mtAnalizVarsayilanAralik();
+    const a = mtYilVarsayilanAralik();
     mtState.analiz.start = a.start;
     mtState.analiz.end = a.end;
   }
@@ -1534,7 +2098,11 @@ async function mtLoadAnaliz() {
 function mtAnalizAralik(tip) {
   const now = new Date();
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  if (tip === 'yil') {
+  mtState.analiz.hizliDonem = String(tip || '');
+  if (/^\d{4}-(?:Q[1-4]|Y)$/.test(String(tip))) {
+    mtState.analiz.start = mtTarifeDonemBaslangici(tip);
+    mtState.analiz.end = mtTarifeDonemSonu(tip);
+  } else if (tip === 'yil') {
     mtState.analiz.start = `${now.getFullYear()}-01-01`;
     mtState.analiz.end = iso(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   } else {
@@ -1551,7 +2119,21 @@ function mtAnalizUygula() {
   if (!start || !end || start > end) { alert('Geçerli bir tarih aralığı seçin.'); return; }
   mtState.analiz.start = start;
   mtState.analiz.end = end;
+  mtState.analiz.hizliDonem = '';
   mtLoadAnaliz();
+}
+
+function mtAnalizRaporIndir(button) {
+  const start = document.getElementById('mt-a-start')?.value || mtState.analiz.start;
+  const end = document.getElementById('mt-a-end')?.value || mtState.analiz.end;
+  if (!start || !end || start > end) { alert('Geçerli bir tarih aralığı seçin.'); return; }
+  const params = new URLSearchParams({ start, end });
+  if (mtState.analiz.ulke && mtState.analiz.ulke !== 'all') params.set('ulkeler', mtState.analiz.ulke);
+  return mtExcelDosyaIndir(
+    '/api/maliyet/rapor?' + params.toString(),
+    `maliyet_analizi_${start}_${end}.xlsx`,
+    button,
+  );
 }
 
 function mtRenderAnaliz() {
@@ -1581,7 +2163,7 @@ function mtRenderAnaliz() {
     <div class="mt-grid" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);">
       <div class="mt-card">
         <div class="mt-card-title">Aylık Trend — ${mtEsc(ulke.label || '')}</div>
-        <div class="mt-card-sub">Beklenen ve gerçek maliyet, EUR (gerçek: dönem başlangıcının ayına atanır)</div>
+        <div class="mt-card-sub">Beklenen ve gerçekleşen tutar, EUR (gerçekleşen: dönem başlangıcının ayına atanır)</div>
         <div class="mt-chart-box"><canvas id="mt-trend-canvas"></canvas></div>
         <table class="mt-mini-table">
           <thead><tr><th>Ay</th><th>Beklenen</th><th>Gerçek</th></tr></thead>
@@ -1865,19 +2447,29 @@ async function mtLoadAnaliz() {
   const content = document.getElementById('mt-content');
   if (!content) return;
   if (!mtState.analiz.start) {
-    const a = mtAnalizVarsayilanAralik();
+    const a = mtYilVarsayilanAralik();
     mtState.analiz.start = a.start;
     mtState.analiz.end = a.end;
   }
+  const requestId = ++mtState.analiz.requestId;
+  const start = mtState.analiz.start;
+  const end = mtState.analiz.end;
   content.innerHTML = '<div class="mt-empty">Gerçek maliyet analizi hazırlanıyor…</div>';
-  const params = new URLSearchParams({ start: mtState.analiz.start, end: mtState.analiz.end });
+  const params = new URLSearchParams({ start, end });
   try {
-    const res = await fetch('/api/maliyet/gercek?' + params.toString(), { cache: 'no-store' });
-    const data = await res.json();
+    const [gercekRes, tarifeRes] = await Promise.all([
+      fetch('/api/maliyet/gercek?' + params.toString(), { cache: 'no-store' }),
+      fetch('/api/maliyet/tarife?all=1', { cache: 'no-store' }),
+    ]);
+    const [data, tarifeData] = await Promise.all([gercekRes.json(), tarifeRes.json()]);
+    if (requestId !== mtState.analiz.requestId || mtState.tab !== 'analiz') return;
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    if (!tarifeData.success) throw new Error(tarifeData.error || 'Tarife geçmişi alınamadı');
+    mtState.tumTarifeler = tarifeData.tarifeler || [];
     mtState.analiz.data = data;
     mtRenderAnaliz();
   } catch (e) {
+    if (requestId !== mtState.analiz.requestId || mtState.tab !== 'analiz') return;
     content.innerHTML = `<div class="mt-empty">Analiz alınamadı: ${mtEsc(e.message)}</div>`;
   }
 }
@@ -1892,9 +2484,88 @@ function mtAnalizChartTemizle() {
   mtState.analiz.charts = [];
 }
 
+function mtAnalizSeciliUlkeler() {
+  const ulkeler = mtState.meta?.ulkeler || [];
+  return mtState.analiz.ulke === 'all'
+    ? ulkeler
+    : ulkeler.filter(u => u.kod === mtState.analiz.ulke);
+}
+
+function mtAnalizGorunumData() {
+  const data = mtState.analiz.data;
+  const kod = mtState.analiz.ulke || 'all';
+  if (!data || kod === 'all') return data;
+  const ulke = (data.ulkeler || []).find(u => u.ulke === kod);
+  const toplam = Number(ulke?.gercek_eur || 0);
+  const kalemler = (data.kalemler || []).map(k => {
+    const tutar = Number((k.ulkeler || {})[kod] || 0);
+    return { ...k, tutar_eur: tutar, ulkeler: { [kod]: tutar }, oran: toplam ? tutar / toplam * 100 : 0 };
+  }).filter(k => k.tutar_eur > 0).sort((a, b) => b.tutar_eur - a.tutar_eur);
+  const aylik = (data.aylik || []).map(a => {
+    const tutar = Number((a.ulkeler || {})[kod] || 0);
+    return { ...a, toplam_eur: tutar, ulkeler: { [kod]: tutar } };
+  });
+  const faturaSayisi = Number(ulke?.fatura_sayisi || 0);
+  const dagitilmis = kalemler.filter(k => k.kalem_id !== 0).reduce((s, k) => s + k.tutar_eur, 0);
+  return {
+    ...data,
+    ulkeler: ulke ? [ulke] : [],
+    kalemler,
+    aylik,
+    ozet: {
+      gercek_toplam_eur: toplam,
+      fatura_sayisi: faturaSayisi,
+      ulke_sayisi: ulke ? 1 : 0,
+      ortalama_fatura_eur: faturaSayisi ? toplam / faturaSayisi : 0,
+      dagitim_orani: toplam ? dagitilmis / toplam * 100 : 0,
+      en_yuksek_ulke: ulke?.label || null,
+      en_yuksek_kalem: kalemler[0]?.kalem_ad || null,
+    },
+  };
+}
+
+function mtAnalizTarifeKalemleri() {
+  const seciliKodlar = new Set(mtAnalizSeciliUlkeler().map(u => u.kod));
+  const tarifeliIds = new Set(mtState.tumTarifeler.filter(r => seciliKodlar.has(r.ulke)).map(r => r.kalem_id));
+  return (mtState.meta.kalemler || []).filter(k => k.aktif && tarifeliIds.has(k.id));
+}
+
+function mtAnalizTarifeKalemSec(value) {
+  mtState.analiz.tarifeKalemId = Number(value);
+  mtRenderAnaliz();
+}
+
+function mtRenderTarifeAnalizCard() {
+  const kalemler = mtAnalizTarifeKalemleri();
+  if (!kalemler.length) return `
+    <div class="mt-card" style="margin-bottom:12px"><div class="mt-card-title">Tarife Fiyat Değişimleri</div><div class="mt-empty">Grafik için henüz tarife geçmişi bulunmuyor.</div></div>`;
+  if (!kalemler.some(k => k.id === mtState.analiz.tarifeKalemId)) mtState.analiz.tarifeKalemId = kalemler[0].id;
+  const secili = kalemler.find(k => k.id === mtState.analiz.tarifeKalemId);
+  const seciliKodlar = new Set(mtAnalizSeciliUlkeler().map(u => u.kod));
+  const versiyonlar = mtState.tumTarifeler.filter(r => r.kalem_id === secili.id && seciliKodlar.has(r.ulke));
+  const degisimler = versiyonlar
+    .filter(r => r.gecerli_baslangic >= mtState.analiz.start && r.gecerli_baslangic <= mtState.analiz.end)
+    .sort((a, b) => b.gecerli_baslangic.localeCompare(a.gecerli_baslangic))
+    .slice(0, 5);
+  return `
+    <div class="mt-card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div><div class="mt-card-title">Tarife Fiyat Değişimleri</div><div class="mt-card-sub">Yalnızca yukarıda seçilen tarih aralığındaki dönemler gösterilir; varsayılan görünüm son 6 aydır.</div></div>
+        <label class="mt-field" style="min-width:240px"><span class="mt-field-label">Maliyet Kalemi</span><select class="mt-select" style="height:36px" onchange="mtAnalizTarifeKalemSec(this.value)">${kalemler.map(k => `<option value="${k.id}" ${k.id === secili.id ? 'selected' : ''}>${mtEsc(k.ad)}</option>`).join('')}</select></label>
+      </div>
+      <div class="mt-an-grid" style="grid-template-columns:minmax(0,1fr) 260px;margin:0">
+        <div class="mt-an-chart" style="height:300px"><canvas id="mt-an-tarife"></canvas></div>
+        <div>
+          <div class="mt-field-label" style="margin-bottom:7px">Seçili aralıktaki tarife başlangıçları</div>
+          <div class="mt-an-insights">${degisimler.map(r => { const u=(mtState.meta.ulkeler||[]).find(x=>x.kod===r.ulke); return `<div class="mt-an-insight"><span class="mt-an-dot" style="background:${mtUlkeColor(r.ulke)};margin-top:3px"></span><div><b>${mtEsc(u?.label || r.ulke)} · ${mtFmtFiyat(r.birim_fiyat,r.para_birimi)}</b><span>${mtFmtTarih(r.gecerli_baslangic)} · ${mtEsc(mtBirimLabel(r.birim))}</span></div></div>`; }).join('') || '<div class="mt-empty">Seçili tarih aralığında tarife değişikliği yok.</div>'}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function mtRenderAnaliz() {
   const content = document.getElementById('mt-content');
-  const data = mtState.analiz.data;
+  const data = mtAnalizGorunumData();
   if (!content || !data) return;
   mtAnalizChartTemizle();
   const o = data.ozet || {};
@@ -1903,6 +2574,8 @@ function mtRenderAnaliz() {
   const aylik = data.aylik || [];
   const zirveAy = aylik.slice().sort((a, b) => b.toplam_eur - a.toplam_eur)[0];
   const matrixToplam = kalemler.reduce((s, k) => s + (k.tutar_eur || 0), 0);
+  const secimLabel = mtState.analiz.ulke === 'all' ? 'Tüm Ülkeler' : (mtAnalizSeciliUlkeler()[0]?.label || 'Seçili Ülke');
+  const tumUlkeler = mtState.analiz.ulke === 'all';
 
   content.innerHTML = `
     <style>
@@ -1926,11 +2599,11 @@ function mtRenderAnaliz() {
     </style>
     <div class="mt-card mt-an-hero">
       <div class="mt-an-toolbar">
-        <div><div class="mt-card-title">Gerçek Maliyet Analizi</div><div class="mt-card-sub">Tüm maliyet türleri, tüm ülkeler ve aylık gelişim — yalnızca kaydedilmiş gerçek faturalar.</div></div>
+        <div><div class="mt-card-title">Maliyet Analizi · ${mtEsc(secimLabel)}</div><div class="mt-card-sub">Seçili ülke kapsamındaki tüm maliyet türleri ve aylık gelişim — yalnızca kaydedilmiş faturalar.</div></div>
         <div class="mt-filter-row" style="margin:0;position:relative;z-index:2;">
           <label class="mt-field"><span class="mt-field-label" style="color:rgba(255,255,255,.65)">Başlangıç</span><input class="mt-input" id="mt-a-start" type="date" value="${mtState.analiz.start}" style="height:38px;"></label>
           <label class="mt-field"><span class="mt-field-label" style="color:rgba(255,255,255,.65)">Bitiş</span><input class="mt-input" id="mt-a-end" type="date" value="${mtState.analiz.end}" style="height:38px;"></label>
-          <button class="mt-btn secondary" onclick="mtAnalizAralik('6ay')">Son 6 Ay</button><button class="mt-btn secondary" onclick="mtAnalizAralik('yil')">Bu Yıl</button><button class="mt-btn" onclick="mtAnalizUygula()">Uygula</button>
+          <select class="mt-select" style="height:38px;width:180px" onchange="if(this.value)mtAnalizAralik(this.value)"><option value="" ${!mtState.analiz.hizliDonem ? 'selected' : ''}>Hızlı dönem seç</option><option value="6ay" ${mtState.analiz.hizliDonem === '6ay' ? 'selected' : ''}>Son 6 Ay</option><option value="yil" ${mtState.analiz.hizliDonem === 'yil' ? 'selected' : ''}>Bu Yıl</option>${mtTarifeDonemleri().map(d => `<option value="${d.key}" ${mtState.analiz.hizliDonem === d.key ? 'selected' : ''}>${d.label}</option>`).join('')}</select><button class="mt-btn" onclick="mtAnalizUygula()">Uygula</button><button class="mt-btn secondary" style="height:38px;background:#fff" onclick="mtAnalizRaporIndir(this)"><i class="ti ti-file-spreadsheet"></i> Excel</button>
         </div>
       </div>
     </div>
@@ -1941,17 +2614,18 @@ function mtRenderAnaliz() {
       <div class="mt-an-kpi" title="Fatura toplamının maliyet türlerine bağlanmış oranı"><i class="ti ti-chart-pie"></i><div class="mt-an-kpi-label">Dağıtım Oranı</div><div class="mt-an-kpi-value">${mtAnalizYuzde(o.dagitim_orani)}</div><div class="mt-an-kpi-note">Kalemlere ayrılan tutar</div></div>
       <div class="mt-an-kpi" title="Dönemde tutarı en yüksek maliyet türü"><i class="ti ti-trending-up"></i><div class="mt-an-kpi-label">Lider Maliyet</div><div class="mt-an-kpi-value" style="font-size:16px;line-height:1.2;margin-top:11px;">${mtEsc(o.en_yuksek_kalem || '—')}</div><div class="mt-an-kpi-note">Türe göre en yüksek pay</div></div>
     </div>
+    ${mtRenderTarifeAnalizCard()}
     ${o.fatura_sayisi ? `
       <div class="mt-an-grid">
-        <div class="mt-card"><div class="mt-card-title">Aylık Maliyet Trendi</div><div class="mt-card-sub">Ülkelere göre yığılmış gerçek maliyet — sütunların üzerine gelerek detayı görün.</div><div class="mt-an-chart"><canvas id="mt-an-trend"></canvas></div></div>
-        <div class="mt-card"><div class="mt-card-title">Ülke Dağılımı</div><div class="mt-card-sub">Toplam gerçek maliyet içindeki pay.</div><div class="mt-an-chart" style="height:235px"><canvas id="mt-an-country"></canvas></div>
+        <div class="mt-card"><div class="mt-card-title">Aylık Maliyet Trendi</div><div class="mt-card-sub">Ülkelere göre yığılmış maliyet — sütunların üzerine gelerek detayı görün.</div><div class="mt-an-chart"><canvas id="mt-an-trend"></canvas></div></div>
+        <div class="mt-card"><div class="mt-card-title">Ülke Dağılımı</div><div class="mt-card-sub">Toplam maliyet içindeki pay.</div><div class="mt-an-chart" style="height:235px"><canvas id="mt-an-country"></canvas></div>
           <div class="mt-an-insights">
             <div class="mt-an-insight"><i class="ti ti-building-warehouse"></i><div><b>${mtEsc(o.en_yuksek_ulke || '—')} en yüksek ülke maliyetine sahip</b><span>${ulkeler[0] ? `${mtFmtEur(ulkeler[0].gercek_eur)} · toplamın ${mtAnalizYuzde((ulkeler[0].gercek_eur || 0) / (o.gercek_toplam_eur || 1) * 100)}` : 'Veri yok'}</span></div></div>
             <div class="mt-an-insight"><i class="ti ti-calendar-stats"></i><div><b>${zirveAy ? mtFmtAy(zirveAy.ay) : '—'} en yüksek maliyetli dönem</b><span>${zirveAy ? mtFmtEur(zirveAy.toplam_eur) : 'Veri yok'}</span></div></div>
           </div>
         </div>
       </div>
-      <div class="mt-card" style="margin-bottom:12px"><div class="mt-card-title">Maliyet Türü Dağılımı</div><div class="mt-card-sub">Tüm ülkelerin toplu gerçek maliyetleri; çubuk üzerinde ülke kırılımı hover ile görünür.</div><div class="mt-an-chart" style="height:${Math.max(280, kalemler.length * 42)}px"><canvas id="mt-an-items"></canvas></div></div>
+      <div class="mt-card" style="margin-bottom:12px"><div class="mt-card-title">Maliyet Türü Dağılımı</div><div class="mt-card-sub">${tumUlkeler ? 'Tüm ülkelerin toplu maliyetleri; çubuk üzerinde ülke kırılımı gösterilir.' : `${mtEsc(secimLabel)} için maliyet türü dağılımı.`}</div><div class="mt-an-chart" style="height:${Math.max(280, kalemler.length * 42)}px"><canvas id="mt-an-items"></canvas></div></div>
       <div class="mt-card" style="margin-bottom:12px"><div class="mt-card-title">Ülke Kartları</div><div class="mt-card-sub">Toplam, pay, fatura sayısı ve o ülkedeki en büyük maliyet kalemi.</div><div class="mt-an-country-grid">${ulkeler.map(u => { const top=(u.kalemler||[])[0], pay=(u.gercek_eur||0)/(o.gercek_toplam_eur||1)*100; return `<div class="mt-an-country" title="${mtEsc(u.label)} toplam içindeki pay: ${mtAnalizYuzde(pay)}"><div class="mt-an-country-head"><div class="mt-an-country-name"><span class="mt-an-dot" style="background:${mtUlkeColor(u.ulke)}"></span>${mtEsc(u.label)}</div><span class="mt-pill birim">${u.fatura_sayisi} fatura</span></div><div class="mt-an-country-val">${mtFmtEur(u.gercek_eur)}</div><div class="mt-an-country-sub">${top ? `En yüksek: ${mtEsc(top.kalem_ad)} · ${mtFmtEur(top.tutar_eur)}` : 'Maliyet kırılımı yapılmamış'}</div><div class="mt-an-progress"><span style="width:${Math.max(pay,1)}%;background:${mtUlkeColor(u.ulke)}"></span></div></div>`; }).join('')}</div></div>
       <div class="mt-card"><div class="mt-card-title">Maliyet Türü × Ülke Matrisi</div><div class="mt-card-sub">Her maliyetin toplu tutarı ve ülke ülke dağılımı. Hücre üzerine gelerek pay bilgisini görün.</div><div class="mt-table-wrap"><table class="mt-table mt-an-matrix"><thead><tr><th>Maliyet Türü</th>${ulkeler.map(u=>`<th>${mtEsc(u.label)}</th>`).join('')}<th>Toplam</th><th>Pay</th></tr></thead><tbody>
         ${kalemler.map(k=>`<tr><td><span class="mt-kalem-ad">${mtEsc(k.kalem_ad)}</span></td>${ulkeler.map(u=>{const v=(k.ulkeler||{})[u.ulke]||0;return `<td title="${mtEsc(k.kalem_ad)} / ${mtEsc(u.label)}: ${mtFmtEur(v)}">${v ? mtFmtEur(v) : '—'}</td>`}).join('')}<td class="mt-an-total">${mtFmtEur(k.tutar_eur)}</td><td><span class="mt-pill birim">${mtAnalizYuzde(k.oran)}</span></td></tr>`).join('')}
@@ -1959,7 +2633,61 @@ function mtRenderAnaliz() {
       </tbody></table></div></div>
     ` : '<div class="mt-card"><div class="mt-empty">Seçili tarih aralığında analiz edilecek gerçek fatura bulunamadı.</div></div>'}
   `;
+  mtAnalizTarifeGrafik();
   if (o.fatura_sayisi) mtAnalizGrafikleri(data, ulkeler, kalemler, aylik);
+}
+
+function mtAnalizTarifeGrafik() {
+  const canvas = document.getElementById('mt-an-tarife');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const kalemId = mtState.analiz.tarifeKalemId;
+  const ulkeler = mtAnalizSeciliUlkeler();
+  const araliktakiVersiyonlar = mtState.tumTarifeler.filter(r =>
+    r.kalem_id === kalemId &&
+    ulkeler.some(u => u.kod === r.ulke) &&
+    r.gecerli_baslangic >= mtState.analiz.start &&
+    r.gecerli_baslangic <= mtState.analiz.end
+  );
+  const tarihler = [...new Set([
+    mtState.analiz.start,
+    ...araliktakiVersiyonlar.map(r => r.gecerli_baslangic),
+    mtState.analiz.end,
+  ])].sort();
+  const datasets = ulkeler.map(u => {
+    const rows = mtState.tumTarifeler.filter(r => r.ulke === u.kod && r.kalem_id === kalemId);
+    const noktalar = tarihler.map(tarih => mtTarifeGosterilecekVersiyon(rows, tarih));
+    const ulkeDegisimTarihleri = new Set(araliktakiVersiyonlar.filter(r => r.ulke === u.kod).map(r => r.gecerli_baslangic));
+    return {
+      label: u.label,
+      data: noktalar.map(r => r ? Number(r.birim_fiyat) : null),
+      _para: noktalar.map(r => r?.para_birimi || ''),
+      _birim: noktalar.map(r => r?.birim || ''),
+      borderColor: mtUlkeColor(u.kod), backgroundColor: mtUlkeColor(u.kod),
+      borderWidth: 2, pointRadius: tarihler.map(t => ulkeDegisimTarihleri.has(t) ? 4 : 2),
+      pointHoverRadius: 6, tension: 0, stepped: 'after', spanGaps: false,
+    };
+  }).filter(ds => ds.data.some(v => v != null));
+  if (!datasets.length) {
+    canvas.parentElement.innerHTML = '<div class="mt-empty">Seçili tarih aralığında bu maliyet kalemi için geçerli tarife yok.</div>';
+    return;
+  }
+  mtState.analiz.charts.push(new Chart(canvas, {
+    type: 'line',
+    data: { labels: tarihler.map(mtFmtTarih), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 7, font: { size: 9 } } },
+        tooltip: { backgroundColor: 'rgba(15,23,42,.96)', padding: 11, cornerRadius: 9, callbacks: {
+          label: c => ` ${c.dataset.label}: ${mtFmtFiyat(c.parsed.y, c.dataset._para[c.dataIndex])} / ${mtBirimLabel(c.dataset._birim[c.dataIndex])}`,
+        } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 0 } },
+        y: { beginAtZero: true, border: { display: false }, grid: { color: '#E2E8F0' }, ticks: { callback: v => new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 }).format(v) } },
+      },
+    },
+  }));
 }
 
 function mtAnalizGrafikleri(data, ulkeler, kalemler, aylik) {
