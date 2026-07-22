@@ -196,6 +196,45 @@ Dosya saklama:
 - Metadata `storage_records` tablosunda.
 - Varsayilan TTL 36 saat.
 
+## Navlun Otomatik Hesaplama (2026-07)
+
+Taslak ekraninda navlun/sigorta, palet/kap oranina gore otomatik hesaplanir.
+
+- ANT/IHR ayrimi mevcut `depoTipi` ile yapilir: `serbest`=IHR, `antrepo`=ANT (yeni secici EKLENMEDI).
+- Formul (33 = kamyon palet kapasitesi): IHR carpan = ham kap; ANT carpan = ceil(kap/30) palet.
+  navlun = ceil((ulke_navlun/33)*carpan/100)*100; sigorta = ceil((sigorta_baz/33)*carpan).
+- Navlun senaryosu: gruplu → navlun_ant_ihr (iki taslak da), degilse ANT→navlun_ant, IHR→navlun_ihr.
+- Gruplu kalan: ilk taslak KAYDEDILIRKEN kalan (toplam − nihai override deger) partner dosya no'ya
+  `navlun_bekleyen_tahsis` olarak yazilir; partner taslagi acilinca alanlar oradan dolar (formul calismaz).
+- Backend: `api/navlun.py` + `/api/navlun/*` route'lari. Tablolar: `ulke_navlun`, `navlun_bekleyen_tahsis`
+  (migration: `migrations/navlun_tanim_001.sql`). Admin ekrani: `js/navlun.js` → sidebar "Navlun Tanimlari".
+- Tum otomatik doldurmalar override edilebilir (alanlar kilitlenmez).
+- Not: taslak formundaki tek `navlun`/`sigorta` alanina yazilir; para birimi `ulke_navlun`'dan okunur.
+
+### Taslak → Sevkiyatlar besleme + otomatik gruplama (2026-07)
+
+- **Besleme (para birimi dogru):** Taslak indirilince `/api/navlun/sevkiyat` cagrilir; hesaplanan
+  navlun/sigorta `navlun_sevkiyat_hesap` (dosya_no bazli cache) tablosuna yazilir. Shipment varsa hemen,
+  yoksa `create_shipment` hook'u (`sevkiyat_olusturuldu`) sonradan uygular. Yazim para birimine gore:
+  EUR ulkeler → `navlun_eur`/`sigorta_eur`; **ge/kz → `navlun_usd`/`sigorta_usd` (navlun_eur'a DOKUNMAZ)**.
+  KRITIK: landed_cost raporu yalniz `*_eur` kolonlarini toplar; USD tutari `navlun_eur`'a yazilirsa rapor
+  siser. Bu yuzden USD ulkelerde sadece USD kolonlari beslenir (migration: `navlun_tanim_002.sql`).
+- **Otomatik gruplama:** Mevcut `sefer_id` anahtari kullanilir (yeni kolon YOK). Gruplu partner esleşmesi
+  `navlun_bekleyen_tahsis` (kaynak_dosya_no ↔ dosya_no) uzerinden turetilir; `create_shipment` hook'u iki
+  kaydi bulunca ortak `sefer_id` atar (ilk kayit once oluştuysa partner baglaninca geriye donuk esleşir).
+  Sevkiyatlar UI'daki mevcut "Grup N" pill'i otomatik gruplari da gosterir (ek UI yok).
+- Backend: `api/navlun.py` (`sevkiyat_olusturuldu`, `_sevkiyat_navlun_uygula`, `_otomatik_grupla`),
+  hook cagrisi `api/shipments.py::create_shipment` sonunda (try/except ile sarili — shipment olusturmayi bozmaz).
+
+### Navlun tanimi revizyon arsivi + degisim grafigi (2026-07)
+
+- Navlun Tanimlari ekraninda her satirda **Kaydet** butonu var. Deger degisip kaydedilince eski deger
+  `ulke_navlun_gecmis` tablosuna arsivlenir (migration: `navlun_tanim_003.sql`). Degisim yoksa arsiv YOK ve
+  `guncelleme_tarihi` bumped edilmez (grafik zaman ekseni bozulmasin diye).
+- `GET /api/navlun/gecmis?ulke=xx` arsiv + guncel satiri tarih artan sirada, ardisik versiyonlar arasi
+  yuzde degisim (navlun_ant_ihr baz) ile doner. `js/navlun.js` bunu Chart.js line chart olarak cizer
+  (3 senaryo serisi) + son revizyon degisim oranini ozetler. Chart.js `js/vendor/chart.umd.js`'ten gelir.
+
 ## Dokunurken Dikkat
 
 - `api/generate.py` icine HTTP handler ekleme; sadece dispatcher olarak kalmali.

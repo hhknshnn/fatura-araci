@@ -37,6 +37,9 @@ from api.maliyet.fatura import (maliyet_fatura_get, maliyet_fatura_post,
     maliyet_fatura_put, maliyet_fatura_delete, maliyet_fatura_pdf_post,
     maliyet_gercek_get)
 from api.maliyet.rapor import maliyet_rapor_get, maliyet_tarife_rapor_get
+from api.navlun import (navlun_tanim_liste, navlun_tanim_kaydet, navlun_hesapla,
+    navlun_tahsis_olustur, navlun_bekleyen_sorgu, navlun_tahsis_kullan,
+    navlun_sevkiyat_yaz, navlun_tanim_gecmis)
 
 def read_port():
     try:
@@ -798,6 +801,61 @@ def api_taslak_store_sil(taslak_id):
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return taslak_store_sil(taslak_id)
+
+# ── /api/navlun ────────────────────────────────────────────────────────────────
+# Navlun tanımları (admin) + taslak ekranı otomatik navlun/sigorta hesabı.
+
+@app.route('/api/navlun/tanim', methods=['GET', 'POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_tanim():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return navlun_tanim_liste()
+    return navlun_tanim_kaydet()
+
+@app.route('/api/navlun/gecmis', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_navlun_gecmis():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_tanim_gecmis()
+
+@app.route('/api/navlun/hesapla', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_hesapla():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_hesapla()
+
+@app.route('/api/navlun/tahsis', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_tahsis():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_tahsis_olustur()
+
+@app.route('/api/navlun/bekleyen', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_navlun_bekleyen():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_bekleyen_sorgu()
+
+@app.route('/api/navlun/tahsis-kullan', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_tahsis_kullan():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_tahsis_kullan()
+
+@app.route('/api/navlun/sevkiyat', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_sevkiyat():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_sevkiyat_yaz()
+
 
 @app.route('/api/shipments/parse-vergi-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()

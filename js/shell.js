@@ -64,7 +64,8 @@ function hideAllPanels() {
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
     'stepGecmis', 'stepUsers', 'stepPermissions', 'stepAudit', 'stepDashboard', 'stepSevkiyatlar',
-    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery', 'stepMaliyetTakip'].forEach(id => {
+    'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery', 'stepMaliyetTakip',
+    'stepNavlunTanim'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -107,6 +108,7 @@ function sidebarSelect(mod) {
     'landed-cost': 'Landed Cost',
     'nebim-delivery': 'Nebim İrsaliye',
     'maliyet-takip': 'Maliyet Takip',
+    'navlun-tanim': 'Navlun Tanımları',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
   document.getElementById('topbarCountry').style.display = 'none';
@@ -352,6 +354,19 @@ function sidebarSelect(mod) {
     }
     panel.style.display = 'block';
     if (typeof initMaliyetPanel === 'function') initMaliyetPanel();
+  } else if (mod === 'navlun-tanim') {
+    // Navlun Tanımları — kurumsal ülkelerin navlun/sigorta değerleri (admin)
+    document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
+    let panel = document.getElementById('stepNavlunTanim');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepNavlunTanim';
+      panel.className = 'panel';
+      document.getElementById('contentArea').appendChild(panel);
+    }
+    panel.style.display = 'block';
+    if (typeof initNavlunTanimPanel === 'function') initNavlunTanimPanel();
   }
 
   // ── URL GÜNCELLEMESİ ───────────────────────────────────────────────────────

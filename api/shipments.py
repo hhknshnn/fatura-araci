@@ -28,6 +28,28 @@ def _musteri_tipi_from_ulke(ulke):
     return ULKE_MUSTERI_TIPI.get(str(ulke).strip().upper(), 'kurumsal')
 
 
+def _gecerli_tarih(v):
+    """Tarih alanı için makul aralık koruması (YYYY-MM-DD, 1900–2100).
+
+    Tarayıcının <input type="date"> alanı 6 haneli yıl kabul ediyor; oraya
+    yanlışlıkla "272026" gibi bir yıl girilirse PostgreSQL değeri sorunsuz
+    yazar ama psycopg2 okurken datetime'a çeviremez ve TÜM sevkiyat listesi
+    500 döner. Bu yüzden aralık dışı tarihleri yazarken None'a çeviriyoruz.
+    """
+    if not v:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    m = re.match(r'^(\d{1,6})-(\d{2})-(\d{2})', s)
+    if not m:
+        return s  # başka formatlar mevcut akışa dokunulmadan geçsin
+    yil = int(m.group(1))
+    if yil < 1900 or yil > 2100:
+        return None
+    return s[:10]
+
+
 # ── TÜM SEVKİYATLARI GETİR ───────────────────────────────────────────────────
 def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
     conn = get_conn()
@@ -99,17 +121,17 @@ def create_shipment(data):
     musteri_tipi = data.get('musteri_tipi') or _musteri_tipi_from_ulke(ulke)
 
     # Franchise/toptan/devir ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
-    gumruk_tarihi = data.get('gumruk_tarihi') or None
+    gumruk_tarihi = _gecerli_tarih(data.get('gumruk_tarihi'))
     if musteri_tipi in ('franchise', 'toptan', 'devir'):
-        varis_tarihi      = gumruk_tarihi or data.get('varis_tarihi') or None
-        gumrukleme_bitis  = gumruk_tarihi or data.get('gumrukleme_bitis') or None
+        varis_tarihi      = gumruk_tarihi or _gecerli_tarih(data.get('varis_tarihi'))
+        gumrukleme_bitis  = gumruk_tarihi or _gecerli_tarih(data.get('gumrukleme_bitis'))
         durum_default     = 'TESLİM EDİLDİ'
     else:
-        varis_tarihi      = data.get('varis_tarihi') or None
-        gumrukleme_bitis  = data.get('gumrukleme_bitis') or None
+        varis_tarihi      = _gecerli_tarih(data.get('varis_tarihi'))
+        gumrukleme_bitis  = _gecerli_tarih(data.get('gumrukleme_bitis'))
         durum_default     = data.get('durum', 'YOLDA')
 
-    yukleme_tarihi = data.get('yukleme_tarihi') or None
+    yukleme_tarihi = _gecerli_tarih(data.get('yukleme_tarihi'))
 
     # USD kuru elle/faturadan gelmediyse yükleme tarihine göre otomatik çek
     usd_kuru = float(data.get('usd_kuru', 0) or 0)
@@ -163,6 +185,15 @@ def create_shipment(data):
             cur.close()
     finally:
         conn.close()
+
+    # Taslakta hesaplanan navlun/sigortayı doğru para birimi kolonuna yaz ve
+    # gruplu partner varsa otomatik grupla. Hata shipment oluşturmayı bozmaz.
+    try:
+        from api.navlun import sevkiyat_olusturuldu
+        sevkiyat_olusturuldu(data.get('ihracat_dosya_no', ''))
+    except Exception:
+        pass
+
     return new_id
 
 
@@ -182,8 +213,8 @@ def update_shipment(shipment_id, data):
     navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
     sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
     usd_kuru    = data.get('usd_kuru',    existing[2]) or 0
-    yukleme_tarihi = data.get('yukleme_tarihi', existing[3]) or None
-    gumruk_tarihi = data.get('gumruk_tarihi', existing[4]) or None
+    yukleme_tarihi = _gecerli_tarih(data.get('yukleme_tarihi', existing[3]))
+    gumruk_tarihi = _gecerli_tarih(data.get('gumruk_tarihi', existing[4]))
 
     # USD kuru elle/faturadan gelmediyse yükleme tarihine göre otomatik çek
     if not usd_kuru:
@@ -199,12 +230,17 @@ def update_shipment(shipment_id, data):
         float(data.get('other_costs_eur', 0) or 0)
     )
 
-    # Varış tarihi veya gümrükleme bitiş tarihi doluysa (maliyet-evrak akışından
-    # ya da manuel girişten) durumu otomatik TESLİM EDİLDİ yap.
-    varis_tarihi = data.get('varis_tarihi', existing[5]) or None
-    gumrukleme_bitis = data.get('gumrukleme_bitis', existing[6]) or None
+    # Varış tarihi veya gümrükleme bitiş tarihi doluysa durumu otomatik
+    # TESLİM EDİLDİ yap — ANCAK yalnızca durum bilgisi istekle gelmediyse.
+    # Maliyet-evrak akışı durum göndermez, o yüzden otomatik kural orada çalışır;
+    # sevkiyat düzenleme pop-up'ı durumu her zaman açıkça gönderir ve kullanıcının
+    # elle seçtiği durum geçerli olur (aksi halde YOLDA seçimi sessizce geri alınır).
+    varis_tarihi = _gecerli_tarih(data.get('varis_tarihi', existing[5]))
+    gumrukleme_bitis = _gecerli_tarih(data.get('gumrukleme_bitis', existing[6]))
+    durum_istekten_geldi = bool(str(data.get('durum') or '').strip())
     durum = _normalize_durum(data.get('durum', 'YOLDA'))
-    if (varis_tarihi or gumrukleme_bitis) and durum != 'TESLİM EDİLDİ':
+    if (not durum_istekten_geldi) and (varis_tarihi or gumrukleme_bitis) \
+            and durum != 'TESLİM EDİLDİ':
         durum = 'TESLİM EDİLDİ'
 
     cur.execute('''

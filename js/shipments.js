@@ -833,6 +833,24 @@ async function saveShipmentDetail() {
   }
 }
 
+// Ülke filtresine göre Maliyet Raporu dosya adını üretir.
+// Hiç seçim yok veya tüm ülkeler seçili ise "Tüm Ülkeler Maliyet Raporu",
+// aksi halde seçili ülkeler "Belçika, Sırbistan Maliyet Raporu" biçiminde yazılır.
+function buildMaliyetDosyaAdi() {
+  const checkboxes = [...document.querySelectorAll('#dd-ulke-menu input[type=checkbox]')];
+  const secili = checkboxes.filter(cb => cb.checked);
+
+  let etiket;
+  if (secili.length === 0 || secili.length === checkboxes.length) {
+    etiket = 'Tüm Ülkeler';
+  } else {
+    etiket = secili
+      .map(cb => cb.closest('.dd-item')?.querySelector('span')?.textContent.trim() || cb.value)
+      .join(', ');
+  }
+  return `${etiket} Maliyet Raporu.xlsx`;
+}
+
 async function downloadMaliyetRaporu() {
   const token = localStorage.getItem('fa_auth_token');
 
@@ -857,7 +875,7 @@ async function downloadMaliyetRaporu() {
     if (blob.size === 0) { alert('Rapor boş geldi.'); return; }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `maliyet_raporu_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.download = buildMaliyetDosyaAdi();
     a.click();
     URL.revokeObjectURL(a.href);
   } catch (e) {

@@ -223,6 +223,14 @@ let taslakBytes = null;
 let taslakDepoTipi = null;
 let menseTaslakBytes = null;
 
+// ── NAVLUN OTOMATİK HESAP STATE ───────────────────────────────────────────────
+// Navlun/sigorta otomatik hesaplaması olan kurumsal ülkeler (backend ile aynı küme)
+const NAVLUN_ULKELER = new Set(['mk', 'xk', 'rs', 'ba', 'kz', 'ge', 'be', 'nl']);
+// Partner taslağı bekleyen tahsisle dolduğunda formül YENİDEN çalışmasın diye kilit
+let _navlunBekleyenAktif = false;
+// Bu taslağın tükettiği bekleyen tahsisin dosya no'su (indirince kullanıldı işaretlenir)
+let _navlunBekleyenDosyaNo = null;
+
 // ── PANELİ BAŞLAT ─────────────────────────────────────────────────────────────
 function initTaslakPanel() {
   for (let i = 1; i <= 5; i++) {
@@ -234,6 +242,8 @@ function initTaslakPanel() {
   taslakDepoTipi = null;
   taslakUlke = null;
   taslakBytes = null;
+  _navlunBekleyenAktif = false;
+  _navlunBekleyenDosyaNo = null;
 
   buildTaslakUlkeGrid();
 
@@ -422,9 +432,158 @@ function buildTaslakForm() {
     container.appendChild(div);
   });
 
+  // ── NAVLUN OTOMATİK HESAP UI (yalnız tanımlı kurumsal ülkeler) ──────────────
+  if (NAVLUN_ULKELER.has(taslakUlke)) {
+    injectNavlunUI(container);
+  }
+
   if (taslakBytes) {
     document.getElementById('taslakIndir').style.display = 'block';
   }
+}
+
+// ── NAVLUN OTOMATİK HESAP: FORM ALTINA GRUPLU/PARTNER ALANLARI EKLE ───────────
+function injectNavlunUI(container) {
+  // Her yeni form kurulumunda bekleyen tahsis kilidini sıfırla
+  _navlunBekleyenAktif = false;
+  _navlunBekleyenDosyaNo = null;
+
+  const yil = window.APP_YIL || '2026';
+  const box = document.createElement('div');
+  box.style.cssText = 'margin-top:6px;padding:12px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);';
+  box.innerHTML = `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;">
+      <input type="checkbox" id="taslak_gruplu" onchange="navlunGrupluDegisti()">
+      Gruplu sevkiyat mı? (ANT + İHR aynı sevkte)
+    </label>
+    <div id="taslak_partnerWrap" style="display:none;margin-top:10px;">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Partner Dosya No</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="taslak_partnerYil" class="yil-select" style="font-family:var(--mono);font-size:13px;color:var(--text3);border:none;background:transparent;cursor:pointer;outline:none;padding:0;">
+          <option ${yil === '2026' ? 'selected' : ''}>2026</option>
+          <option ${yil === '2027' ? 'selected' : ''}>2027</option>
+          <option ${yil === '2028' ? 'selected' : ''}>2028</option>
+        </select>
+        <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
+        <input class="target-input" id="taslak_partnerNo" placeholder="örn: 101" style="flex:1;">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">
+        Bu taslak kaydedilince kalan navlun/sigorta bu partner dosyaya otomatik aktarılır.
+      </div>
+    </div>
+    <div id="taslak_navlunNot" style="font-size:11px;color:var(--accent2);margin-top:8px;display:none;"></div>`;
+  container.appendChild(box);
+
+  // KAP değişince otomatik hesap tetikle
+  const kapEl = document.getElementById('taslak_kap');
+  if (kapEl) kapEl.addEventListener('input', navlunOtomatikHesapla);
+
+  // Referans No girilince bu dosya için bekleyen tahsis var mı diye sor
+  const refEl = document.getElementById('taslak_referansNo');
+  if (refEl) refEl.addEventListener('blur', navlunBekleyenKontrol);
+}
+
+// ── GRUPLU TOGGLE DEĞİŞTİ ─────────────────────────────────────────────────────
+function navlunGrupluDegisti() {
+  const gruplu = document.getElementById('taslak_gruplu')?.checked;
+  const wrap = document.getElementById('taslak_partnerWrap');
+  if (wrap) wrap.style.display = gruplu ? 'block' : 'none';
+  // Gruplu durumu navlun bazını değiştirir → yeniden hesapla
+  navlunOtomatikHesapla();
+}
+
+// ── OTOMATİK NAVLUN/SİGORTA HESAPLA ───────────────────────────────────────────
+async function navlunOtomatikHesapla() {
+  if (!taslakUlke || !NAVLUN_ULKELER.has(taslakUlke)) return;
+  // Partner taslağı bekleyen tahsisle dolduysa formül alanları ezmez
+  if (_navlunBekleyenAktif) return;
+  if (!taslakDepoTipi) return;
+
+  const kapEl = document.getElementById('taslak_kap');
+  const kap = kapEl ? kapEl.value.trim() : '';
+  if (!kap) return;
+
+  const gruplu = document.getElementById('taslak_gruplu')?.checked || false;
+  try {
+    const resp = await fetch('/api/navlun/hesapla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ulkeKodu: taslakUlke, depoTipi: taslakDepoTipi, kap, gruplu }),
+    });
+    const data = await resp.json();
+    if (!data.success) return;
+
+    const navEl = document.getElementById('taslak_navlun');
+    const sigEl = document.getElementById('taslak_sigorta');
+    if (navEl) navEl.value = data.navlun;
+    if (sigEl) sigEl.value = data.sigorta;
+
+    const not = document.getElementById('taslak_navlunNot');
+    if (not) {
+      const paletBilgi = taslakDepoTipi === 'antrepo' ? ` · ${data.palet} palet` : '';
+      not.style.display = 'block';
+      not.style.color = 'var(--accent2)';
+      not.textContent = `⚡ Otomatik: navlun ${data.navlun} · sigorta ${data.sigorta} ${data.paraBirimi}${paletBilgi} (değiştirilebilir)`;
+    }
+  } catch (e) {
+    // Sessiz geç — kullanıcı elle girebilir
+  }
+}
+
+// ── BEKLEYEN TAHSİS KONTROLÜ (partner taslağı açılışı) ────────────────────────
+async function navlunBekleyenKontrol() {
+  if (!taslakUlke || !NAVLUN_ULKELER.has(taslakUlke)) return;
+  const refEl = document.getElementById('taslak_referansNo');
+  if (!refEl) return;
+  const val = refEl.value.trim();
+  if (!val) return;
+
+  // Tam dosya no: yıl-no
+  const yilEl = refEl.closest('div')?.querySelector('select');
+  const yil = yilEl ? yilEl.value : (window.APP_YIL || '2026');
+  const dosyaNo = val.startsWith(yil + '-') ? val : yil + '-' + val;
+
+  try {
+    const resp = await fetch('/api/navlun/bekleyen?dosyaNo=' + encodeURIComponent(dosyaNo), { cache: 'no-store' });
+    const data = await resp.json();
+    if (!data.success) return;
+
+    if (data.var) {
+      // Formülü kilitle, alanları bekleyen tahsisle doldur
+      _navlunBekleyenAktif = true;
+      _navlunBekleyenDosyaNo = dosyaNo;
+      const navEl = document.getElementById('taslak_navlun');
+      const sigEl = document.getElementById('taslak_sigorta');
+      if (navEl) navEl.value = data.navlun;
+      if (sigEl) sigEl.value = data.sigorta;
+      const not = document.getElementById('taslak_navlunNot');
+      if (not) {
+        not.style.display = 'block';
+        not.style.color = 'var(--success,#1a7f37)';
+        not.textContent = `🔗 Bekleyen tahsis uygulandı (kaynak: ${data.kaynakDosyaNo}): navlun ${data.navlun} · sigorta ${data.sigorta} ${data.paraBirimi}`;
+      }
+    } else {
+      // Bu dosya için tahsis yok → formül serbest
+      _navlunBekleyenAktif = false;
+      _navlunBekleyenDosyaNo = null;
+    }
+  } catch (e) {
+    // Sessiz geç
+  }
+}
+
+// ── GRUPLU/PARTNER BİLGİSİNİ TOPLA ────────────────────────────────────────────
+function getNavlunGrupluBilgi() {
+  const grupluEl = document.getElementById('taslak_gruplu');
+  const gruplu = grupluEl ? grupluEl.checked : false;
+  if (!gruplu) return { gruplu: false, partnerDosyaNo: null };
+  const noEl = document.getElementById('taslak_partnerNo');
+  const yilEl = document.getElementById('taslak_partnerYil');
+  const no = noEl ? noEl.value.trim() : '';
+  if (!no) return { gruplu: true, partnerDosyaNo: null };
+  const yil = yilEl ? yilEl.value : (window.APP_YIL || '2026');
+  const partnerDosyaNo = no.startsWith(yil + '-') ? no : yil + '-' + no;
+  return { gruplu: true, partnerDosyaNo };
 }
 
 // ── NET KG OTOMATİK ──────────────────────────────────────────────────────────
@@ -602,6 +761,51 @@ async function indirTaslak() {
       });
     } catch(e) {
       console.warn('Taslak DB kayıt hatası:', e);
+    }
+
+    // ── NAVLUN GRUPLU: kalanı partner dosyaya sakla / tükettiğini işaretle ─────
+    if (NAVLUN_ULKELER.has(taslakUlke)) {
+      try {
+        // Hesaplanan (override edilmiş olabilen) navlun/sigortayı Sevkiyatlar'a besle.
+        // Backend doğru para birimi kolonuna yazar (EUR ülke→EUR, ge/kz→USD).
+        await fetch('/api/navlun/sevkiyat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ulkeKodu: taslakUlke,
+            dosyaNo: formData.referansNo,
+            navlun: formData.navlun || 0,
+            sigorta: formData.sigorta || 0,
+          }),
+        });
+
+        const gb = getNavlunGrupluBilgi();
+        // İlk (gruplu) taslak: kalanı partner dosyaya bekleyen tahsis olarak yaz.
+        // Nihai (override edilmiş olabilen) navlun/sigorta değerleri gönderilir.
+        if (gb.gruplu && gb.partnerDosyaNo) {
+          await fetch('/api/navlun/tahsis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ulkeKodu: taslakUlke,
+              partnerDosyaNo: gb.partnerDosyaNo,
+              kaynakDosyaNo: formData.referansNo,
+              navlunFinal: formData.navlun || 0,
+              sigortaFinal: formData.sigorta || 0,
+            }),
+          });
+        }
+        // Partner taslağı: bu dosyanın bekleyen tahsisini kullanıldı işaretle
+        if (_navlunBekleyenAktif && _navlunBekleyenDosyaNo) {
+          await fetch('/api/navlun/tahsis-kullan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dosyaNo: _navlunBekleyenDosyaNo }),
+          });
+        }
+      } catch(e) {
+        console.warn('Navlun tahsis hatası:', e);
+      }
     }
   } catch (err) {
     showTaslakStatus('error', '⚠ ' + err.message);
