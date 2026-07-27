@@ -338,6 +338,7 @@ def navlun_hesapla():
     ulke = str(body.get('ulkeKodu') or '').strip().lower()
     depo_tipi = str(body.get('depoTipi') or '').strip()
     gruplu = bool(body.get('gruplu'))
+    komple = bool(body.get('komple'))
     kap = body.get('kap', '')
 
     if ulke not in KURUMSAL_ULKELER:
@@ -353,6 +354,19 @@ def navlun_hesapla():
 
     if not row:
         return jsonify({'success': False, 'error': 'Ülke navlun tanımı bulunamadı'}), 404
+
+    # Komple depo/antrepo: kamyonun tamamı bu dosyaya ait → navlun ve sigorta
+    # kap oranına bölünmeden, ülke tanımındaki tam değerle döner.
+    if komple:
+        baz = _navlun_baz_sec(row, depo_tipi, gruplu=False)
+        return jsonify({
+            'success': True,
+            'navlun': int(round(baz)),
+            'sigorta': int(round(row['sigorta_baz'])),
+            'palet': 0,
+            'komple': True,
+            'paraBirimi': row['para_birimi'],
+        })
 
     baz = _navlun_baz_sec(row, depo_tipi, gruplu)
     sonuc = hesapla_navlun_sigorta(baz, row['sigorta_baz'], depo_tipi, kap, gruplu)

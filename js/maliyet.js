@@ -24,6 +24,7 @@ let mtState = {
   karsi: {             // Karşılaştırma sekmesi
     start: '',         // boşsa ilk açılışta geçen ay atanır
     end: '',
+    ulke: 'all',       // all veya tek ülke kodu — üst pill filtresi
     data: null,
     expanded: {},      // { ulkeKod: bool } — kalem kırılımı açık mı
     detay: {},         // { ulkeKod: beklenenDetay } — dönem değişince sıfırlanır
@@ -453,12 +454,14 @@ function mtSelectTab(tab) {
 function mtRenderUlkePills() {
   const box = document.getElementById('mt-ulke-pills');
   if (!box || !mtState.meta) return;
-  const tumUlkeliTab = mtState.tab === 'analiz' || mtState.tab === 'depolama' || mtState.tab === 'tarifeler';
+  const tumUlkeliTab = mtState.tab === 'analiz' || mtState.tab === 'depolama' || mtState.tab === 'tarifeler' || mtState.tab === 'karsilastirma';
   const secim = mtState.tab === 'depolama'
     ? (mtState.depolama.ulke || 'all')
     : mtState.tab === 'tarifeler'
       ? (mtState.tarifeUlke || 'all')
-      : (mtState.analiz.ulke || 'all');
+      : mtState.tab === 'karsilastirma'
+        ? (mtState.karsi.ulke || 'all')
+        : (mtState.analiz.ulke || 'all');
   const tumu = tumUlkeliTab ? `
     <button class="mt-ulke-pill all ${secim === 'all' ? 'active' : ''}"
             style="--ulke-color:#2563EB;"
@@ -495,6 +498,14 @@ function mtSelectUlke(kod) {
     mtState.analiz.ulke = kod;
     mtRenderUlkePills();
     mtRenderAnaliz();
+    return;
+  }
+  if (mtState.tab === 'karsilastirma') {
+    if (mtState.karsi.ulke === kod) return;
+    mtState.karsi.ulke = kod;
+    mtState.karsi.expanded = {};   // ülke değişince açık kırılımları kapat
+    mtRenderUlkePills();
+    mtRenderKarsi();               // veri tümünü içeriyor — istemci tarafında filtrele
     return;
   }
   if (mtState.ulke === kod) return;
@@ -1567,7 +1578,9 @@ function mtRenderKarsi() {
   const content = document.getElementById('mt-content');
   const data = mtState.karsi.data;
   if (!content || !data) return;
-  const rows = data.ulkeler || [];
+  const seciliUlke = mtState.karsi.ulke || 'all';
+  const tumRows = data.ulkeler || [];
+  const rows = seciliUlke === 'all' ? tumRows : tumRows.filter(u => u.ulke === seciliUlke);
   const gercekToplam = rows.reduce((s, u) => s + (u.gercek_eur || 0), 0);
   const faturaToplam = rows.reduce((s, u) => s + u.fatura_sayisi, 0);
   const dagitilmamis = rows.reduce((s, u) => s + u.dagitilmamis, 0);
@@ -1604,6 +1617,7 @@ function mtRenderKarsi() {
             <tr><th>Ülke</th><th style="text-align:right;">Gerçek Toplam</th><th style="text-align:right;">Fatura</th><th style="text-align:right;">Maliyet Kalemi</th><th></th></tr>
           </thead>
           <tbody>
+            ${rows.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:22px;">${seciliUlke === 'all' ? 'Bu dönemde kayıtlı gerçek maliyet yok.' : 'Seçili ülkede bu dönemde kayıtlı gerçek maliyet yok.'}</td></tr>` : ''}
             ${rows.map(u => {
               const acik = !!mtState.karsi.expanded[u.ulke];
               return `

@@ -4365,6 +4365,30 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
   border-color: #C7D2FE;
 }
 
+/* Komple (grupsuz) sevkler: IHR yeşil, ANT kırmızı */
+#shipments-table-wrapper .shipment-pill-ihr-komple {
+  background: #ECFDF5;
+  color: #047857;
+  border-color: #A7F3D0;
+}
+
+#shipments-table-wrapper .shipment-pill-ant-komple {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border-color: #FECACA;
+}
+
+#shipments-legend .shipment-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 #shipments-table-wrapper .shipments-modern-table input[type="checkbox"] {
   width: 15px !important;
   height: 15px !important;

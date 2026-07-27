@@ -8,8 +8,8 @@ let currentPage = 1;
 let filteredList = [];
 
 const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','yukleme_tarihi','durum'];
-const COL_DEFAULTS = { ihracat_dosya_no:96, fatura_no:118, palet:52, _depo:56, ulke:82, nakliye_firmasi:104, plaka:86, sefer_id:72, fatura_bedeli_eur:98, yukleme_tarihi:84, durum:96 };
-const COL_MAX = { ihracat_dosya_no:120, fatura_no:140, palet:72, _depo:72, ulke:110, nakliye_firmasi:140, plaka:110, sefer_id:96, fatura_bedeli_eur:118, yukleme_tarihi:104, durum:118 };
+const COL_DEFAULTS = { ihracat_dosya_no:75, fatura_no:140, palet:50, _depo:56, ulke:85, nakliye_firmasi:75, plaka:142, sefer_id:72, fatura_bedeli_eur:98, yukleme_tarihi:84, durum:96 };
+const COL_MAX = { ihracat_dosya_no:120, fatura_no:160, palet:72, _depo:72, ulke:110, nakliye_firmasi:140, plaka:160, sefer_id:96, fatura_bedeli_eur:118, yukleme_tarihi:104, durum:118 };
 
 function normalizeColWidths(widths) {
   return COL_KEYS.reduce((acc, key) => {
@@ -536,7 +536,7 @@ function renderShipments(list, fullList) {
           ${thCell('Palet',           'palet',            `width:${colWidths.palet}px;text-align:center;`)}
           ${thCell('Depo',            '_depo',            `width:${colWidths._depo}px;`)}
           ${thCell('Ülke',            'ulke',             `width:${colWidths.ulke}px;`)}
-          ${thCell('Nakliye Firması', 'nakliye_firmasi',  `width:${colWidths.nakliye_firmasi}px;`)}
+          ${thCell('Nakliyeci',       'nakliye_firmasi',  `width:${colWidths.nakliye_firmasi}px;`)}
           ${thCell('Plaka',           'plaka',            `width:${colWidths.plaka}px;`)}
           ${thCell('Grup',            'sefer_id',         `width:${colWidths.sefer_id}px;`)}
           ${thCell('Fatura EUR',      'fatura_bedeli_eur',`width:${colWidths.fatura_bedeli_eur}px;`)}
@@ -550,9 +550,12 @@ function renderShipments(list, fullList) {
           : list.map((s, idx) => {
               const durumNorm = normalizeDurum(s.durum);
               const isAnt    = s.fatura_no?.startsWith('ANT');
-              const depoTag  = isAnt
-                ? `<span class="shipment-pill shipment-pill-ant">ANT</span>`
-                : `<span class="shipment-pill shipment-pill-ihr">IHR</span>`;
+              // Gruplu (sefer_id var) = mevcut renk; Komple (grupsuz) = ANT kırmızı / IHR yeşil
+              const isGrouped = !!s.sefer_id;
+              const depoCls  = isAnt
+                ? (isGrouped ? 'shipment-pill-ant' : 'shipment-pill-ant-komple')
+                : (isGrouped ? 'shipment-pill-ihr' : 'shipment-pill-ihr-komple');
+              const depoTag  = `<span class="shipment-pill ${depoCls}">${isAnt ? 'ANT' : 'IHR'}</span>`;
               return `
                 <tr class="shipments-row" data-id="${s.id}" onclick="openShipmentDetail(${s.id})">
                   <td class="shipments-td shipments-check-td" onclick="event.stopPropagation()">

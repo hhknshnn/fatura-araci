@@ -205,10 +205,15 @@ def update_shipment(shipment_id, data):
     # USD alanları formdan gelmiyorsa mevcut DB değerini koru (veri kaybını önler)
     cur.execute('''
         SELECT navlun_usd, sigorta_usd, usd_kuru, yukleme_tarihi,
-               gumruk_tarihi, varis_tarihi, gumrukleme_bitis
+               gumruk_tarihi, varis_tarihi, gumrukleme_bitis, durum, sefer_id
         FROM shipments WHERE id = %s
     ''', (shipment_id,))
-    existing = cur.fetchone() or (0, 0, 0, None, None, None, None)
+    existing = cur.fetchone() or (0, 0, 0, None, None, None, None, None, None)
+    eski_durum            = existing[7]
+    eski_varis_tarihi     = str(existing[5]) if existing[5] else None
+    eski_gumruk_tarihi    = str(existing[4]) if existing[4] else None
+    eski_gumrukleme_bitis = str(existing[6]) if existing[6] else None
+    sefer_id              = existing[8]
 
     navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
     sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
@@ -302,6 +307,30 @@ def update_shipment(shipment_id, data):
         shipment_id,
     ))
     conn.commit()
+
+    # Gruplu sevkiyatlarda (aynı sefer_id) bu düzenlemede fiilen değişen
+    # teslim durumu / varış / gümrük tarihi alanlarını gruptaki diğer
+    # kayıtlara da yay — değişmeyen alanlar ezilmesin diye kısmi update.
+    if sefer_id is not None:
+        cascade = {}
+        if durum != eski_durum:
+            cascade['durum'] = durum
+        if varis_tarihi != eski_varis_tarihi:
+            cascade['varis_tarihi'] = varis_tarihi
+        if gumruk_tarihi != eski_gumruk_tarihi:
+            cascade['gumruk_tarihi'] = gumruk_tarihi
+        if gumrukleme_bitis != eski_gumrukleme_bitis:
+            cascade['gumrukleme_bitis'] = gumrukleme_bitis
+
+        if cascade:
+            set_clause = ', '.join(f'{k} = %s' for k in cascade)
+            values = list(cascade.values()) + [sefer_id, shipment_id]
+            cur.execute(
+                f'UPDATE shipments SET {set_clause} WHERE sefer_id = %s AND id != %s',
+                values,
+            )
+            conn.commit()
+
     cur.close()
     conn.close()
 

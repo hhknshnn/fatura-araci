@@ -26,6 +26,7 @@ from api.auth import auth_get, auth_post, require_auth
 from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
+from api.taslak_form import taslak_form_kaydet, taslak_form_liste, taslak_form_getir, taslak_form_sil, taslak_form_koru
 from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 from api.nebim import nebim_delivery_get, nebim_delivery_put
 from api.audit import log_action, audit_log_get, audit_log_export
@@ -801,6 +802,40 @@ def api_taslak_store_sil(taslak_id):
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return taslak_store_sil(taslak_id)
+
+# ── /api/taslak-form ──────────────────────────────────────────────────────────
+# "Fatura Üret" ekranındaki tamamlanmamış taslak form state'inin kalıcılığı
+# (indirilmemiş/eksik girdiler) — /api/taslak-store'dan (üretilmiş Excel arşivi) ayrı.
+
+@app.route('/api/taslak-form/kaydet', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_taslak_form_kaydet():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_form_kaydet()
+
+@app.route('/api/taslak-form/liste', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_taslak_form_liste():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_form_liste()
+
+@app.route('/api/taslak-form/<int:kayit_id>', methods=['GET', 'DELETE', 'OPTIONS'])
+@require_auth()
+def api_taslak_form_detay(kayit_id):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'DELETE':
+        return taslak_form_sil(kayit_id)
+    return taslak_form_getir(kayit_id)
+
+@app.route('/api/taslak-form/<int:kayit_id>/koru', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_taslak_form_koru(kayit_id):
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return taslak_form_koru(kayit_id)
 
 # ── /api/navlun ────────────────────────────────────────────────────────────────
 # Navlun tanımları (admin) + taslak ekranı otomatik navlun/sigorta hesabı.

@@ -221,7 +221,10 @@ const TASLAK_ULKELER = {
 let taslakUlke = null;
 let taslakBytes = null;
 let taslakDepoTipi = null;
+let taslakKomple = false;
 let menseTaslakBytes = null;
+// Kayıtlı taslak (form state) kalıcılığı — hangi kayıt üzerinde çalışıldığı
+let taslakDraftId = null;
 
 // ── NAVLUN OTOMATİK HESAP STATE ───────────────────────────────────────────────
 // Navlun/sigorta otomatik hesaplaması olan kurumsal ülkeler (backend ile aynı küme)
@@ -240,8 +243,10 @@ function initTaslakPanel() {
   document.getElementById('stepTaslak').style.display = 'block';
 
   taslakDepoTipi = null;
+  taslakKomple = false;
   taslakUlke = null;
   taslakBytes = null;
+  taslakDraftId = null;
   _navlunBekleyenAktif = false;
   _navlunBekleyenDosyaNo = null;
 
@@ -250,9 +255,13 @@ function initTaslakPanel() {
   document.getElementById('taslakDepoSection').style.display = 'none';
   document.getElementById('taslakFormSection').style.display = 'none';
   document.getElementById('taslakIndir').style.display = 'none';
+  const kaydetBtn = document.getElementById('taslakKaydet');
+  if (kaydetBtn) kaydetBtn.style.display = 'none';
 
   const status = document.getElementById('taslakStatus');
   if (status) { status.className = 'status-box'; status.innerHTML = ''; }
+
+  loadTaslakDraftlar();
 }
 
 // ── TASLAK ÜLKE GRİD — .cc kart yapısı ───────────────────────────────────────
@@ -353,6 +362,9 @@ function filterTaslakCountryList() {
 
 // ── ÜLKE SEÇ ──────────────────────────────────────────────────────────────────
 async function selectTaslakUlke(kod) {
+  // Manuel ülke seçimi her zaman "yeni taslak" başlangıcı sayılır; devam edilen
+  // bir kayıt varsa çağıran (acTaslakDraft) bu satırdan SONRA taslakDraftId'yi geri yükler.
+  taslakDraftId = null;
   taslakUlke = kod;
 
   // Önceki seçimi temizle, yeni kartı aktif yap
@@ -379,6 +391,8 @@ async function selectTaslakUlke(kod) {
   document.getElementById('taslakDepoSection').style.display = 'block';
   document.getElementById('taslakFormSection').style.display = 'none';
   document.getElementById('taslakIndir').style.display = 'none';
+  const kaydetBtn0 = document.getElementById('taslakKaydet');
+  if (kaydetBtn0) kaydetBtn0.style.display = 'none';
 }
 
 // ── DEPO TİPİ SEÇ ─────────────────────────────────────────────────────────────
@@ -386,8 +400,74 @@ function selectTaslakDepo(tip) {
   taslakDepoTipi = tip;
   document.getElementById('taslak-depo-serbest').classList.toggle('active', tip === 'serbest');
   document.getElementById('taslak-depo-antrepo').classList.toggle('active', tip === 'antrepo');
+
+  // Depo tipi değişince komple seçimi sıfırlanır ve tetiklenirse formu ezmesin
+  taslakKomple = false;
+  const kompleEl = document.getElementById('taslakKomple');
+  if (kompleEl) kompleEl.checked = false;
+
   buildTaslakForm();
+
+  // "Komple depo/antrepo" seçeneği yalnız navlun tanımı olan ülkelerde çıkar;
+  // etiketi seçilen depo tipine göre uyarlanır.
+  const kompleWrap = document.getElementById('taslakKompleWrap');
+  const kompleLabel = document.getElementById('taslakKompleLabel');
+  if (kompleWrap) {
+    const goster = NAVLUN_ULKELER.has(taslakUlke);
+    kompleWrap.style.display = goster ? 'block' : 'none';
+    if (goster && kompleLabel) {
+      kompleLabel.textContent = tip === 'antrepo' ? 'Komple Antrepo' : 'Komple Depo';
+    }
+  }
+
   document.getElementById('taslakFormSection').style.display = 'block';
+}
+
+// ── KOMPLE DEPO/ANTREPO TOGGLE ────────────────────────────────────────────────
+// İşaretlenince navlun ve sigortanın tamamı (kap oranına bölünmeden) yazılır;
+// kaldırılınca normal kap bazlı otomatik hesaba dönülür.
+function taslakKompleDegisti() {
+  taslakKomple = document.getElementById('taslakKomple')?.checked || false;
+  if (taslakKomple) {
+    // Komple + gruplu birlikte anlamsız → gruplu seçimini kapat
+    const grupluEl = document.getElementById('taslak_gruplu');
+    if (grupluEl && grupluEl.checked) {
+      grupluEl.checked = false;
+      navlunGrupluDegisti();
+    }
+    navlunKompleHesapla();
+  } else {
+    navlunOtomatikHesapla();
+  }
+}
+
+// ── KOMPLE: NAVLUN/SİGORTA TAMAMINI YAZ ───────────────────────────────────────
+async function navlunKompleHesapla() {
+  if (!taslakUlke || !NAVLUN_ULKELER.has(taslakUlke)) return;
+  if (!taslakDepoTipi) return;
+  try {
+    const resp = await fetch('/api/navlun/hesapla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ulkeKodu: taslakUlke, depoTipi: taslakDepoTipi, komple: true }),
+    });
+    const data = await resp.json();
+    if (!data.success) return;
+
+    const navEl = document.getElementById('taslak_navlun');
+    const sigEl = document.getElementById('taslak_sigorta');
+    if (navEl) navEl.value = data.navlun;
+    if (sigEl) sigEl.value = data.sigorta;
+
+    const not = document.getElementById('taslak_navlunNot');
+    if (not) {
+      not.style.display = 'block';
+      not.style.color = 'var(--accent2)';
+      not.textContent = `📦 Komple: navlun ${data.navlun} · sigorta ${data.sigorta} ${data.paraBirimi} — tamamı (değiştirilebilir)`;
+    }
+  } catch (e) {
+    // Sessiz geç — kullanıcı elle girebilir
+  }
 }
 
 // ── FORM OLUŞTUR ──────────────────────────────────────────────────────────────
@@ -400,7 +480,11 @@ function buildTaslakForm() {
   // Kıbrıs özel form
   if (formCfg.tip === 'kibris') {
     buildKibrisForm(container);
-    if (taslakBytes) document.getElementById('taslakIndir').style.display = 'block';
+    if (taslakBytes) {
+      document.getElementById('taslakIndir').style.display = 'block';
+      const kaydetBtn = document.getElementById('taslakKaydet');
+      if (kaydetBtn) kaydetBtn.style.display = 'inline-block';
+    }
     return;
   }
 
@@ -439,6 +523,8 @@ function buildTaslakForm() {
 
   if (taslakBytes) {
     document.getElementById('taslakIndir').style.display = 'block';
+    const kaydetBtn = document.getElementById('taslakKaydet');
+    if (kaydetBtn) kaydetBtn.style.display = 'inline-block';
   }
 }
 
@@ -488,6 +574,12 @@ function navlunGrupluDegisti() {
   const gruplu = document.getElementById('taslak_gruplu')?.checked;
   const wrap = document.getElementById('taslak_partnerWrap');
   if (wrap) wrap.style.display = gruplu ? 'block' : 'none';
+  // Gruplu + komple birlikte anlamsız → gruplu seçilince komple kapanır
+  if (gruplu && taslakKomple) {
+    taslakKomple = false;
+    const kompleEl = document.getElementById('taslakKomple');
+    if (kompleEl) kompleEl.checked = false;
+  }
   // Gruplu durumu navlun bazını değiştirir → yeniden hesapla
   navlunOtomatikHesapla();
 }
@@ -495,6 +587,8 @@ function navlunGrupluDegisti() {
 // ── OTOMATİK NAVLUN/SİGORTA HESAPLA ───────────────────────────────────────────
 async function navlunOtomatikHesapla() {
   if (!taslakUlke || !NAVLUN_ULKELER.has(taslakUlke)) return;
+  // Komple seçiliyken kap değişimi tam tutarı ezmesin
+  if (taslakKomple) return;
   // Partner taslağı bekleyen tahsisle dolduysa formül alanları ezmez
   if (_navlunBekleyenAktif) return;
   if (!taslakDepoTipi) return;
@@ -763,6 +857,14 @@ async function indirTaslak() {
       console.warn('Taslak DB kayıt hatası:', e);
     }
 
+    // ── Kayıtlı taslak (form state) artık indirildi → "devam ediyor" listesinden düş ──
+    if (taslakDraftId) {
+      const _dId = taslakDraftId;
+      taslakDraftId = null;
+      fetch('/api/taslak-form/' + _dId, { method: 'DELETE' }).catch(() => {});
+      loadTaslakDraftlar();
+    }
+
     // ── NAVLUN GRUPLU: kalanı partner dosyaya sakla / tükettiğini işaretle ─────
     if (NAVLUN_ULKELER.has(taslakUlke)) {
       try {
@@ -933,4 +1035,256 @@ function arrayBufferToBase64(buf) {
     s += String.fromCharCode(...b.subarray(i, i + chunkSize));
   }
   return btoa(s);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── KAYITLI TASLAKLAR — form state kalıcılığı (indirilmemiş/eksik taslaklar) ──
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Ham (parse edilmemiş) form değerlerini topla — Kaydet için, validasyonsuz ──
+function collectStandardDraftFields() {
+  const formCfg = TASLAK_ULKELER[taslakUlke];
+  const fields = {};
+  if (!formCfg) return fields;
+  formCfg.alanlar.forEach(alan => {
+    const el = document.getElementById('taslak_' + alan.id);
+    fields[alan.id] = el ? el.value : '';
+  });
+  return fields;
+}
+
+function collectKibrisDraftFields() {
+  const gruplar = ['tekstil', 'tekstilDisi', 'kozmetik'];
+  const fields = {};
+  gruplar.forEach(g => {
+    fields[g + '_kap']    = document.getElementById(`kibris_${g}_kap`)?.value    || '';
+    fields[g + '_brutKg'] = document.getElementById(`kibris_${g}_brutKg`)?.value || '';
+    fields[g + '_netKg']  = document.getElementById(`kibris_${g}_netKg`)?.value  || '';
+  });
+  fields.referansNo = document.getElementById('kibris_referansNo')?.value || '';
+  return fields;
+}
+
+function _yilSelectNear(inputId) {
+  return document.getElementById(inputId)?.closest('div')?.querySelector('select');
+}
+
+function _setYilSelectNear(inputId, yil) {
+  if (!yil) return;
+  const sel = _yilSelectNear(inputId);
+  if (sel) sel.value = yil;
+}
+
+// ── KAYDET — eksik alanlarla da çalışır, tek zorunluluk ülke seçili olması ──
+async function kaydetTaslakDraft() {
+  if (!taslakUlke) { showTaslakStatus('error', '⚠ Önce ülke seçin.'); return; }
+  const cfg = TASLAK_ULKELER[taslakUlke];
+  const isKibris = cfg?.tip === 'kibris';
+
+  const fields = isKibris ? collectKibrisDraftFields() : collectStandardDraftFields();
+  const rawRef = (fields.referansNo || '').trim();
+  const yilSel = isKibris ? _yilSelectNear('kibris_referansNo') : _yilSelectNear('taslak_referansNo');
+  const yil = yilSel ? yilSel.value : (window.APP_YIL || localStorage.getItem('app_yil') || '2026');
+  const referansNoTam = rawRef ? (rawRef.includes('-') ? rawRef : `${yil}-${rawRef}`) : '';
+
+  const formData = {
+    yil,
+    komple:     taslakKomple,
+    gruplu:     document.getElementById('taslak_gruplu')?.checked || false,
+    partnerYil: document.getElementById('taslak_partnerYil')?.value || '',
+    partnerNo:  document.getElementById('taslak_partnerNo')?.value || '',
+    fields,
+  };
+
+  const btn = document.getElementById('taslakKaydet');
+  const eskiMetin = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ Kaydediliyor...'; btn.disabled = true; }
+  try {
+    const resp = await fetch('/api/taslak-form/kaydet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id:         taslakDraftId,
+        ulkeKodu:   taslakUlke,
+        ulkeAdi:    cfg?.label || taslakUlke,
+        depoTipi:   taslakDepoTipi,
+        referansNo: referansNoTam,
+        formData,
+      }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    taslakDraftId = data.id;
+    const refInfo = referansNoTam ? `: <span>${escapeHtml(referansNoTam)}</span>` : ' (referans no henüz girilmedi)';
+    showTaslakStatus('success', `<div class="stat">💾 Taslak kaydedildi${refInfo}</div>`);
+    loadTaslakDraftlar();
+  } catch (err) {
+    showTaslakStatus('error', '⚠ ' + err.message);
+  } finally {
+    if (btn) { btn.textContent = eskiMetin; btn.disabled = false; }
+  }
+}
+
+// ── LİSTELE ───────────────────────────────────────────────────────────────────
+async function loadTaslakDraftlar() {
+  const section = document.getElementById('taslakKayitliSection');
+  const listEl  = document.getElementById('taslakKayitliListe');
+  if (!section || !listEl) return;
+  try {
+    const resp = await fetch('/api/taslak-form/liste');
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    const taslaklar = data.taslaklar || [];
+    if (taslaklar.length === 0) {
+      section.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+    section.style.display = 'block';
+    renderTaslakDraftListesi(taslaklar);
+  } catch (e) {
+    console.warn('Kayıtlı taslak listesi alınamadı:', e);
+  }
+}
+
+function renderTaslakDraftListesi(taslaklar) {
+  const listEl = document.getElementById('taslakKayitliListe');
+  listEl.innerHTML = '';
+
+  taslaklar.forEach(t => {
+    const ulkeLabel = escapeHtml(t.ulkeAdi || t.ulkeKodu);
+    const refLabel  = t.referansNo ? escapeHtml(t.referansNo) : 'Referans no girilmedi';
+
+    let seritHtml = '';
+    if (t.uyari === 'silinecek') {
+      const kalanMetin = t.kalanGun === 0 ? 'bugün silinecek' : `${t.kalanGun} gün sonra silinecek`;
+      seritHtml = `
+        <div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--warning-dim);color:var(--gold);font-size:11px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>⚠ 5 gün doluyor, ${kalanMetin} — tutmak ister misin?</span>
+          <span class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="tutTaslakDraft(event, ${t.id})">🔒 Tut</span>
+        </div>`;
+    } else if (t.uyari === 'onbes_gecti') {
+      seritHtml = `
+        <div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--surface2);color:var(--text2);font-size:11px;">
+          🔒 Korunuyor · 15 günü geçti, hâlâ duruyor
+        </div>`;
+    }
+
+    const korunanRozet = (t.korunan && t.uyari !== 'onbes_gecti')
+      ? `<span class="badge" style="background:var(--surface2);color:var(--text2);">🔒 Korunuyor</span>`
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = `margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;${t.korunan ? 'border-color:var(--accent);' : ''}`;
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="badge badge-blue">${ulkeLabel}</span>
+          ${korunanRozet}
+        </div>
+        <span style="font-size:10px;color:var(--error);cursor:pointer;" onclick="silTaslakDraft(event, ${t.id})">🗑 Sil</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);">${refLabel}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">Son güncelleme: ${escapeHtml(t.guncellemeTarihi)}</div>
+      ${seritHtml}`;
+    card.addEventListener('click', () => acTaslakDraft(t.id));
+    listEl.appendChild(card);
+  });
+}
+
+// ── DEVAM ET — kaydı çek, formu doldur ───────────────────────────────────────
+async function acTaslakDraft(id) {
+  try {
+    showTaslakStatus('info', '⏳ Taslak yükleniyor...');
+    const resp = await fetch('/api/taslak-form/' + id);
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Taslak bulunamadı');
+
+    const kod = data.ulkeKodu;
+    if (!TASLAK_ULKELER[kod]) throw new Error('Bilinmeyen ülke: ' + kod);
+
+    await selectTaslakUlke(kod);  // taslakDraftId'yi sıfırlar, şablonu yükler
+    taslakDraftId = id;           // devam edilen taslağın kimliğini geri yükle
+
+    const formData = data.formData || {};
+
+    if (!data.depoTipi) {
+      showTaslakStatus('success', '<div class="stat">✓ Taslak yüklendi — devam etmek için depo tipi seçin.</div>');
+      return;
+    }
+    selectTaslakDepo(data.depoTipi); // formu kurar (buildTaslakForm), komple/gruplu'yu sıfırlar
+
+    const isKibris = TASLAK_ULKELER[kod]?.tip === 'kibris';
+    const fields = formData.fields || {};
+
+    if (isKibris) {
+      ['tekstil', 'tekstilDisi', 'kozmetik'].forEach(g => {
+        const kapEl  = document.getElementById(`kibris_${g}_kap`);
+        const brutEl = document.getElementById(`kibris_${g}_brutKg`);
+        const netEl  = document.getElementById(`kibris_${g}_netKg`);
+        if (kapEl)  kapEl.value  = fields[g + '_kap']    || '';
+        if (brutEl) brutEl.value = fields[g + '_brutKg'] || '';
+        if (netEl)  netEl.value  = fields[g + '_netKg']  || '';
+      });
+      const refEl = document.getElementById('kibris_referansNo');
+      if (refEl) refEl.value = fields.referansNo || '';
+      _setYilSelectNear('kibris_referansNo', formData.yil);
+    } else {
+      const formCfg = TASLAK_ULKELER[kod];
+      formCfg.alanlar.forEach(alan => {
+        const el = document.getElementById('taslak_' + alan.id);
+        if (el) el.value = fields[alan.id] || '';
+      });
+      _setYilSelectNear('taslak_referansNo', formData.yil);
+
+      // Komple/gruplu/partner alanlarını DOĞRUDAN geri yükle — otomatik hesap
+      // fonksiyonlarını (navlunKompleHesapla/navlunOtomatikHesapla) TETİKLEME,
+      // aksi halde kaydedilmiş navlun/sigorta override'ları API çağrısıyla ezilir.
+      taslakKomple = !!formData.komple;
+      const kompleEl = document.getElementById('taslakKomple');
+      if (kompleEl) kompleEl.checked = taslakKomple;
+
+      const grupluEl = document.getElementById('taslak_gruplu');
+      if (grupluEl) grupluEl.checked = !!formData.gruplu;
+      const partnerWrap = document.getElementById('taslak_partnerWrap');
+      if (partnerWrap) partnerWrap.style.display = formData.gruplu ? 'block' : 'none';
+      const partnerYilEl = document.getElementById('taslak_partnerYil');
+      if (partnerYilEl) partnerYilEl.value = formData.partnerYil || (window.APP_YIL || '2026');
+      const partnerNoEl = document.getElementById('taslak_partnerNo');
+      if (partnerNoEl) partnerNoEl.value = formData.partnerNo || '';
+    }
+
+    showTaslakStatus('success', '<div class="stat">✓ Taslak yüklendi, kaldığınız yerden devam edin.</div>');
+  } catch (err) {
+    showTaslakStatus('error', '⚠ ' + err.message);
+  }
+}
+
+// ── SİL — onaylı ─────────────────────────────────────────────────────────────
+async function silTaslakDraft(event, id) {
+  event.stopPropagation();
+  if (!confirm('Bu taslak kalıcı olarak silinsin mi?')) return;
+  try {
+    const resp = await fetch('/api/taslak-form/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    if (taslakDraftId === id) taslakDraftId = null;
+    loadTaslakDraftlar();
+  } catch (err) {
+    showTaslakStatus('error', '⚠ ' + err.message);
+  }
+}
+
+// ── TUT — 5 günlük otomatik silmeden muaf tut ────────────────────────────────
+async function tutTaslakDraft(event, id) {
+  event.stopPropagation();
+  try {
+    const resp = await fetch('/api/taslak-form/' + id + '/koru', { method: 'POST' });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Sunucu hatası');
+    loadTaslakDraftlar();
+  } catch (err) {
+    showTaslakStatus('error', '⚠ ' + err.message);
+  }
 }
