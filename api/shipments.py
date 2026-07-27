@@ -1950,9 +1950,17 @@ def parse_ge_broker_pdf(pdf_bytes):
 
 def parse_ge_im_pdf(pdf_bytes):
     """
-    Gürcistan ithalat beyanından (sadece son sayfa) KDV (kod 28) ve gümrük vergisi (kod 20) çeker.
-    სახე ჯამი ... სულ ჯამი arası özet bölümden alınır.
-    Format: 21,453.80 (nokta ondalık)
+    Gürcistan ithalat beyanından KDV (kod 28) ve gümrük vergisi (kod 20) çeker.
+
+    Bu form alanları üst üste binecek şekilde dizildiğinden pdfplumber'ın
+    extract_text() çıkışı satır/sütun sırasını koruyamıyor (aynı görsel satırdaki
+    kod, baza, oran ve tutar hücreleri metinde birbirinden kopup öngörülemeyen bir
+    sırada art arda gelebiliyor — bu yüzden basit regex ile "KOD ... TUTAR" aramak
+    yanlış sayıyı yakalayabiliyor). Bunun önüne geçmek için kelimeler extract_words
+    ile konumlarıyla (top/x0) alınır, aynı görsel satıra ait olanlar y-konumuna göre
+    kümelenip soldan sağa yeniden sıralanır — böylece her satırın gerçek okuma
+    sırası garanti edilir ve regex bu düzeltilmiş satırlar üzerinde çalışır.
+    Format: 21,453.80 (binlik virgül, ondalık nokta)
     """
     result = {'kdv': 0.0, 'vergi': 0.0, 'toplam': 0.0}
 
@@ -1963,26 +1971,42 @@ def parse_ge_im_pdf(pdf_bytes):
         except:
             return 0.0
 
+    def page_lines(page):
+        words = page.extract_words(use_text_flow=False, keep_blank_chars=False)
+        words.sort(key=lambda w: (w['top'], w['x0']))
+        lines, current, current_top = [], [], None
+        for w in words:
+            if current_top is None or abs(w['top'] - current_top) <= 2.5:
+                current.append(w)
+                current_top = w['top'] if current_top is None else current_top
+            else:
+                lines.append(current)
+                current, current_top = [w], w['top']
+        if current:
+            lines.append(current)
+        return [' '.join(w['text'] for w in sorted(line, key=lambda w: w['x0'])) for line in lines]
+
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            last_text = pdf.pages[-1].extract_text() or ''
-        text = re.sub(r'\s+', ' ', last_text)
+            all_lines = []
+            for page in pdf.pages:
+                all_lines.extend(page_lines(page))
 
-        # "სახე ჯამი" ile "სულ ჯამი" arasındaki özet bölümü bul
-        m_section = re.search(r'სახე\s+ჯამი(.*?)სულ\s+ჯამი', text, re.DOTALL)
-        if m_section:
-            section = m_section.group(1)
-            # Özet satırında sadece "KOD TUTAR" var (detay satırlarında rate ve computed da var)
-            m28 = re.search(r'\b28\b\s+([\d,]+\.?\d*)', section)
-            if m28:
-                result['kdv'] = parse_gel(m28.group(1))
-            m20 = re.search(r'\b20\b\s+([\d,]+\.?\d*)', section)
-            if m20:
-                result['vergi'] = parse_gel(m20.group(1))
+        row_re = re.compile(r'\b(20|28)\b\s+[\d,]+\.?\d*\s+[\d.]+\s+([\d,]+\.?\d*)\s+\d\b')
+        for line in all_lines:
+            # Bir satırda iki kalemin verisi yan yana kümelenebiliyor (aynı
+            # görsel satır yüksekliğinde iki farklı sütun) — search() yalnızca
+            # ilk eşleşmeyi alıp ikincisini kaybederdi, finditer ile hepsi alınır.
+            for m in row_re.finditer(line):
+                code, tutar = m.group(1), parse_gel(m.group(2))
+                if code == '28':
+                    result['kdv'] += tutar
+                else:
+                    result['vergi'] += tutar
 
-        m_total = re.search(r'სულ\s+ჯამი\s+([\d,]+\.?\d*)', text)
-        if m_total:
-            result['toplam'] = parse_gel(m_total.group(1))
+        result['kdv']    = round(result['kdv'], 2)
+        result['vergi']  = round(result['vergi'], 2)
+        result['toplam'] = round(result['kdv'] + result['vergi'], 2)
 
     except Exception as e:
         print(f'GE IM PDF parse hatası: {e}')

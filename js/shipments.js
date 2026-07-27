@@ -1893,13 +1893,21 @@ async function meHandleGePdf(file) {
         detailHtml += `<div style="margin-top:6px;font-size:11px;color:var(--text3);">ℹ ANT faturası bulunamadı; vergi seçili sevkiyata yazılacak.</div>`;
       }
 
+      const vergiTarget = antFatura || s;
+
+      // Aynı sevkiyata (ANT) hem KDV hem vergi yazılacaksa, güncellemeleri TEK
+      // kayıtta birleştir. meGeSaveField tam satırı gönderdiğinden, aynı id'ye
+      // iki eşzamanlı PUT atılırsa sonra biteni öndekini eski (stale) değerle
+      // ezip alanı sıfırlıyordu (KDV veya vergi kayboluyordu).
       for (const p of paylar) {
         const kdvPay = Math.round(toplamKdv * p.oran * 100) / 100;
-        savePromises.push(meGeSaveField(p, 'kdv_eur', kdvPay, token));
+        const fields = { kdv_eur: kdvPay };
+        if (p.id === vergiTarget.id) fields.gumruk_vergisi_eur = toplamVergi;
+        savePromises.push(meGeSaveFields(p, fields, token));
       }
-
-      const vergiTarget = antFatura || s;
-      savePromises.push(meGeSaveField(vergiTarget, 'gumruk_vergisi_eur', toplamVergi, token));
+      if (!paylar.some(p => p.id === vergiTarget.id)) {
+        savePromises.push(meGeSaveFields(vergiTarget, { gumruk_vergisi_eur: toplamVergi }, token));
+      }
     }
 
     resultEl.innerHTML = detailHtml +
@@ -1920,6 +1928,10 @@ async function meHandleGePdf(file) {
 }
 
 async function meGeSaveField(shipment, field, value, token) {
+  return meGeSaveFields(shipment, { [field]: value }, token);
+}
+
+async function meGeSaveFields(shipment, fields, token) {
   const s = shipment;
   const body = {
     id:                    s.id,
@@ -1947,7 +1959,7 @@ async function meGeSaveField(shipment, field, value, token) {
     gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
     kdv_eur:               s.kdv_eur || 0,
   };
-  body[field] = value;
+  Object.assign(body, fields);
   const res  = await fetch('/api/shipments', {
     method:  'PUT',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
