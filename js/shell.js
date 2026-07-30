@@ -227,6 +227,9 @@ function sidebarSelect(mod) {
           <button class="fu-tab" id="fu-tab-invpl" onclick="switchFaturaUretTab('invpl')" type="button">
             <i class="ti ti-file-invoice" aria-hidden="true"></i><span>INV + PL</span>
           </button>
+          <button class="fu-tab" id="fu-tab-t1" onclick="switchFaturaUretTab('t1')" type="button">
+            <i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Belçika T1 Ayrımı</span>
+          </button>
           <!-- <button class="fu-tab" id="fu-tab-evrak" onclick="switchFaturaUretTab('evrak')" type="button">
             <i class="ti ti-paperclip" aria-hidden="true"></i><span>Ek Evrak</span>
           </button> -->
@@ -235,6 +238,7 @@ function sidebarSelect(mod) {
           <div id="fu-content-taslak" class="fu-tab-panel"></div>
           <div id="fu-content-gtip" class="fu-tab-panel" style="display:none;"></div>
           <div id="fu-content-invpl" class="fu-tab-panel" style="display:none;"></div>
+          <div id="fu-content-t1" class="fu-tab-panel" style="display:none;"></div>
           <!-- <div id="fu-content-evrak" class="fu-tab-panel" style="display:none;"></div> -->
         </div>
       `;
@@ -524,7 +528,7 @@ let _fuInvplOpened = false;
 
 function switchFaturaUretTab(tab) {
   // Sekme butonlarını güncelle
-  ['taslak', 'gtip', 'invpl' /*, 'evrak' */].forEach(t => {
+  ['taslak', 'gtip', 'invpl', 't1' /*, 'evrak' */].forEach(t => {
     const btn = document.getElementById('fu-tab-' + t);
     if (btn) btn.classList.toggle('active', t === tab);
   });
@@ -534,6 +538,7 @@ function switchFaturaUretTab(tab) {
     taslak: ['stepTaslak'],
     gtip:   ['stepGtip'],
     invpl:  ['wizardSteps', 'step2'],
+    t1:     [],
     // evrak:  ['stepEvrak'],
   };
 
@@ -548,7 +553,7 @@ function switchFaturaUretTab(tab) {
   if (!container) return;
 
   // fu-content divlerini temizle (display none yeterli)
-  ['taslak','gtip','invpl','evrak'].forEach(t => {
+  ['taslak','gtip','invpl','t1','evrak'].forEach(t => {
     const c = document.getElementById('fu-content-' + t);
     if (c) c.style.display = t === tab ? 'block' : 'none';
   });
@@ -573,6 +578,8 @@ function switchFaturaUretTab(tab) {
   } else if (tab === 'invpl' && !_fuInvplOpened && typeof resetSonrasiWizard === 'function') {
     _fuInvplOpened = true;
     setTimeout(resetSonrasiWizard, 0);
+  } else if (tab === 't1' && typeof initT1AyrimiPanel === 'function') {
+    setTimeout(initT1AyrimiPanel, 0);
   }
   // else if (tab === 'evrak' && typeof initEvrakPanel === 'function') {
   //   setTimeout(initEvrakPanel, 0);

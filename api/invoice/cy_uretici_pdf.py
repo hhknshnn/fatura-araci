@@ -1,10 +1,11 @@
 """
 Kıbrıs Tekstil Dışı fatura PDF'ine Üretici sütunu ekleyen modül.
 
-Yüklenen orijinal e-Fatura PDF'i satır/sütun bazında pdfplumber ile taranır,
-mevcut 13 sütun hafifçe daraltılır ve açılan alana Excel'deki
-YURT DIŞI/İÇİ TEDARİKÇİ Açıklama değeri (SKU eşleşmesiyle) "Üretici" adıyla
-14. sütun olarak eklenir. Satır yüksekliği ve sayfa sayısı değişmez.
+Yüklenen orijinal e-Fatura PDF'i satır/sütun bazında pdfplumber ile taranır.
+Hem 13 sütunlu ihracat şablonu hem de 6 sütunlu e-Arşiv şablonu desteklenir;
+mevcut sütunlar daraltılarak açılan alana Excel'deki YURT DIŞI/İÇİ TEDARİKÇİ
+Açıklama değeri (SKU eşleşmesiyle) "Üretici" adıyla eklenir. Satır yüksekliği
+ve sayfa sayısı değişmez.
 """
 import io
 import os
@@ -69,13 +70,19 @@ def _ensure_font():
         _FONT_REGISTERED = True
 
 
-# Sütun sırası (13 sütun, PDF şablonundaki sabit düzen)
+# 13 sütunlu ihracat şablonunun sütun sırası:
 # idx: 0 Sıra No, 1 Ürün Kodu, 2 Renk Kodu, 3 Renk, 4 Mal Hizmet, 5 Menşei,
 #      6 Miktar, 7 Birim Fiyat, 8 Mal Hizmet Tutarı, 9 Teslim/Bedel Ödeme Yeri,
 #      10 Gönderilme Şekli, 11 Teslim Şartı, 12 GTİP
 # Sadece bilgi yoğunluğu düşük/kısa sütunlar daraltılır; Mal Hizmet, Menşei,
 # Miktar, Fiyat, Tutar ve Teslim/Bedel Ödeme Yeri'ne dokunulmaz.
-SHRINK = {0: -1.5, 1: -4.2, 2: -1.4, 3: -20.2, 10: -4.2, 11: -2.7}
+SHRINK_13_COL = {0: -1.5, 1: -4.2, 2: -1.4, 3: -20.2, 10: -4.2, 11: -2.7}
+
+# 6 sütunlu e-Arşiv şablonu:
+# idx: 0 Ürün Kodu, 1 Ürün Adı, 2 Miktar, 3 Birim Fiyat,
+#      4 Brüt Tutar, 5 Ürün Tutarı
+# İlk iki geniş metin sütunundan yer açılır; sayısal sütunlar korunur.
+SHRINK_6_COL = {0: -32.0, 1: -38.0}
 
 LEFT_ALIGN_PAD = 2.7
 LINE_H = 7.6
@@ -84,69 +91,116 @@ DATA_FONT_SIZE = 5.4
 URETICI_FONT_SIZE = 5.0
 HEADER_FONT_SIZE = 5.8
 MAX_LINES_URETICI = 6
+EARCHIVE_DATA_FONT_SIZE = 7.2
+EARCHIVE_HEADER_FONT_SIZE = 7.2
+EARCHIVE_LINE_H = 8.4
 
 HEADER_KEYWORDS = {'Sıra', 'Ürün', 'Kodu', 'Renk', 'Mal', 'Hizmet', 'Menşei', 'Miktar',
                    'Birim', 'Fiyat', 'Tutarı', 'Teslim', 'Bedel', 'Ödeme', 'Yeri',
                    'Gönderilme', 'Şekli', 'Şartı', 'GTİP'}
 
 
+def _table_cell_groups(page):
+    """Aynı yatay bantta duran dolu hücre dikdörtgenlerini döndürür.
+
+    e-Arşiv PDF'lerinde satırlar 26-29 pt, ihracat şablonunda ise 30-55 pt
+    yüksekliğindedir. Sabit bir yükseklik aralığı yerine, aynı üst/alt
+    koordinatları ve birbirine bitişik 6/13 hücreyi tablo sinyali sayarız.
+    """
+    grouped = {}
+    for r in page.rects:
+        h = r['bottom'] - r['top']
+        if (not r.get('fill') or r.get('stroke') or r.get('width', 0) <= 4
+                or not 15 < h < 80):
+            continue
+        key = (round(r['top'], 2), round(r['bottom'], 2))
+        grouped.setdefault(key, []).append(r)
+
+    result = []
+    for (top, bottom), rects in grouped.items():
+        # Aynı x0'da üst üste çizilmiş olabilecek hücreleri tekilleştir.
+        by_x0 = {}
+        for r in rects:
+            by_x0.setdefault(round(r['x0'], 1), r)
+        cells = sorted(by_x0.values(), key=lambda r: r['x0'])
+        if len(cells) not in (6, 13):
+            continue
+        if cells[-1]['x1'] - cells[0]['x0'] < page.width * 0.70:
+            continue
+        if any(abs(cells[i + 1]['x0'] - cells[i]['x1']) > 2
+               for i in range(len(cells) - 1)):
+            continue
+        result.append((top, bottom, cells))
+    return result
+
+
 def _detect_cols_and_row_height(pdf):
-    """Şablon tablosunun 13 sütun sınırını ve satır yüksekliğini PDF'in kendi
-    hücre dikdörtgenlerinden (arka plan fill'lerinden) tespit eder."""
-    sample_page = pdf.pages[2] if len(pdf.pages) > 2 else pdf.pages[0]
-    tops = sorted(set(round(r['top'], 2) for r in sample_page.rects
-                       if r['fill'] and not r['stroke'] and 30 < (r['bottom'] - r['top']) < 55))
-    diffs = [tops[i + 1] - tops[i] for i in range(len(tops) - 1)]
-    if not diffs:
-        raise ValueError('PDF tablo satır yapısı tanınamadı (satır yüksekliği bulunamadı)')
-    row_h = sorted(diffs)[len(diffs) // 2]
-
-    cols = set()
-    max_x1 = 0.0
+    """Desteklenen tablonun sütun sınırlarını ve tipik satır yüksekliğini bulur."""
+    candidates = {}
     for page in pdf.pages[:3]:
-        for r in page.rects:
-            if not r['fill'] or r['stroke']:
-                continue
-            h = r['bottom'] - r['top']
-            if abs(h - row_h) < 0.5:
-                cols.add(round(r['x0'], 1))
-                max_x1 = max(max_x1, r['x1'])
+        words = page.extract_words()
+        for top, bottom, cells in _table_cell_groups(page):
+            signature = tuple(round(r['x0'], 1) for r in cells) + (
+                round(cells[-1]['x1'], 1),
+            )
+            band_words = [w for w in words if top - 0.5 <= w['top'] < bottom - 0.5]
+            header_hits = len({w['text'] for w in band_words} & HEADER_KEYWORDS)
+            item = candidates.setdefault(signature, {
+                'cells': cells, 'heights': [], 'bands': 0, 'header_hits': 0,
+            })
+            item['heights'].append(bottom - top)
+            item['bands'] += 1
+            item['header_hits'] = max(item['header_hits'], header_hits)
 
-    cols = sorted(cols)
-    if len(cols) < 13:
-        raise ValueError('PDF tablo sütun yapısı tanınamadı (beklenen sütun sayısına ulaşılamadı)')
-    cols.append(round(max_x1, 1))
-    old_cols = [(cols[i], cols[i + 1]) for i in range(len(cols) - 1)]
+    if not candidates:
+        raise ValueError('PDF tablo satır yapısı tanınamadı (satır yüksekliği bulunamadı)')
+
+    # Başlık kelimeleri en güçlü sinyaldir; ardından tekrar eden bant ve sütun
+    # sayısı gelir. Böylece faturadaki özet tablolar ürün tablosuyla karışmaz.
+    best = max(candidates.values(), key=lambda x: (
+        x['header_hits'], x['bands'], len(x['cells']),
+    ))
+    cells = best['cells']
+    old_cols = [(round(r['x0'], 1), round(r['x1'], 1)) for r in cells]
+    heights = sorted(best['heights'])
+    row_h = heights[len(heights) // 2]
     return old_cols, row_h
 
 
 def _build_new_cols(old_cols):
+    if len(old_cols) == 13:
+        shrink = SHRINK_13_COL
+    elif len(old_cols) == 6:
+        shrink = SHRINK_6_COL
+    else:
+        raise ValueError(f'Desteklenmeyen PDF tablo sütun sayısı: {len(old_cols)}')
+
     new_cols = []
     x = old_cols[0][0]
     total_shrink = 0.0
     for idx, (x0, x1) in enumerate(old_cols):
-        w = (x1 - x0) + SHRINK.get(idx, 0)
+        w = (x1 - x0) + shrink.get(idx, 0)
         new_cols.append((x, x + w))
-        total_shrink += -SHRINK.get(idx, 0)
+        total_shrink += -shrink.get(idx, 0)
         x += w
     uretici_col = (x, x + total_shrink)
     return new_cols, uretici_col
 
 
-def _get_row_bands(page):
+def _get_row_bands(page, old_cols):
     """Her satırın kendi hücre dikdörtgeninden gerçek üst/alt sınırını alır.
     Bir sonraki satırın üstünü tahmin etmeye veya son satırda row_h ekleyip
     tahmin yapmaya gerek yok — bu, son satırın alt sınırını yanlış hesaplayıp
     hemen altındaki toplam/footer kutusunun metnini satıra karıştırmayı önler."""
-    groups = {}
-    for r in page.rects:
-        if not r['fill'] or r['stroke']:
+    expected = [x0 for x0, _x1 in old_cols]
+    bands = []
+    for top, bottom, cells in _table_cell_groups(page):
+        if len(cells) != len(old_cols):
             continue
-        h = r['bottom'] - r['top']
-        if 30 < h < 55:
-            t = round(r['top'], 2)
-            groups[t] = r['bottom']
-    return sorted(groups.items())
+        actual = [round(r['x0'], 1) for r in cells]
+        if all(abs(a - b) <= 1.5 for a, b in zip(actual, expected)):
+            bands.append((top, bottom))
+    return sorted(bands)
 
 
 def _assign_col(x0, old_cols):
@@ -159,12 +213,17 @@ def _assign_col(x0, old_cols):
 def _get_row_bg_color(page, band):
     top, _bottom = band
     for r in page.rects:
-        if not r['fill'] or r['stroke']:
+        if not r.get('fill') or r.get('stroke') or r.get('width', 0) <= 4:
             continue
         h = r['bottom'] - r['top']
-        if 30 < h < 55 and abs(r['top'] - top) < 1:
+        if 15 < h < 80 and abs(r['top'] - top) < 1:
             return r['non_stroking_color']
     return (1, 1, 1)
+
+
+def _normalize_sku(value):
+    """PDF'deki görsel son nokta/boşluk farklarını eşleştirmeden çıkarır."""
+    return ''.join(str(value or '').split()).rstrip('.').upper()
 
 
 def _split_long_token(token, max_width, font_size, font_name):
@@ -251,10 +310,43 @@ def _is_header_band(band_words):
     return len(texts & HEADER_KEYWORDS) >= 4
 
 
+def _get_band_sku(page, band, old_cols):
+    """Bir tablo bandındaki Ürün Kodu/SKU değerini normalize ederek döndürür."""
+    top, bottom = band
+    sku_col_idx = 1 if len(old_cols) == 13 else 0
+    sku_words = [
+        w for w in page.extract_words()
+        if top - 0.5 <= w['top'] < bottom - 0.5
+        and _assign_col(w['x0'], old_cols) == sku_col_idx
+    ]
+    sku_words.sort(key=lambda w: (w['top'], w['x0']))
+    return _normalize_sku(''.join(w['text'] for w in sku_words))
+
+
+def _get_pdf_skus(pdf, old_cols):
+    """PDF ürün tablosundaki başlık dışı tüm SKU'ları sırasıyla döndürür."""
+    result = []
+    for page in pdf.pages:
+        words = page.extract_words()
+        for band in _get_row_bands(page, old_cols):
+            top, bottom = band
+            band_words = [
+                w for w in words if top - 0.5 <= w['top'] < bottom - 0.5
+            ]
+            if not band_words or _is_header_band(band_words):
+                continue
+            sku = _get_band_sku(page, band, old_cols)
+            if sku:
+                result.append(sku)
+    return result
+
+
 def _build_overlay_for_page(page, old_cols, new_cols, uretici_col,
                              sku_to_uretici, page_w, page_h):
     words = page.extract_words()
-    bands = _get_row_bands(page)
+    bands = _get_row_bands(page, old_cols)
+    sku_col_idx = 1 if len(old_cols) == 13 else 0
+    is_earchive = len(old_cols) == 6
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(page_w, page_h))
     any_drawn = False
@@ -269,10 +361,9 @@ def _build_overlay_for_page(page, old_cols, new_cols, uretici_col,
             cols_words[idx].append(w)
 
         is_header = _is_header_band(band_words)
-        sku_words = sorted(cols_words.get(1, []), key=lambda w: w['top'])
-        sku_text = ''.join(w['text'] for w in sku_words).strip()
-        if not is_header and sku_text not in sku_to_uretici:
-            continue
+        sku_words = sorted(cols_words.get(sku_col_idx, []),
+                           key=lambda w: (w['top'], w['x0']))
+        sku_text = _normalize_sku(''.join(w['text'] for w in sku_words))
 
         any_drawn = True
         bg_color = _get_row_bg_color(page, (top, bottom))
@@ -314,20 +405,26 @@ def _build_overlay_for_page(page, old_cols, new_cols, uretici_col,
 
             new_x0, new_x1 = new_cols[idx]
             max_w = (new_x1 - new_x0) - 2 * LEFT_ALIGN_PAD
-            font_size = HEADER_FONT_SIZE if is_header else DATA_FONT_SIZE
+            if is_earchive:
+                font_size = (EARCHIVE_HEADER_FONT_SIZE if is_header
+                             else EARCHIVE_DATA_FONT_SIZE)
+                text_line_h = EARCHIVE_LINE_H
+            else:
+                font_size = HEADER_FONT_SIZE if is_header else DATA_FONT_SIZE
+                text_line_h = LINE_H
             new_lines = _wrap_text(full_text, max_w, font_size)
             n = len(new_lines)
-            offset = max(2.0, ((bottom - top) - n * LINE_H) / 2)
+            offset = max(2.0, ((bottom - top) - n * text_line_h) / 2)
             c.setFont(FONT_NAME, font_size)
             for li, line in enumerate(new_lines):
-                line_top = top + offset + li * LINE_H
+                line_top = top + offset + li * text_line_h
                 baseline_y = page_h - (line_top + font_size * 0.83)
                 c.drawString(new_x0 + LEFT_ALIGN_PAD, baseline_y, line)
 
         if is_header:
             uretici_text = 'Üretici'
-            font_size = HEADER_FONT_SIZE
-            line_h = LINE_H
+            font_size = EARCHIVE_HEADER_FONT_SIZE if is_earchive else HEADER_FONT_SIZE
+            line_h = EARCHIVE_LINE_H if is_earchive else LINE_H
             max_lines = 4
         else:
             uretici_text = sku_to_uretici.get(sku_text, '')
@@ -368,16 +465,38 @@ def generate_uretici_pdf(pdf_bytes, sku_to_uretici):
     page_w = float(page0.mediabox.width)
     page_h = float(page0.mediabox.height)
 
+    normalized_sku_to_uretici = {
+        _normalize_sku(sku): value
+        for sku, value in sku_to_uretici.items()
+        if _normalize_sku(sku)
+    }
+
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         old_cols, _row_h = _detect_cols_and_row_height(pdf)
         new_cols, uretici_col = _build_new_cols(old_cols)
+
+        pdf_skus = _get_pdf_skus(pdf, old_cols)
+        if not pdf_skus:
+            raise ValueError('PDF ürün tablosunda eşleştirilecek Ürün Kodu bulunamadı')
+
+        missing_skus = sorted({
+            sku for sku in pdf_skus if sku not in normalized_sku_to_uretici
+        })
+        if missing_skus:
+            sample = ', '.join(missing_skus[:8])
+            suffix = ' ...' if len(missing_skus) > 8 else ''
+            raise ValueError(
+                f'{len(missing_skus)} ürün için üretici bilgisi bulunamadı: '
+                f'{sample}{suffix}'
+            )
 
         sig_reader = PdfReader(_build_signature_overlay(page_w, page_h))
 
         writer = PdfWriter()
         for i, page in enumerate(pdf.pages):
             overlay_buf, any_drawn = _build_overlay_for_page(
-                page, old_cols, new_cols, uretici_col, sku_to_uretici, page_w, page_h)
+                page, old_cols, new_cols, uretici_col,
+                normalized_sku_to_uretici, page_w, page_h)
             base_page = base_reader.pages[i]
             if any_drawn:
                 overlay_reader = PdfReader(overlay_buf)

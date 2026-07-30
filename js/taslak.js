@@ -366,6 +366,8 @@ async function selectTaslakUlke(kod) {
   // bir kayıt varsa çağıran (acTaslakDraft) bu satırdan SONRA taslakDraftId'yi geri yükler.
   taslakDraftId = null;
   taslakUlke = kod;
+  // Önceki ülkenin şablonu yeni ülke için yanlışlıkla kullanılmasın.
+  taslakBytes = null;
 
   // Önceki seçimi temizle, yeni kartı aktif yap
   document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc, #tcbody-devir .cc').forEach(b => b.classList.remove('active'));
@@ -471,6 +473,17 @@ async function navlunKompleHesapla() {
 }
 
 // ── FORM OLUŞTUR ──────────────────────────────────────────────────────────────
+function updateTaslakActionButtons() {
+  const indirBtn = document.getElementById("taslakIndir");
+  const kaydetBtn = document.getElementById("taslakKaydet");
+
+  // İndirme için Excel şablonu gerekir; form taslağı kaydetmek için gerekmez.
+  if (indirBtn) indirBtn.style.display = taslakBytes ? "block" : "none";
+  if (kaydetBtn) {
+    kaydetBtn.style.display = taslakUlke && taslakDepoTipi ? "inline-block" : "none";
+  }
+}
+
 function buildTaslakForm() {
   if (!taslakUlke) return;
   const formCfg = TASLAK_ULKELER[taslakUlke];
@@ -480,11 +493,7 @@ function buildTaslakForm() {
   // Kıbrıs özel form
   if (formCfg.tip === 'kibris') {
     buildKibrisForm(container);
-    if (taslakBytes) {
-      document.getElementById('taslakIndir').style.display = 'block';
-      const kaydetBtn = document.getElementById('taslakKaydet');
-      if (kaydetBtn) kaydetBtn.style.display = 'inline-block';
-    }
+    updateTaslakActionButtons();
     return;
   }
 
@@ -521,11 +530,7 @@ function buildTaslakForm() {
     injectNavlunUI(container);
   }
 
-  if (taslakBytes) {
-    document.getElementById('taslakIndir').style.display = 'block';
-    const kaydetBtn = document.getElementById('taslakKaydet');
-    if (kaydetBtn) kaydetBtn.style.display = 'inline-block';
-  }
+  updateTaslakActionButtons();
 }
 
 // ── NAVLUN OTOMATİK HESAP: FORM ALTINA GRUPLU/PARTNER ALANLARI EKLE ───────────

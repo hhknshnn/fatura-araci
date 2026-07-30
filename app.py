@@ -429,6 +429,63 @@ def api_evrak():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/t1-ayrimi', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_t1_ayrimi():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True)
+        dosya_adi = body.get('dosyaAdi') or 'T1-Ayrimi.xlsx'
+
+        from api.invoice.t1_ayrim import (t1_ayrimi_uret, siniflandir_dosyalar,
+                                          ROL_ADLARI)
+
+        # Yeni akış: tek dropzone — dosyalar içerikten tanınır.
+        # Eski akış (rol bazlı alanlar) geriye dönük olarak desteklenir.
+        gelen = body.get('dosyalar')
+        tanima_uyarilari = []
+        secilen_adlar = {}
+        if gelen:
+            liste = [(d.get('ad', ''), base64.b64decode(d.get('veri', '') or ''))
+                     for d in gelen if d.get('veri')]
+            secilen, secilen_adlar, tanima_uyarilari = siniflandir_dosyalar(liste)
+        else:
+            secilen = {}
+            for rol in ('invpl', 'masterfile', 't1', 'talep'):
+                b64 = body.get(rol, '')
+                if b64:
+                    secilen[rol] = base64.b64decode(b64)
+                    secilen_adlar[rol] = ROL_ADLARI[rol]
+
+        eksik = [ROL_ADLARI[r] for r in ('invpl', 'masterfile') if r not in secilen]
+        if eksik:
+            raise ValueError('Eksik dosya: ' + ', '.join(eksik))
+        if 't1' not in secilen and 'talep' not in secilen:
+            raise ValueError('T1 PDF veya talep formundan en az biri gerekli')
+
+        excel_bytes, ozet = t1_ayrimi_uret(
+            secilen['invpl'],
+            secilen['masterfile'],
+            secilen.get('t1'),
+            secilen.get('talep'),
+        )
+        ozet['dosyalar'] = {ROL_ADLARI[r]: ad for r, ad in secilen_adlar.items()}
+        ozet['uyarilar'] = tanima_uyarilari + ozet['uyarilar']
+        log_action(getattr(g, 'user', None), 't1_ayrimi',
+                   f"T1 ayrımı üretti: {dosya_adi} ({ozet['satir']} satır)")
+        return jsonify({
+            'success':  True,
+            'excel':    base64.b64encode(excel_bytes).decode(),
+            'dosyaAdi': dosya_adi,
+            'ozet':     ozet,
+        })
+
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/auth', methods=['GET', 'POST', 'OPTIONS'])
 def api_auth():
     if request.method == 'OPTIONS':

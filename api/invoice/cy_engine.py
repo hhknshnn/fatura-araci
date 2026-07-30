@@ -144,19 +144,30 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
         if hasattr(fatura_date, 'date'):
             fatura_date = fatura_date.date()
 
+        depo_tipi = 'antrepo' if hedef_net > 0 else 'serbest'
+
+        # Master ham satırlarda üretilir (diğer ülkelerdeki df_original kalıbı) —
+        # satır sayısı ve sırası faturanın PDF'i ile birebir kalsın diye ağırlık
+        # dağıtımı gruplama öncesi ham df üzerinde ayrıca hesaplanır.
+        brut_orig, _ = calculate_weights(df_raw, grup_kilolari, hedef_brut, exception_skus)
+        net_orig     = get_net_list(brut_orig, hedef_net, depo_tipi, hedef_brut)
+
         # SKU gruplandır
         df = sku_grupla(df)
 
         # Ağırlık hesapla
         brut_list, _ = calculate_weights(df, grup_kilolari, hedef_brut, exception_skus)
-        net_list     = get_net_list(brut_list, hedef_net,
-                                    'antrepo' if hedef_net > 0 else 'serbest')
+        net_list     = get_net_list(brut_list, hedef_net, depo_tipi)
 
         fatura_list.append({
             'df':           df,
             'df_raw':       df_raw,
             'brut_list':    brut_list,
             'net_list':     net_list,
+            'brut_orig':    brut_orig,
+            'net_orig':     net_orig,
+            'hedef_net':    hedef_net,
+            'depo_tipi':    depo_tipi,
             'fatura_no':    fatura_no,
             'fatura_date':  fatura_date,
             'kap':          pdf_fields.get('kap', ''),
@@ -251,8 +262,8 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
     master_list = []
     for f in fatura_list:
         mb = generate_master_excel(
-            f['df'], f['brut_list'], f['net_list'],
-            hedef_net=0, depo_tipi='serbest',
+            f['df_raw'], f['brut_orig'], f['net_orig'],
+            hedef_net=f['hedef_net'], depo_tipi=f['depo_tipi'],
         )
         master_list.append({'fatura_no': f['fatura_no'], 'bytes': mb, 'kap': f.get('kap', '')})
 
@@ -278,22 +289,28 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
         if not f['tekstil_disi'] or not f['raw_pdf_bytes']:
             continue
         df_raw = f['df_raw']
-        # PDF'teki "Ürün Kodu" ham excel'deki 'Madde Kodu' ile eşleşir
-        # ('SKU' sütunu renk kodu gibi ek karakterler içerir).
-        sku_col = 'Madde Kodu' if 'Madde Kodu' in df_raw.columns else 'SKU'
+        # e-Arşiv ve ihracat PDF şablonları "Ürün Kodu" alanında farklı
+        # seviyede kod gösterebilir: bazıları Madde Kodu'nu, bazıları renk
+        # ekini de içeren tam SKU'yu kullanır. Aynı üreticiyi iki kodla da
+        # indeksleyerek PDF tarafında hangisi varsa eşleşmesini sağlarız.
+        sku_cols = [c for c in ('Madde Kodu', 'SKU') if c in df_raw.columns]
         cols = [c for c in TEDARIKCI_COLS if c in df_raw.columns]
-        if not cols:
+        if not cols or not sku_cols:
             continue
         sku_to_uretici = {}
         for _, row in df_raw.iterrows():
-            sku = str(row.get(sku_col, '')).strip()
-            if not sku:
-                continue
+            uretici = ''
             for c in cols:
                 val = str(row.get(c, '') or '').strip()
                 if val and val.lower() != 'nan':
-                    sku_to_uretici[sku] = val
+                    uretici = val
                     break
+            if not uretici:
+                continue
+            for sku_col in sku_cols:
+                sku = str(row.get(sku_col, '') or '').strip()
+                if sku and sku.lower() != 'nan':
+                    sku_to_uretici[sku] = uretici
 
         uretici_pdf_bytes = generate_uretici_pdf(f['raw_pdf_bytes'], sku_to_uretici)
         uretici_pdf_list.append({

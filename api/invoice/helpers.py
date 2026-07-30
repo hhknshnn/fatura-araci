@@ -157,12 +157,12 @@ def _extract_amount_near_keywords(text, keywords, window=140):
 
 def _extract_pdf_packages(text):
     patterns = [
-        r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-        r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-        r'[*\-]?\s*KAP\s+ADEDI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-        r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-        r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-        r'\bCOLL[Iİ]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s+ADET[İI]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s+SAYISI\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s+ADEDI\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        r'[*\-]?\s*KAP\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        r'\bPACKAGES?\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        r'\bCOLL[Iİ]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
     ]
     for pattern in patterns:
         m = re.search(pattern, text, re.IGNORECASE)

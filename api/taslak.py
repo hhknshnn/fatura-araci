@@ -84,10 +84,10 @@ def parse_pdf_fields(pdf_bytes):
         ])
         # Kap sayısı
         kap_patterns = [
-            r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-            r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-            r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-            r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s+ADET[İI]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s+SAYISI\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'\bPACKAGES?\s*:\s*(\d+(?:\s*\([^)]*\))?)',
         ]
         for p in kap_patterns:
             m = re.search(p, text, re.IGNORECASE)
