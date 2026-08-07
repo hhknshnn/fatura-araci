@@ -27,7 +27,7 @@ from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
 from api.taslak_form import taslak_form_kaydet, taslak_form_liste, taslak_form_getir, taslak_form_sil, taslak_form_koru
-from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_be_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 from api.nebim import nebim_delivery_get, nebim_delivery_put
 from api.audit import log_action, audit_log_get, audit_log_export
 from api.maliyet.meta import maliyet_meta_get, maliyet_kalem_post, maliyet_kalem_put, maliyet_kalem_delete, maliyet_depo_ayar_put
@@ -41,6 +41,7 @@ from api.maliyet.rapor import maliyet_rapor_get, maliyet_tarife_rapor_get
 from api.navlun import (navlun_tanim_liste, navlun_tanim_kaydet, navlun_hesapla,
     navlun_tahsis_olustur, navlun_bekleyen_sorgu, navlun_tahsis_kullan,
     navlun_sevkiyat_yaz, navlun_tanim_gecmis)
+from api.grup_kilo import grup_kilo_get, grup_kilo_put
 
 def read_port():
     try:
@@ -832,6 +833,15 @@ def api_maliyet_gercek():
         return app.make_default_options_response()
     return maliyet_gercek_get()
 
+@app.route('/api/grup-kilo', methods=['GET', 'PUT', 'OPTIONS'])
+@require_auth(write=('admin',))
+def api_grup_kilo():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return grup_kilo_get()
+    return grup_kilo_put()
+
 @app.route('/api/taslak-store/kaydet', methods=['POST', 'OPTIONS'])
 @require_auth()
 def api_taslak_store_kaydet():
@@ -1147,6 +1157,37 @@ def api_parse_nl_pdf():
             'eur':     {
                 'brokerage': nl['brokerage'],
                 'vergi':     nl['vergi'],
+            },
+        })
+
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/shipments/parse-be-pdf', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_parse_be_pdf():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body    = request.get_json(force=True)
+        pdf_b64 = body.get('pdf', '')
+        if not pdf_b64:
+            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+
+        pdf_bytes = base64.b64decode(pdf_b64)
+        be = parse_be_broker_pdf(pdf_bytes)
+
+        if not any(be.values()):
+            return jsonify({'success': False, 'error': 'PDF tipi tanınamadı. Intertrans NV broker faturası yükleyin.'}), 400
+
+        return jsonify({
+            'success': True,
+            'eur':     {
+                'invoerrechten':        be['invoerrechten'],
+                'administratieve':      be['administratieve'],
+                'douaneformaliteiten':  be['douaneformaliteiten'],
+                'bijkomende':           be['bijkomende'],
             },
         })
 

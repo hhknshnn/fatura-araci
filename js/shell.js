@@ -322,6 +322,14 @@ function sidebarSelect(mod) {
     if (meNlResult) meNlResult.style.display = 'none';
     if (meNlInput)  meNlInput.value = '';
     if (typeof meLoadNlShipments === 'function') meLoadNlShipments();
+    // BE sıfırla
+    const meBeStatus = document.getElementById('me-be-status');
+    const meBeResult = document.getElementById('me-be-result');
+    const meBeInput  = document.getElementById('me-be-input');
+    if (meBeStatus) { meBeStatus.textContent = 'PDF\'i buraya sürükleyin veya tıklayın'; meBeStatus.style.color = 'var(--text3)'; }
+    if (meBeResult) meBeResult.style.display = 'none';
+    if (meBeInput)  meBeInput.value = '';
+    if (typeof meLoadBeShipments === 'function') meLoadBeShipments();
   } else if (mod === 'landed-cost') {
     document.getElementById('contentArea').style.padding = '0';
     document.getElementById('contentArea').classList.add('ops-content-area');

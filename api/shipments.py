@@ -2153,6 +2153,67 @@ def parse_nl_broker_pdf(pdf_bytes):
     return result
 
 
+def parse_be_broker_pdf(pdf_bytes):
+    """
+    Belçika (Intertrans NV) broker faturasından 4 sabit kod satırını çeker:
+    605 INVOERRECHTEN, 112 ADMINISTRATIEVE KOSTEN, 511 IMPORT DOUANEFORMALITEITEN,
+    522 BIJKOMENDE DOUANE-TARIEVEN. Fatura ANT+IHR beyannamelerini birleşik
+    kapsadığından ("ZIE 2 X T1") bu 4 kalem sevkiyat çiftine dağıtılır — bkz.
+    çağıran taraftaki dağıtım kuralı. Tutarlar zaten EUR.
+
+    PDF'te bu satırlar kalın (bold) yazıldığından pdfplumber her karakteri iki kez
+    üst üste basıyor (örn. "INVOERRECHTEN" -> "IINNVVOOEERRRREECCHHTTEENN"). Bunu
+    düzeltmek için extract_words ile kelimeler konumlarına göre satırlara
+    kümelenir, her kelimedeki ardışık tekrar eden harfler tekilleştirilip anahtar
+    kelime bu normalize edilmiş satırda aranır; tutar ise satırdaki (normalize
+    edilmemiş, zaten tekrarsız olan) ilk sayısal karakter dizisinden alınır.
+    """
+    result = {'invoerrechten': 0.0, 'administratieve': 0.0, 'douaneformaliteiten': 0.0, 'bijkomende': 0.0}
+
+    def dedupe_letters(w):
+        return re.sub(r'([A-Za-z])\1', r'\1', w)
+
+    def page_lines(page):
+        words = page.extract_words(use_text_flow=False, keep_blank_chars=False)
+        words.sort(key=lambda w: (w['top'], w['x0']))
+        lines, current, current_top = [], [], None
+        for w in words:
+            if current_top is None or abs(w['top'] - current_top) <= 2.5:
+                current.append(w)
+                current_top = w['top'] if current_top is None else current_top
+            else:
+                lines.append(current)
+                current, current_top = [w], w['top']
+        if current:
+            lines.append(current)
+        return lines
+
+    targets = {
+        'INVOERRECHTEN':              'invoerrechten',
+        'ADMINISTRATIEVEKOSTEN':      'administratieve',
+        'IMPORTDOUANEFORMALITEITEN':  'douaneformaliteiten',
+        'BIJKOMENDEDOUANETARIEVEN':   'bijkomende',
+    }
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                for line in page_lines(page):
+                    joined = ''.join(dedupe_letters(w['text']) for w in line)
+                    joined = joined.upper().replace('-', '').replace('(', '').replace(')', '')
+                    for key, field in targets.items():
+                        if result[field] or key not in joined:
+                            continue
+                        nums = [w['text'] for w in line if re.match(r'^\d+\.\d{2}$', w['text'])]
+                        if nums:
+                            result[field] = float(nums[0])
+
+    except Exception as e:
+        print(f'BE broker PDF parse hatası: {e}')
+
+    return result
+
+
 def _parse_kzt_sayi(s):
     """KZT sayı formatı: '702 062,00' veya '3167375,35' — boşluk/nokta binlik, virgül ondalık."""
     s = s.strip().replace('\xa0', '').replace(' ', '').replace('.', '').replace(',', '.')

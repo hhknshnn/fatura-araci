@@ -50,6 +50,43 @@ async function loadSharedConfig() {
   } catch (e) {
     console.warn('config.json yüklenemedi');
   }
+  await syncGrupKilolariFromServer();
+}
+
+// ── GRUP KİLOLARI: ORTAK KAYNAK (sunucu) ───────────────────────────────────────
+// Grup kiloları artık kullanıcı tarayıcısında (localStorage) değil, DB'de tek
+// bir ortak kayıt olarak tutuluyor — aksi halde her kullanıcı farklı kg
+// girip menşe/GTİP hesaplamaları kişiden kişiye farklılaşıyordu.
+function isAdminUser() {
+  return !!(window.currentUser && window.currentUser.role === 'admin');
+}
+
+async function syncGrupKilolariFromServer() {
+  try {
+    const res = await fetch('/api/grup-kilo');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.grupKilolari) groupWeights = { ...groupWeights, ...data.grupKilolari };
+  } catch (e) {
+    console.warn('Grup kiloları sunucudan alınamadı');
+  }
+}
+
+async function saveGrupKilolariToServer(changed) {
+  if (!changed || Object.keys(changed).length === 0) return;
+  try {
+    const res = await fetch('/api/grup-kilo', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grupKilolari: changed })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.success) {
+      console.warn('Grup kiloları kaydedilemedi', data && data.error);
+    }
+  } catch (e) {
+    console.warn('Grup kiloları kaydedilemedi', e);
+  }
 }
 
 // ── WIZARD NAV ────────────────────────────────────────────────────────────────
@@ -456,13 +493,19 @@ function buildKgTable(rows) {
   } else {
     document.getElementById('kgBody').style.display = 'block';
     document.getElementById('kgArrow').textContent = '▲';
+    const admin = isAdminUser();
     needsInput.forEach(({ g, zeroCount }) => {
       const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
       const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
       const tr = tbody.insertRow();
+      const inputHtml = admin
+        ? `<input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg">`
+        : (saved !== ''
+          ? `<input class="kg-input" id="${id}" type="text" value="${saved}" disabled title="Standart değer — sadece admin değiştirebilir">`
+          : `<input class="kg-input" id="${id}" type="text" value="" disabled placeholder="—"><div style="color:var(--gold);font-size:12px;margin-top:4px;">Admin tanımlamadı</div>`);
       tr.innerHTML = `
         <td style="color:var(--text);">${g}</td>
-        <td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td>
+        <td>${inputHtml}</td>
         <td style="color:var(--gold);">${zeroCount}</td>`;
     });
   }
@@ -489,12 +532,24 @@ function applyGroupWeights() {
   const rows = currentCountry === 'cy' ? cyMasterRows : masterRows;
   if (!rows) return;
   const groups = [...new Set(rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
+  const admin = isAdminUser();
+  const changed = {};
+  const stillMissing = [];
   groups.forEach(g => {
     const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
     const el = document.getElementById(id);
-    if (el && el.value !== '') groupWeights[g] = parseNum(el.value);
+    if (admin && el && el.value !== '') {
+      const v = parseNum(el.value);
+      if (v > 0 && v !== groupWeights[g]) changed[g] = v;
+      groupWeights[g] = v;
+    }
+    if (groupWeights[g] === undefined || parseNum(groupWeights[g]) <= 0) stillMissing.push(g);
   });
-  try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch (e) { }
+  if (!admin && stillMissing.length > 0) {
+    alert('Şu gruplar için standart kilo tanımlı değil: ' + stillMissing.join(', ') + '\nDevam etmeden önce bir admin bu grupların kilosunu tanımlamalı.');
+    return;
+  }
+  if (admin && Object.keys(changed).length > 0) saveGrupKilolariToServer(changed);
 
   workingRows = rows.map(row => {
     const r = { ...row };
@@ -1204,9 +1259,9 @@ function arrayBufferToBase64(buf) {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  if (window.authReadyPromise) { try { await window.authReadyPromise; } catch (e) { } }
   await loadSharedConfig();
   try { const s = localStorage.getItem('exSkus'); if (s) { const l = JSON.parse(s); exceptionSkus = { ...exceptionSkus, ...l }; } } catch (e) { }
-  try { const s = localStorage.getItem('gwData'); if (s) { const l = JSON.parse(s); groupWeights = { ...groupWeights, ...l }; } } catch (e) { }
   renderExSkuList();
 
   // dropZone drag-drop

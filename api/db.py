@@ -91,6 +91,19 @@ def init_db():
     ''')
     cur.execute('CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC)')
 
+    # Ürün ara grubu -> standart birim kilo (kg). Menşe/GTİP akışlarında eksik
+    # ağırlık girilirken kullanılıyor; tüm kullanıcılar için ortak tek kaynak
+    # olsun diye burada tutuluyor (önceden her kullanıcının kendi localStorage'ında
+    # ayrı ayrı tutuluyordu, bu da kullanıcılar arasında farklı kg değerlerine yol açıyordu).
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS group_weights (
+            grup_adi     TEXT PRIMARY KEY,
+            kilo         NUMERIC NOT NULL,
+            updated_by   TEXT NOT NULL DEFAULT '',
+            updated_at   BIGINT NOT NULL
+        )
+    ''')
+
     # NOT: `shipments` ve `taslak_dosyalar` tabloları burada CREATE EDİLMEZ —
     # mevcut prod veritabanında zaten var ve şeması (kolon sayısı/tipleri) bu
     # dosyanın dışında yönetiliyor. Sıfırdan bir ortam kurulacaksa bu iki tablo

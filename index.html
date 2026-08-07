@@ -1975,6 +1975,39 @@
               <div id="me-nl-result" class="me-result" style="display:none;"></div>
             </div>
 
+            <!-- Belçika Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/be.png" alt="BE">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Belçika</div>
+                  <div class="me-card-sub">Intertrans Broker Faturası (ANT+IHR Birleşik)</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                ANT veya IHR sevkiyatını seçin, tek faturayı yükleyin — grup otomatik bulunur. INVOERRECHTEN → ANT vergi, BIJKOMENDE DOUANE-TARIEVEN → IHR vergi; ADMINISTRATIEVE KOSTEN + IMPORT DOUANEFORMALITEITEN yarı yarıya her iki broker alanına yazılır. Tutarlar zaten EUR.
+              </div>
+              <div class="me-select-row">
+                <select id="me-be-select" class="me-select">
+                  <option value="">— Belçika sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadBeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-be-select-status" class="me-select-status"></div>
+              <div id="me-be-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleBePdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-be-input').click()">
+                <input type="file" id="me-be-input" accept=".pdf" style="display:none;" onchange="meHandleBePdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-be-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
+                </div>
+              </div>
+              <div id="me-be-result" class="me-result" style="display:none;"></div>
+            </div>
+
           </div>
         </div>
 

@@ -2618,6 +2618,165 @@ async function meNlSaveFields(shipment, fields, token) {
   if (!d.success) throw new Error(d.error || 'Kayıt hatası');
 }
 
+// ── BELÇİKA MALİYET EVRAK ─────────────────────────────────────────────────
+
+async function meLoadBeShipments() {
+  const sel      = document.getElementById('me-be-select');
+  const statusEl = document.getElementById('me-be-select-status');
+  if (!sel) return;
+  if (statusEl) { statusEl.textContent = 'Yükleniyor...'; statusEl.style.color = 'var(--text3)'; }
+  try {
+    const token = localStorage.getItem('fa_auth_token');
+    const res   = await fetch(`/api/shipments?ulke=${encodeURIComponent('BELÇİKA')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data  = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const parseNo = s => { const m = (s || '').match(/^(\d+)-(\d+)$/); return m ? [+m[1], +m[2]] : [0, 0]; };
+    const list = (data.shipments || []).sort((a, b) => {
+      const [ay, an] = parseNo(a.ihracat_dosya_no);
+      const [by, bn] = parseNo(b.ihracat_dosya_no);
+      return by !== ay ? by - ay : bn - an;
+    });
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
+      list.map(s => {
+        const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
+        return `<option value="${s.id}">${escapeHtml(label)}</option>`;
+      }).join('');
+    if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
+    if (statusEl) { statusEl.textContent = `${list.length} sevkiyat listelendi.`; statusEl.style.color = 'var(--text3)'; }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleBePdf(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('me-be-status');
+  const resultEl = document.getElementById('me-be-result');
+  statusEl.textContent = '⏳ PDF okunuyor...';
+  statusEl.style.color = 'var(--text3)';
+  resultEl.style.display = 'none';
+
+  let data;
+  try {
+    const b64 = await fileToBase64(file);
+    const token = localStorage.getItem('fa_auth_token');
+    const res   = await fetch('/api/shipments/parse-be-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ pdf: b64 }),
+    });
+    data = await res.json();
+    if (!data.success) throw new Error(data.error);
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + err.message;
+    return;
+  }
+
+  const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+  statusEl.style.color = 'var(--success)';
+  statusEl.textContent = `✓ ${file.name} okundu`;
+  resultEl.style.display = 'block';
+
+  // 605 INVOERRECHTEN → ANT vergi | 522 BIJKOMENDE DOUANE-TARIEVEN → IHR vergi
+  // 112 ADMINISTRATIEVE KOSTEN + 511 IMPORT DOUANEFORMALITEITEN → yarı yarıya her iki broker alanına
+  const invoerrechten       = data.eur.invoerrechten || 0;
+  const bijkomende          = data.eur.bijkomende || 0;
+  const brokerFixedToplam   = (data.eur.administratieve || 0) + (data.eur.douaneformaliteiten || 0);
+  const brokerFixedPerTaraf = Math.round((brokerFixedToplam / 2) * 100) / 100;
+
+  const detailHtml = `<div style="color:var(--success);">✓ Intertrans Broker Faturası</div>
+    <div style="margin-top:6px;">INVOERRECHTEN (605) → ANT vergi: <b>${fmtEur(invoerrechten)}</b><br>
+    BIJKOMENDE DOUANE-TARIEVEN (522) → IHR vergi: <b>${fmtEur(bijkomende)}</b><br>
+    ADMINISTRATIEVE KOSTEN + IMPORT DOUANEFORMALITEITEN = ${fmtEur(brokerFixedToplam)} → her iki tarafa: <b>${fmtEur(brokerFixedPerTaraf)}</b></div>`;
+
+  const selEl      = document.getElementById('me-be-select');
+  const selectedId = selEl?.value;
+
+  if (!selectedId) {
+    resultEl.innerHTML = detailHtml + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+    return;
+  }
+
+  // ANT/IHR çiftini sefer_id grubundan bul — fatura tek başına ikisini birden kapsar
+  try {
+    const token = localStorage.getItem('fa_auth_token');
+    const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const sData = await sRes.json();
+    if (!sData.success) throw new Error(sData.error);
+    const s = sData.shipment;
+
+    if (!s.sefer_id) throw new Error('Bu sevkiyatın bir sefer grubu yok — ANT/IHR eşleşmesi için önce iki sevkiyatı aynı gruba (sefer_id) almalısınız.');
+
+    const gRes  = await fetch(`/api/shipments?sefer_id=${s.sefer_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const gData = await gRes.json();
+    if (!gData.success || !gData.shipments?.length) throw new Error('Grup sevkiyatları alınamadı');
+    const group = gData.shipments;
+
+    const antShip = group.find(x => (x.fatura_no || '').startsWith('ANT'));
+    const ihrShip = group.find(x => (x.fatura_no || '').startsWith('IHR'));
+    if (!antShip || !ihrShip) throw new Error('Grupta hem ANT hem IHR fatura numaralı bir sevkiyat bulunamadı.');
+
+    resultEl.innerHTML = detailHtml +
+      `<div style="margin-top:8px;font-size:11px;">Vergi → ANT: <b>${escapeHtml(antShip.fatura_no)}</b> · IHR: <b>${escapeHtml(ihrShip.fatura_no)}</b></div>` +
+      `<div id="me-be-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+
+    await Promise.all([
+      meBeSaveFields(antShip, { gumruk_vergisi_eur: invoerrechten, brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 }, token),
+      meBeSaveFields(ihrShip, { gumruk_vergisi_eur: bijkomende,    brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 }, token),
+    ]);
+
+    document.getElementById('me-be-save-status').innerHTML =
+      `<span style="color:var(--success);">✓ Kaydedildi (2 sevkiyat güncellendi)</span>`;
+    const inp = document.getElementById('me-be-input');
+    if (inp) inp.value = '';
+
+  } catch (saveErr) {
+    const saveEl = document.getElementById('me-be-save-status');
+    if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
+  }
+}
+
+async function meBeSaveFields(shipment, fields, token) {
+  const s = shipment;
+  const body = {
+    id:                    s.id,
+    ihracat_dosya_no:      s.ihracat_dosya_no || '',
+    nakliye_firmasi:       s.nakliye_firmasi || '',
+    plaka:                 s.plaka || '',
+    palet:                 s.palet || null,
+    durum:                 s.durum || '',
+    varis_tarihi:          s.varis_tarihi || '',
+    gumrukleme_bitis:      s.gumrukleme_bitis || '',
+    fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
+    fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
+    mal_bedeli_eur:        s.mal_bedeli_eur || 0,
+    navlun_eur:            s.navlun_eur || 0,
+    sigorta_eur:           s.sigorta_eur || 0,
+    eur_kuru:              s.eur_kuru || 0,
+    navlun_usd:            s.navlun_usd || 0,
+    sigorta_usd:           s.sigorta_usd || 0,
+    usd_kuru:              s.usd_kuru || 0,
+    ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
+    ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
+    arac_bekleme:          s.arac_bekleme || 0,
+    other_costs_eur:       s.other_costs_eur || 0,
+    brokerage_eur:         s.brokerage_eur || 0,
+    gumruk_vergisi_eur:    s.gumruk_vergisi_eur || 0,
+    kdv_eur:               s.kdv_eur || 0,
+    ...fields,
+  };
+  const res  = await fetch('/api/shipments', {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.error || 'Kayıt hatası');
+}
+
 // ── BOSNA MALİYET EVRAK ───────────────────────────────────────────────────
 
 async function meLoadBaShipments() {

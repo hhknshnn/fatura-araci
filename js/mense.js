@@ -205,13 +205,19 @@ function buildMenseKgTable(rows) {
   } else {
     document.getElementById('menseKgBody').style.display = 'block';
     document.getElementById('menseKgArrow').textContent = '▲';
+    const admin = isAdminUser();
     needsInput.forEach(({ g, zeroCount }) => {
       const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
       const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
       const tr = tbody.insertRow();
+      const inputHtml = admin
+        ? `<input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg">`
+        : (saved !== ''
+          ? `<input class="kg-input" id="${id}" type="text" value="${saved}" disabled title="Standart değer — sadece admin değiştirebilir">`
+          : `<input class="kg-input" id="${id}" type="text" value="" disabled placeholder="—"><div style="color:var(--gold);font-size:12px;margin-top:4px;">Admin tanımlamadı</div>`);
       tr.innerHTML = `
         <td>${g}</td>
-        <td><input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg"></td>
+        <td>${inputHtml}</td>
         <td style="color:var(--gold);">${zeroCount}</td>`;
     });
   }
@@ -230,12 +236,24 @@ function applyMenseWeights() {
   if (!menseRows) return;
 
   const groups = [...new Set(menseRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
+  const admin = isAdminUser();
+  const changed = {};
+  const stillMissing = [];
   groups.forEach(g => {
     const id = 'mgw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
     const el = document.getElementById(id);
-    if (el && el.value !== '') groupWeights[g] = parseNum(el.value);
+    if (admin && el && el.value !== '') {
+      const v = parseNum(el.value);
+      if (v > 0 && v !== groupWeights[g]) changed[g] = v;
+      groupWeights[g] = v;
+    }
+    if (groupWeights[g] === undefined || parseNum(groupWeights[g]) <= 0) stillMissing.push(g);
   });
-  try { localStorage.setItem('gwData', JSON.stringify(groupWeights)); } catch (e) { }
+  if (!admin && stillMissing.length > 0) {
+    alert('Şu gruplar için standart kilo tanımlı değil: ' + stillMissing.join(', ') + '\nDevam etmeden önce bir admin bu grupların kilosunu tanımlamalı.');
+    return;
+  }
+  if (admin && Object.keys(changed).length > 0) saveGrupKilolariToServer(changed);
 
   menseWorkingRows = menseRows.map(row => {
     const r = { ...row };
