@@ -1646,6 +1646,13 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
 
 .kg-input:focus { border-color: var(--accent); }
 
+.kg-input-empty {
+  border-color: var(--error);
+  background: var(--error-dim);
+}
+.kg-input-empty:focus { border-color: var(--error); }
+.kg-input-empty::placeholder { color: var(--error); opacity: 0.7; }
+
 /* ── INPUTS ───────────────────────────────────────────────────────────────── */
 .target-input {
   flex: 1;

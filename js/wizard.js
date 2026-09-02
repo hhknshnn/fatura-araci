@@ -498,11 +498,12 @@ function buildKgTable(rows) {
       const id = 'gw_' + g.replace(/[^a-zA-Z0-9]/g, '_');
       const saved = groupWeights[g] !== undefined ? groupWeights[g] : '';
       const tr = tbody.insertRow();
+      const emptyCls = saved === '' ? ' kg-input-empty' : '';
       const inputHtml = admin
-        ? `<input class="kg-input" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg">`
+        ? `<input class="kg-input${emptyCls}" id="${id}" type="text" inputmode="decimal" value="${saved}" placeholder="kg" oninput="this.classList.toggle('kg-input-empty', this.value.trim()==='')">`
         : (saved !== ''
           ? `<input class="kg-input" id="${id}" type="text" value="${saved}" disabled title="Standart değer — sadece admin değiştirebilir">`
-          : `<input class="kg-input" id="${id}" type="text" value="" disabled placeholder="—"><div style="color:var(--gold);font-size:12px;margin-top:4px;">Admin tanımlamadı</div>`);
+          : `<input class="kg-input kg-input-empty" id="${id}" type="text" value="" disabled placeholder="—"><div style="color:var(--error);font-size:12px;margin-top:4px;">Admin tanımlamadı</div>`);
       tr.innerHTML = `
         <td style="color:var(--text);">${g}</td>
         <td>${inputHtml}</td>
