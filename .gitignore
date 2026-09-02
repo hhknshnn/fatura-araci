@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtualenv
+venv/
+.venv/
+
+# Backups / temp exploration artifacts
+cleanup_backups/
+fatura_araci_guncel.zip
+ref_ba.zip
+ref_ge_tmp.zip
+_ref_ba/
+_ref_ge/
+git
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Kök dizine kazara düşen üretilmiş fatura/müşteri dosyaları
+/*.pdf
+/*.xlsx
+/*.xls

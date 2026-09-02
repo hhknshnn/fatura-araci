@@ -1,3 +1,21 @@
+// ── YENİ: MERKEZİ ÜLKE CONFIG ────────────────────────────────────────────────
+window.COUNTRIES_CACHE = null;
+
+async function loadCountriesConfig() {
+  if (window.COUNTRIES_CACHE) return window.COUNTRIES_CACHE;
+  try {
+    const res = await fetch('./config/countries.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('countries.json yüklenemedi');
+    window.COUNTRIES_CACHE = await res.json();
+    return window.COUNTRIES_CACHE;
+  } catch(e) {
+    console.error('countries.json yükleme hatası:', e);
+    // Cache'i {} olarak bırakma: bir sonraki çağrıda yeniden denenebilsin.
+    window.COUNTRIES_CACHE = null;
+    return {};
+  }
+}
+
 // ── ÜLKE TANIMLARI ──────────────────────────────────────────────────────────
 // Bu dosya tüm ülkelerin çıktı sütunlarını tanımlar.
 // Yeni ülke eklemek için sadece bu dosyayı düzenlemen yeterli.
@@ -19,6 +37,9 @@ const COUNTRIES = {
   ly: { label: 'Libya',    suffix: '_libya'   },
   lr: { label: 'Liberya',  suffix: '_liberya' },
   lb: { label: 'Lübnan',   suffix: '_lubnan'  },
+  abh: { label: 'Abhazya', suffix: '_abhazya' },
+  jo: { label: 'Ürdün',     suffix: '_urdun'    },
+  mu: { label: 'Mauritius', suffix: '_mauritius' },
 };
 
 const KZ_COLS = [

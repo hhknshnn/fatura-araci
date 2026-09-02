@@ -1,825 +1,2117 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fatura Aracı</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/auth.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fatura Aracı</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 13L8 3l5 10H3z' fill='%232563EB'/></svg>">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=20260807-grup-kilo-kirmizi">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/tabler-icons.min.css">
+
 </head>
+
 <body>
 
-<!-- ── LOGIN OVERLAY ─────────────────────────────────────────────────────── -->
-<div class="login-overlay" id="loginOverlay" style="display:none;">
-  <div class="login-box">
-    <div class="login-logo">
-      <div class="logo-mark">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95"/>
-        </svg>
-      </div>
-      <div>
-        <div class="login-title">Fatura Aracı</div>
-        <div class="login-sub">v2.0 · Lojistik Evrak</div>
-      </div>
-    </div>
-    <div class="login-field">
-      <label>Kullanıcı Adı</label>
-      <input class="login-input" id="loginUsername" type="text" placeholder="kullanıcı adınız" autocomplete="username">
-    </div>
-    <div class="login-field">
-      <label>Şifre</label>
-      <input class="login-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
-    <div class="login-error" id="loginError"></div>
-  </div>
-</div>
+  <!-- ── LOGIN OVERLAY ─────────────────────────────────────────────────────── -->
+  <div class="login-overlay" id="loginOverlay" style="display:none;">
+    <div class="login-shell">
 
-<div class="app-shell" id="app-shell">
-
-  <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
-  <aside class="sidebar">
-    <a class="sidebar-logo" href="/" onclick="location.reload();return false;">
-      <div class="logo-mark">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95"/>
-        </svg>
-      </div>
-      <div>
-        <div class="logo-text">Fatura Aracı</div>
-        <div class="logo-sub">v2.0 · Lojistik Evrak</div>
-      </div>
-    </a>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">İşlemler</div>
-
-      <div class="nav-item active" id="nav-sonrasi" onclick="sidebarSelect('sonrasi')">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor"/>
-          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.5"/>
-          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.5"/>
-          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.25"/>
-        </svg>
-        INV + PL Oluştur
-      </div>
-
-      <div class="nav-item" id="nav-taslak" onclick="sidebarSelect('taslak')">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <path d="M3 4h10M3 8h7M3 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Taslak Doldur
-      </div>
-
-      <div class="nav-item" id="nav-oncesi" onclick="sidebarSelect('oncesi')">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Menşe Hesapla
-      </div>
-
-      <div class="nav-item" id="nav-gtip" onclick="sidebarSelect('gtip')">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L2 6v7h4v-4h4v4h4V6L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-        GTİP Kontrol
-      </div>
-
-      <div class="nav-item" id="nav-evrak" onclick="sidebarSelect('evrak')" style="display:none;">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <path d="M4 2h8l2 2v10H2V4l2-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M5 9h6M5 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Ek Evrak
-      </div>
-
-      <div class="nav-item" id="nav-gecmis-item" onclick="sidebarSelect('gecmis')" style="display:none;">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Son İşlemler
-      </div>
-
-      <!-- Admin only -->
-      <div class="nav-item" id="nav-users-item" onclick="sidebarSelect('users')" style="display:none;">
-        <svg class="nav-ic" viewBox="0 0 16 16" fill="none">
-          <circle cx="6" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M1 13c0-2.5 2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 7v4M14 9h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Kullanıcılar
-      </div>
-
-    </nav>
-
-    <div class="sidebar-footer">
-      <div class="user-row">
-        <div class="user-avatar" id="sidebarAvatar">?</div>
-        <div>
-          <div class="user-name" id="sidebarUserName">Kullanıcı</div>
-          <div class="user-role" id="sidebarUserRole">Lojistik Ekibi</div>
+      <!-- Sol: tanıtım paneli — gerçek/canlı veri içermez, sadece görsel/temsili öğeler -->
+      <div class="login-brand">
+        <div class="login-brand-logo">
+          <div class="logo-mark">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
+            </svg>
+          </div>
+          <span>Fatura Aracı</span>
         </div>
-      </div>
-      <button class="logout-btn" onclick="doLogout()">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-          <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Çıkış Yap
-      </button>
-    </div>
-  </aside>
 
-  <!-- ── MAIN AREA ──────────────────────────────────────────────────────── -->
-  <div class="main-area">
-
-    <!-- TOP BAR -->
-    <div class="topbar">
-      <div class="topbar-left">
-        <span class="topbar-title" id="topbarTitle">INV + PL Oluştur</span>
-        <span class="badge badge-blue" id="topbarCountry" style="display:none;"></span>
-        <span class="badge badge-amber" id="topbarDepo" style="display:none;"></span>
-      </div>
-      <div class="topbar-right" id="topbarRight"></div>
-    </div>
-
-    <!-- CONTENT -->
-    <div class="content-area" id="contentArea">
-
-      <!-- ── WIZARD STEPS ────────────────────────────────────────────────────── -->
-      <div class="wizard-steps" id="wizardSteps" style="display:none;">
-        <div class="step-item">
-          <div class="step-dot active" id="dot1">1</div>
-          <span class="step-label active" id="lbl1">Depo & Ülke & Dosyalar</span>
+        <div class="login-brand-headline">
+          İhracat evrak ve<br>sevkiyat operasyonunuz<br><span>tek panelde.</span>
         </div>
-        <div class="step-line" id="line1"></div>
-        <div class="step-item">
-          <div class="step-dot idle" id="dot2">2</div>
-          <span class="step-label" id="lbl2">KG & Hesap</span>
+        <div class="login-brand-sub">
+          Fatura, taslak, ek evrak ve sevkiyat takibini tek yerden yönetin.
+        </div>
+
+        <div class="login-feature-list">
+          <div class="login-feature"><i class="ti ti-file-invoice"></i><span>Ülkeye özel fatura &amp; PL üretimi</span></div>
+          <div class="login-feature"><i class="ti ti-truck"></i><span>Sevkiyat ve gümrükleme takibi</span></div>
+          <div class="login-feature"><i class="ti ti-shield-check"></i><span>Rol bazlı yetkilendirme ve işlem kaydı</span></div>
+        </div>
+
+        <!-- Temsili görsel — sabit/örnek şekiller, gerçek veriye bağlı değildir -->
+        <div class="login-decor-chart" aria-hidden="true">
+          <div class="login-decor-bar" style="--h:38%;"></div>
+          <div class="login-decor-bar" style="--h:62%;"></div>
+          <div class="login-decor-bar" style="--h:48%;"></div>
+          <div class="login-decor-bar" style="--h:80%;"></div>
+          <div class="login-decor-bar" style="--h:56%;"></div>
+          <div class="login-decor-bar" style="--h:70%;"></div>
+          <div class="login-decor-bar" style="--h:44%;"></div>
         </div>
       </div>
 
-      <!-- ── ADIM 2: ÜLKE & DOSYALAR ───────────────────────────────────── -->
-      <div class="panel" id="step2" style="display:none;">
-        <div class="panel-label">Adım 2</div>
-        <div class="panel-title">Ülke & Dosyalar</div>
-        <div class="panel-desc">Hedef ülkeyi seçin, Excel ve PDF dosyalarını yükleyin.</div>
-        
-          <!-- ── DEPO TİPİ — en üstte, ülke seçiminden önce ────────────────────── -->
+      <!-- Sağ: giriş formu -->
+      <div class="login-box">
+        <div class="login-logo login-logo-mobile">
+          <div class="logo-mark">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
+            </svg>
+          </div>
           <div>
+            <div class="login-title">Fatura Aracı</div>
+            <div class="login-sub">v2.0 · Lojistik Evrak</div>
+          </div>
+        </div>
+        <div class="login-form-title">Giriş Yap</div>
+        <div class="login-field">
+          <label>Kullanıcı Adı</label>
+          <input class="login-input" id="loginUsername" type="text" placeholder="kullanıcı adınız"
+            autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label>Şifre</label>
+          <input class="login-input" id="loginPassword" type="password" placeholder="••••••••"
+            autocomplete="current-password">
+        </div>
+        <label class="login-remember">
+          <input id="rememberMe" type="checkbox">
+          <span>Beni hatırla</span>
+        </label>
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="app-shell" id="app-shell" style="display:none;">
+
+    <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="mainSidebar">
+      <a class="sidebar-logo" href="#" onclick="return false;">
+        <div class="logo-mark">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
+          </svg>
+        </div>
+        <div class="logo-text-wrap" style="flex:1;min-width:0;">
+          <div class="logo-text">Fatura Aracı</div>
+          <div class="logo-sub">v2.0 · Lojistik Evrak</div>
+        </div>
+        <button class="logo-toggle-btn" onclick="toggleSidebar(); return false;" title="Menüyü daralt">
+          <i class="ti ti-layout-sidebar-left-collapse" id="toggleIcon"></i>
+        </button>
+      </a>
+      <nav class="sidebar-nav">
+
+        <div class="nav-section-label">GENEL</div>
+        <div class="nav-item" id="nav-dashboard" onclick="sidebarSelect('dashboard')">
+          <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+          <span class="nav-label">Dashboard</span>
+        </div>
+
+        <div class="nav-group-header open" id="ngh-ihracat" onclick="toggleNavGroup('ihracat')">
+          <span class="nav-group-label">İHRACAT OPERASYONLARI</span>
+          <i class="ti ti-chevron-down nav-group-chevron" id="ngc-ihracat" aria-hidden="true"></i>
+        </div>
+        <div class="nav-group-body open" id="ngb-ihracat">
+          <div class="nav-item" id="nav-sevkiyatlar" onclick="sidebarSelect('sevkiyatlar')">
+            <i class="ti ti-ship" aria-hidden="true"></i>
+            <span class="nav-label">Sevkiyatlar</span>
+          </div>
+          <div class="nav-item" id="nav-fatura-uret" onclick="sidebarSelect('fatura-uret')">
+            <i class="ti ti-file-invoice" aria-hidden="true"></i>
+            <span class="nav-label">Fatura Üret</span>
+          </div>
+          <div class="nav-item" id="nav-maliyet-evrak" onclick="sidebarSelect('maliyet-evrak')">
+            <i class="ti ti-file-upload" aria-hidden="true"></i>
+            <span class="nav-label">Maliyet Evrak</span>
+          </div>
+          <div class="nav-item" id="nav-landed-cost" onclick="sidebarSelect('landed-cost')">
+            <i class="ti ti-chart-bar" aria-hidden="true"></i>
+            <span class="nav-label">Landed Cost</span>
+          </div>
+          <div class="nav-item" id="nav-nebim-delivery" onclick="sidebarSelect('nebim-delivery')">
+            <i class="ti ti-truck-delivery" aria-hidden="true"></i>
+            <span class="nav-label">Nebim İrsaliye</span>
+            <span class="nav-warn-badge" id="nav-nebim-warn-badge" style="display:none;" title=""></span>
+          </div>
+          <div class="nav-item" id="nav-navlun-tanim" onclick="sidebarSelect('navlun-tanim')">
+            <i class="ti ti-currency-euro" aria-hidden="true"></i>
+            <span class="nav-label">Navlun Tanımları</span>
+          </div>
+        </div>
+
+        <div class="nav-group-header open" id="ngh-yurtdisi" onclick="toggleNavGroup('yurtdisi')">
+          <span class="nav-group-label">YURTDIŞİ MALİYETLER</span>
+          <i class="ti ti-chevron-down nav-group-chevron" id="ngc-yurtdisi" aria-hidden="true"></i>
+        </div>
+        <div class="nav-group-body open" id="ngb-yurtdisi">
+          <div class="nav-item" id="nav-maliyet-takip" onclick="sidebarSelect('maliyet-takip')">
+            <i class="ti ti-chart-line" aria-hidden="true"></i>
+            <span class="nav-label">Maliyet Takip</span>
+          </div>
+          <div class="nav-item nav-item-soon">
+            <i class="ti ti-currency-exchange" aria-hidden="true"></i>
+            <span class="nav-label">Kur Yönetimi</span>
+            <span class="nav-soon-badge">yakında</span>
+          </div>
+        </div>
+
+        <div class="nav-group-header open" id="ngh-antrepo" onclick="toggleNavGroup('antrepo')">
+          <span class="nav-group-label">ANTREPO</span>
+          <i class="ti ti-chevron-down nav-group-chevron" id="ngc-antrepo" aria-hidden="true"></i>
+        </div>
+        <div class="nav-group-body open" id="ngb-antrepo">
+          <div class="nav-item nav-item-soon">
+            <i class="ti ti-package" aria-hidden="true"></i>
+            <span class="nav-label">Stok Takip</span>
+            <span class="nav-soon-badge">yakında</span>
+          </div>
+          <div class="nav-item nav-item-soon">
+            <i class="ti ti-arrows-transfer-up" aria-hidden="true"></i>
+            <span class="nav-label">Giriş / Çıkış</span>
+            <span class="nav-soon-badge">yakında</span>
+          </div>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <div class="nav-item" id="nav-gecmis-item" onclick="sidebarSelect('gecmis')" style="display:none;">
+          <i class="ti ti-history" aria-hidden="true"></i>
+          <span class="nav-label">Son İşlemler</span>
+        </div>
+        <div class="nav-item" id="nav-permissions-item" onclick="sidebarSelect('permissions')" style="display:none;">
+          <i class="ti ti-shield-check" aria-hidden="true"></i>
+          <span class="nav-label">Admin Portalı</span>
+        </div>
+        <div class="nav-item" id="nav-users-item" onclick="sidebarSelect('users')" style="display:none;">
+          <i class="ti ti-users" aria-hidden="true"></i>
+          <span class="nav-label">Kullanıcılar</span>
+        </div>
+        <div class="nav-item" id="nav-audit-item" onclick="sidebarSelect('audit')" style="display:none;">
+          <i class="ti ti-list-details" aria-hidden="true"></i>
+          <span class="nav-label">İşlem Kayıtları</span>
+        </div>
+
+        <div id="nav-sonrasi" style="display:none;"></div>
+        <div id="nav-taslak" style="display:none;"></div>
+        <div id="nav-oncesi" style="display:none;"></div>
+        <div id="nav-gtip" style="display:none;"></div>
+        <div id="nav-evrak" style="display:none;"></div>
+
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-row">
+          <div class="user-avatar" id="sidebarAvatar">?</div>
+          <div>
+            <div class="user-name" id="sidebarUserName">Kullanıcı</div>
+            <div class="user-role" id="sidebarUserRole">Lojistik Ekibi</div>
+          </div>
+        </div>
+        <button class="logout-btn" onclick="doLogout()">
+          <i class="ti ti-logout" aria-hidden="true"></i>
+          <span class="logout-label">Çıkış Yap</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── MAIN AREA ──────────────────────────────────────────────────────── -->
+    <div class="main-area">
+
+      <!-- TOP BAR -->
+      <div class="topbar" id="topbarMain" style="display:none;">
+        <div class="topbar-left">
+          <span class="topbar-title" id="topbarTitle">INV + PL Oluştur</span>
+          <span class="badge badge-blue" id="topbarCountry" style="display:none;"></span>
+          <span class="badge badge-amber" id="topbarDepo" style="display:none;"></span>
+        </div>
+        <div class="topbar-right" id="topbarRight"></div>
+      </div>
+
+      <!-- CONTENT AREA — tüm paneller burada -->
+      <div class="content-area" id="contentArea">
+
+        <!-- ── DASHBOARD ──────────────────────────────────────────────────── -->
+        <!-- index.html içinde mevcut stepDashboard div'ini BU BLOKLA komple değiştir -->
+
+        <div class="panel" id="stepDashboard" style="display:none;">
+
+          <style>
+            @keyframes dashFadeIn {
+              from {
+                opacity: 0;
+                transform: translateY(6px);
+              }
+
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
+            @keyframes dashCardIn {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
+            .dash-kpi {
+              background: var(--surface);
+              border: 0.5px solid var(--border2);
+              border-radius: 14px;
+              padding: 18px;
+              position: relative;
+              overflow: hidden;
+              transition: transform 0.2s, box-shadow 0.2s;
+              cursor: default;
+              animation: dashCardIn 0.4s ease both;
+            }
+
+            .dash-kpi:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            }
+
+            .dash-kpi-accent {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 3px;
+              border-radius: 14px 14px 0 0;
+            }
+
+            .dash-kpi-icon {
+              width: 36px;
+              height: 36px;
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-bottom: 12px;
+              font-size: 18px;
+            }
+
+            .dash-kpi-label {
+              font-size: 11px;
+              color: var(--text3);
+              margin-bottom: 4px;
+              font-weight: 500;
+              letter-spacing: 0.02em;
+            }
+
+            .dash-kpi-value {
+              font-size: 28px;
+              font-weight: 600;
+              color: var(--text);
+              line-height: 1;
+              letter-spacing: -0.5px;
+            }
+
+            .dash-kpi-sub {
+              font-size: 11px;
+              color: var(--text3);
+              margin-top: 8px;
+            }
+
+            .dash-tag {
+              font-size: 10.5px;
+              font-weight: 600;
+              padding: 2px 7px;
+              border-radius: 20px;
+              display: inline-block;
+            }
+
+            .dash-card {
+              background: var(--surface);
+              border: 0.5px solid var(--border2);
+              border-radius: 14px;
+              padding: 18px;
+              transition: box-shadow 0.2s;
+              animation: dashCardIn 0.4s ease both;
+            }
+
+            .dash-card:hover {
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            }
+
+            .dash-card-title {
+              font-size: 13px;
+              font-weight: 600;
+              color: var(--text);
+            }
+
+            .dash-card-sub {
+              font-size: 11px;
+              color: var(--text3);
+              margin-top: 2px;
+              margin-bottom: 14px;
+            }
+
+            .dash-year-badge {
+              font-size: 10px;
+              font-weight: 600;
+              padding: 3px 9px;
+              border-radius: 20px;
+              background: var(--accent-dim);
+              color: var(--accent);
+            }
+
+            .dash-donut-seg {
+              transition: stroke-width 0.15s ease, opacity 0.15s ease;
+              cursor: default;
+            }
+
+            .dash-donut-seg:hover {
+              stroke-width: 17;
+            }
+          </style>
+
+          <!-- KPI Kartları -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;">
+
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard()" style="animation-delay:0.05s;cursor:pointer;">
+              <div class="dash-kpi-accent" style="background:#2563EB;"></div>
+              <div class="dash-kpi-icon" style="background:#EFF6FF;color:#2563EB;">
+                <i class="ti ti-ship" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Toplam Sevkiyat</div>
+              <div class="dash-kpi-value" id="dash-kv1">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag" style="background:#EFF6FF;color:#1D4ED8;">Tüm
+                  zamanlar</span></div>
+            </div>
+
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'YOLDA'})" style="animation-delay:0.10s;cursor:pointer;">
+              <div class="dash-kpi-accent" style="background:#F59E0B;"></div>
+              <div class="dash-kpi-icon" style="background:#FFFBEB;color:#F59E0B;">
+                <i class="ti ti-clock" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Yolda</div>
+              <div class="dash-kpi-value" id="dash-kv2" style="color:#F59E0B;">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag" style="background:#FFFBEB;color:#B45309;">Aktif
+                  sevkiyat</span></div>
+            </div>
+
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'Varış Gümrük'})" style="animation-delay:0.15s;cursor:pointer;">
+              <div class="dash-kpi-accent" style="background:#06B6D4;"></div>
+              <div class="dash-kpi-icon" style="background:#ECFEFF;color:#06B6D4;">
+                <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Varış Gümrük</div>
+              <div class="dash-kpi-value" id="dash-kv4" style="color:#06B6D4;">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag" style="background:#ECFEFF;color:#0E7490;">Gümrükte</span>
+              </div>
+            </div>
+
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard({durum:'TESLİM EDİLDİ'})" style="animation-delay:0.20s;cursor:pointer;">
+              <div class="dash-kpi-accent" style="background:#22C55E;"></div>
+              <div class="dash-kpi-icon" style="background:#F0FDF4;color:#22C55E;">
+                <i class="ti ti-circle-check" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Teslim Edildi</div>
+              <div class="dash-kpi-value" id="dash-kv3" style="color:#22C55E;">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag"
+                  style="background:#F0FDF4;color:#16A34A;">Tamamlanan</span></div>
+            </div>
+
+            <div class="dash-kpi" onclick="openShipmentsFromDashboard()" style="animation-delay:0.25s;cursor:pointer;">
+              <div class="dash-kpi-accent" style="background:#8B5CF6;"></div>
+              <div class="dash-kpi-icon" style="background:#F5F3FF;color:#8B5CF6;">
+                <i class="ti ti-currency-euro" aria-hidden="true"></i>
+              </div>
+              <div class="dash-kpi-label">Toplam EUR</div>
+              <div class="dash-kpi-value" id="dash-kv5" style="font-size:20px;color:#8B5CF6;">—</div>
+              <div class="dash-kpi-sub"><span class="dash-tag" style="background:#F5F3FF;color:#6D28D9;">Fatura
+                  bedeli</span></div>
+            </div>
+
+          </div>
+
+          <!-- Aylık Trend (tam genişlik) -->
+          <div class="dash-card" style="margin-bottom:16px;animation-delay:0.25s;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+              <div>
+                <div class="dash-card-title">Aylık sevkiyat trendi</div>
+                <div class="dash-card-sub">2026 yılı — yükleme tarihine göre</div>
+              </div>
+              <span class="dash-year-badge">2026</span>
+            </div>
+            <div id="dash-bar-chart"></div>
+          </div>
+
+          <!-- Alt satır: Donut + Hbar -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+
+            <div class="dash-card" style="animation-delay:0.30s;">
+              <div class="dash-card-title">Maliyet kırılımı</div>
+              <div class="dash-card-sub">Kurumsal ülkeler, KDV hariç</div>
+              <div id="dash-cost-summary"></div>
+            </div>
+
+            <div class="dash-card" style="animation-delay:0.35s;">
+              <div class="dash-card-title">Ülkelere göre dağılım</div>
+              <div class="dash-card-sub">Sevkiyat sayısı</div>
+              <div id="dash-hbar"></div>
+            </div>
+
+          </div>
+
+          <!-- Son Sevkiyatlar -->
+          <div class="dash-card" style="animation-delay:0.40s;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div>
+                <div class="dash-card-title">Son sevkiyatlar</div>
+                <div class="dash-card-sub" style="margin-bottom:0;">En güncel kayıtlar</div>
+              </div>
+              <button onclick="sidebarSelect('sevkiyatlar')"
+                style="font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;color:var(--accent);cursor:pointer;transition:background 0.12s;"
+                onmouseenter="this.style.background='var(--accent-dim)'"
+                onmouseleave="this.style.background='transparent'">
+                Tümünü gör →
+              </button>
+            </div>
+            <div id="dash-recent"></div>
+          </div>
+
+        </div>
+
+        <!-- ── SEVKİYATLAR ────────────────────────────────────────────────── -->
+        <div class="panel" id="stepSevkiyatlar" style="display:none;padding:0;gap:0;">
+          <!-- Filtre Barı -->
+          <div style="border-bottom:0.5px solid var(--border2);background:var(--surface);">
+
+            <!-- Filtre ve buton satırı -->
+            <div
+              style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;flex-wrap:nowrap;overflow-x:auto;">
+
+              <!-- Sol taraf: filtreler -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;" id="filter-bar">
+
+                <!-- Müşteri Tipi -->
+                <div class="custom-dd" id="dd-tip">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-tip')">
+                    <i class="ti ti-building" aria-hidden="true"></i>
+                    <span id="dd-tip-label">Tipler</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-tip-menu">
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="" checked
+                        onchange="onDDChange('tip',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="kurumsal"
+                        onchange="onDDChange('tip',this)"><span>Kurumsal</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="franchise"
+                        onchange="onDDChange('tip',this)"><span>Franchise</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="toptan"
+                        onchange="onDDChange('tip',this)"><span>Toptan</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-tip-r" value="devir"
+                        onchange="onDDChange('tip',this)"><span>Devir</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('tip')">Uygula</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Ülke — çok seçmeli -->
+                <div class="custom-dd" id="dd-ulke">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-ulke')">
+                    <i class="ti ti-world" aria-hidden="true"></i>
+                    <span id="dd-ulke-label">Ülkeler</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" style="min-width:180px;" id="dd-ulke-menu">
+                    <div class="dd-group-label">Kurumsal</div>
+                    <label class="dd-item"><input type="checkbox" value="ALMANYA"
+                        onchange="onUlkeChange()"><span>Almanya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="BELÇİKA"
+                        onchange="onUlkeChange()"><span>Belçika</span></label>
+                    <label class="dd-item"><input type="checkbox" value="BOSNA"
+                        onchange="onUlkeChange()"><span>Bosna</span></label>
+                    <label class="dd-item"><input type="checkbox" value="GÜRCİSTAN"
+                        onchange="onUlkeChange()"><span>Gürcistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="HOLLANDA"
+                        onchange="onUlkeChange()"><span>Hollanda</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KAZAKİSTAN"
+                        onchange="onUlkeChange()"><span>Kazakistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KOSOVA"
+                        onchange="onUlkeChange()"><span>Kosova</span></label>
+                    <label class="dd-item"><input type="checkbox" value="MAKEDONYA"
+                        onchange="onUlkeChange()"><span>Makedonya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="SIRBİSTAN"
+                        onchange="onUlkeChange()"><span>Sırbistan</span></label>
+                    <div class="dd-group-label">Franchise</div>
+                    <label class="dd-item"><input type="checkbox" value="IRAK"
+                        onchange="onUlkeChange()"><span>Irak</span></label>
+                    <label class="dd-item"><input type="checkbox" value="KIBRIS"
+                        onchange="onUlkeChange()"><span>Kıbrıs</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LİBERYA"
+                        onchange="onUlkeChange()"><span>Liberya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LİBYA"
+                        onchange="onUlkeChange()"><span>Libya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="LÜBNAN"
+                        onchange="onUlkeChange()"><span>Lübnan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="ÖZBEKİSTAN"
+                        onchange="onUlkeChange()"><span>Özbekistan</span></label>
+                    <label class="dd-item"><input type="checkbox" value="RUSYA"
+                        onchange="onUlkeChange()"><span>Rusya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="ÜRDÜN"
+                        onchange="onUlkeChange()"><span>Ürdün</span></label>
+                    <label class="dd-item"><input type="checkbox" value="ABHAZYA"
+                        onchange="onUlkeChange()"><span>Abhazya</span></label>
+                    <label class="dd-item"><input type="checkbox" value="MAURITIUS"
+                        onchange="onUlkeChange()"><span>Mauritius</span></label>
+                    <div class="dd-group-label">Devir</div>
+                    <label class="dd-item"><input type="checkbox" value="KENYA"
+                        onchange="onUlkeChange()"><span>Kenya</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="toggleDD('dd-ulke')">Uygula</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Durum -->
+                <div class="custom-dd" id="dd-durum">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-durum')">
+                    <i class="ti ti-loader" aria-hidden="true"></i>
+                    <span id="dd-durum-label">Durumlar</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-durum-menu">
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="" checked
+                        onchange="onDDChange('durum',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Yüklenecek"
+                        onchange="onDDChange('durum',this)"><span>Yüklenecek</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="YOLDA"
+                        onchange="onDDChange('durum',this)"><span>Yolda</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Varış Gümrük"
+                        onchange="onDDChange('durum',this)"><span>Varış Gümrük</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Gümrükleme"
+                        onchange="onDDChange('durum',this)"><span>Gümrükleme</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="TESLİM EDİLDİ"
+                        onchange="onDDChange('durum',this)"><span>Teslim Edildi</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('durum')">Uygula</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Depo -->
+                <div class="custom-dd" id="dd-depo">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-depo')">
+                    <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+                    <span id="dd-depo-label">Depolar</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-depo-menu">
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="" checked
+                        onchange="onDDChange('depo',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="IHR"
+                        onchange="onDDChange('depo',this)"><span>Serbest (IHR)</span></label>
+                    <label class="dd-item"><input type="radio" name="dd-depo-r" value="ANT"
+                        onchange="onDDChange('depo',this)"><span>Antrepo (ANT)</span></label>
+                  </div>
+                </div>
+
+                <!-- Ay Filtresi -->
+                <div class="custom-dd" id="dd-ay">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-ay')">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    <span id="dd-ay-label">Ay</span>
+                    <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
+                  </button>
+                  <div class="custom-dd-menu" id="dd-ay-menu">
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="" checked
+                        onchange="onDDChange('ay',this)"><span>Tümü</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="01"
+                        onchange="onDDChange('ay',this)"><span>Ocak</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="02"
+                        onchange="onDDChange('ay',this)"><span>Şubat</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="03"
+                        onchange="onDDChange('ay',this)"><span>Mart</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="04"
+                        onchange="onDDChange('ay',this)"><span>Nisan</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="05"
+                        onchange="onDDChange('ay',this)"><span>Mayıs</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="06"
+                        onchange="onDDChange('ay',this)"><span>Haziran</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="07"
+                        onchange="onDDChange('ay',this)"><span>Temmuz</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="08"
+                        onchange="onDDChange('ay',this)"><span>Ağustos</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="09"
+                        onchange="onDDChange('ay',this)"><span>Eylül</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="10"
+                        onchange="onDDChange('ay',this)"><span>Ekim</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="11"
+                        onchange="onDDChange('ay',this)"><span>Kasım</span></label>
+                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="12"
+                        onchange="onDDChange('ay',this)"><span>Aralık</span></label>
+                    <div class="dd-apply-row">
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('ay')">Uygula</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Temizle -->
+                <button onclick="clearFilters()" title="Filtreleri Temizle" style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;
+                         border-radius:var(--radius-md);border:0.5px solid #FECACA;
+                         background:#FFF5F5;color:#EF4444;cursor:pointer;flex-shrink:0;transition:background 0.15s;"
+                  onmouseenter="this.style.background='#FEE2E2'" onmouseleave="this.style.background='#FFF5F5'">
+                  <i class="ti ti-trash" style="font-size:15px;" aria-hidden="true"></i>
+                </button>
+
+              </div>
+
+              <!-- Hidden inputs — eski kod uyumluluğu için -->
+              <input type="hidden" id="filter-musteri-tipi">
+              <input type="hidden" id="filter-ay">
+              <input type="hidden" id="filter-ulke">
+              <input type="hidden" id="filter-durum">
+              <input type="hidden" id="filter-depo">
+
+              <style>
+                .custom-dd {
+                  position: relative;
+                }
+
+                .custom-dd-btn {
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  height: 32px;
+                  padding: 0 10px;
+                  border-radius: var(--radius-md);
+                  border: 0.5px solid var(--border2);
+                  background: var(--surface2);
+                  color: var(--text);
+                  font-family: var(--font);
+                  font-size: 12px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  white-space: nowrap;
+                  transition: border-color 0.15s, background 0.15s;
+                }
+
+                .custom-dd-btn:hover {
+                  background: var(--surface);
+                  border-color: var(--accent);
+                }
+
+                .custom-dd-btn.active {
+                  border-color: var(--accent);
+                  background: var(--accent-dim);
+                  color: var(--accent-text);
+                }
+
+                .custom-dd-btn .ti {
+                  font-size: 14px;
+                }
+
+                .dd-arrow {
+                  font-size: 11px !important;
+                  opacity: 0.6;
+                  transition: transform 0.15s;
+                }
+
+                .custom-dd.open .dd-arrow {
+                  transform: rotate(180deg);
+                }
+
+                .custom-dd-menu {
+                  display: none;
+                  position: fixed;
+                  min-width: 150px;
+                  background: var(--surface);
+                  border: 0.5px solid var(--border2);
+                  border-radius: var(--radius-md);
+                  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+                  z-index: 1000;
+                  padding: 4px;
+                  max-height: 320px;
+                  overflow-y: auto;
+                }
+
+                .custom-dd.open .custom-dd-menu {
+                  display: block;
+                }
+
+                .dd-item {
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  padding: 6px 10px;
+                  border-radius: 6px;
+                  font-size: 12px;
+                  color: var(--text);
+                  cursor: pointer;
+                  user-select: none;
+                  transition: background 0.1s;
+                }
+
+                .dd-item:hover {
+                  background: var(--accent-dim);
+                }
+
+                .dd-item input {
+                  accent-color: var(--accent);
+                  cursor: pointer;
+                  width: 13px;
+                  height: 13px;
+                  flex-shrink: 0;
+                }
+
+                .dd-group-label {
+                  font-size: 10px;
+                  font-weight: 600;
+                  color: var(--text3);
+                  text-transform: uppercase;
+                  letter-spacing: 0.06em;
+                  padding: 8px 10px 4px;
+                }
+
+                .dd-apply-row {
+                  position: sticky;
+                  bottom: -4px;
+                  margin: 6px -4px -4px;
+                  padding: 6px;
+                  background: var(--surface);
+                  border-top: 0.5px solid var(--border2);
+                }
+
+                .dd-apply-btn {
+                  width: 100%;
+                  height: 30px;
+                  border: none;
+                  border-radius: var(--radius-md);
+                  background: var(--accent);
+                  color: #fff;
+                  font-family: var(--font);
+                  font-size: 12px;
+                  font-weight: 600;
+                  cursor: pointer;
+                }
+              </style>
+
+              <!-- Sağ taraf: butonlar -->
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                <button onclick="openImportModal()" class="role-admin-only"
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-upload" aria-hidden="true"></i>İçe Aktar</button>
+                <button onclick="downloadMaliyetRaporu()"
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-download" aria-hidden="true"></i>Maliyet Raporu</button>
+                <button onclick="openNewShipmentForm()" class="role-write-only"
+                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#0e9f6e;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  <i class="ti ti-plus" aria-hidden="true"></i>Yeni Sevkiyat</button>
+              </div>
+
+            </div>
+
+            <!-- Özet Şerit -->
+            <div id="shipments-ozet"
+              style="display:flex;gap:10px;align-items:center;padding:6px 20px;background:var(--accent-dim);border-bottom:0.5px solid var(--accent-mid);font-size:12px;color:var(--accent-text);flex-wrap:wrap;row-gap:6px;">
+            </div>
+
+            <!-- Tablo -->
+            <div id="shipments-table-wrapper" style="background:var(--surface);overflow-x:auto;"></div>
+
+            <!-- Renk Açıklaması (Legend) -->
+            <div id="shipments-legend"
+              style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:6px 20px;background:var(--surface);border-top:0.5px solid var(--accent-mid);font-size:11px;color:var(--text3);">
+              <span style="font-weight:600;color:var(--text2);">Depo:</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;">
+                <span class="shipment-legend-swatch" style="background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;">IHR</span>Komple Serbest Depo
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:5px;">
+                <span class="shipment-legend-swatch" style="background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;">ANT</span>Komple Antrepo
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:5px;">
+                <span class="shipment-legend-swatch" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;">IHR</span>
+                <span class="shipment-legend-swatch" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;">ANT</span>Gruplu sevk
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sevkiyat Detay Popup -->
+        <div id="shipment-overlay" onclick="closeShipmentDetail()"></div>
+        <div id="shipment-detail-panel">
+          <div class="detail-header">
+            <div>
+              <div class="detail-header-title" id="detail-dosya-no">-</div>
+              <div class="detail-header-meta"><span id="detail-ulke">-</span> · <span id="detail-fatura-no">-</span>
+              </div>
+            </div>
+            <button class="detail-close-btn" onclick="closeShipmentDetail()">✕</button>
+          </div>
+          <input type="hidden" id="detail-id">
+          <div class="detail-body">
+            <div id="new-shipment-fields" style="display:none;">
+              <div class="detail-section-label">Temel Bilgiler</div>
+              <div class="detail-grid">
+                <div class="detail-field"><label>İhracat Dosya No</label><input id="new-dosya-no" type="text"
+                    placeholder="örn: 2026-210"></div>
+                <div class="detail-field"><label>Fatura No</label><input id="new-fatura-no" type="text"
+                    placeholder="örn: IHR2026000000071"></div>
+                <div class="detail-field"><label>Ülke</label><input id="new-ulke" type="text"
+                    placeholder="örn: SIRBİSTAN"></div>
+                <div class="detail-field"><label>Yükleme Tarihi</label><input id="new-yukleme" type="date"></div>
+                <div class="detail-field"><label>Fatura Bedeli TL</label><input id="new-fatura-tl" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>Fatura Bedeli EUR</label><input id="new-fatura-eur" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>Mal Bedeli EUR</label><input id="new-mal-eur" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>Navlun EUR</label><input id="new-navlun" type="number" placeholder="0">
+                </div>
+                <div class="detail-field"><label>Sigorta EUR</label><input id="new-sigorta" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>EUR Kuru</label><input id="new-kur" type="number" placeholder="0">
+                </div>
+                <div class="detail-field"><label>Navlun USD</label><input id="new-navlun-usd" type="number" placeholder="0">
+                </div>
+                <div class="detail-field"><label>Sigorta USD</label><input id="new-sigorta-usd" type="number"
+                    placeholder="0"></div>
+                <div class="detail-field"><label>USD Kuru</label><input id="new-usd-kur" type="number" placeholder="0">
+                </div>
+              </div>
+            </div>
+            <div class="detail-section-label">Fatura Bilgileri</div>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Fatura Bedeli TL</label><input id="edit-fatura-tl" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Fatura Bedeli EUR</label><input id="edit-fatura-eur" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Mal Bedeli EUR</label><input id="edit-mal-eur" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Navlun EUR</label><input id="edit-navlun" type="number" placeholder="0">
+              </div>
+              <div class="detail-field"><label>Sigorta EUR</label><input id="edit-sigorta" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>EUR Kuru</label><input id="edit-kur" type="number" placeholder="0">
+              </div>
+              <div class="detail-field"><label>Navlun USD</label><input id="edit-navlun-usd" type="number" placeholder="0">
+              </div>
+              <div class="detail-field"><label>Sigorta USD</label><input id="edit-sigorta-usd" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>USD Kuru</label><input id="edit-usd-kur" type="number" placeholder="0">
+              </div>
+            </div>
+            <div class="detail-section-label">Genel Bilgiler</div>
+            <div class="detail-grid">
+              <div class="detail-field"><label>İhracat Dosya No</label><input id="edit-dosya-no" type="text"
+                  placeholder="örn: 2026-210"></div>
+              <div class="detail-field"><label>Nakliye Firması</label><input id="edit-nakliye" type="text"
+                  placeholder="örn: RAPID"></div>
+              <div class="detail-field"><label>Plaka</label><input id="edit-plaka" type="text"
+                  placeholder="örn: 34ABC123"></div>
+              <div class="detail-field"><label>Palet</label><input id="edit-palet" type="text"
+                  placeholder="örn: 20 veya 126 (5)"></div>
+            </div>
+            <div class="detail-field">
+              <label>Durum</label>
+              <select id="edit-durum">
+                <option value="Yüklenecek">Yüklenecek</option>
+                <option value="YOLDA">Yolda</option>
+                <option value="Varış Gümrük">Varış Gümrük</option>
+                <option value="Gümrükleme">Gümrükleme</option>
+                <option value="TESLİM EDİLDİ">Teslim Edildi</option>
+              </select>
+            </div>
+            <div class="detail-section-label">Tarihler</div>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Yükleme Tarihi</label><input id="edit-yukleme" type="date"></div>
+              <div class="detail-field"><label>Gümrük Tarihi</label><input id="edit-gumruk-tarihi" type="date"></div>
+              <div class="detail-field"><label>Varış Tarihi</label><input id="edit-varis" type="date"></div>
+              <div class="detail-field"><label>Gümrükleme Bitiş</label><input id="edit-gumruk-bitis" type="date">
+              </div>
+            </div>
+            <!-- Sırbistan vergi PDF yükleme — sadece SIRBİSTAN için gösterilir -->
+            <div id="vergi-pdf-section" style="display:none;">
+              <div class="detail-section-label">Sırbistan Maliyet PDF'leri</div>
+              <div id="vergi-drop-zone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleVergiPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('vergi-pdf-input').click()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                       background:var(--surface2);border:1.5px dashed var(--border2);
+                       border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s,background 0.15s;
+                       margin-top:8px;">
+                <input type="file" id="vergi-pdf-input" accept=".pdf" style="display:none;"
+                  onchange="handleVergiPdf(this.files[0])">
+                <span style="font-size:20px;flex-shrink:0;">📄</span>
+                <div style="flex:1;min-width:0;">
+                  <div id="vergi-pdf-status" style="font-size:12px;color:var(--text3);">
+                    PDF'i buraya sürükleyin veya tıklayın — Gümrük, KDV veya Brokerage Fee & Other Costs EUR otomatik dolar
+                  </div>
+                </div>
+              </div>
+              <style>
+                #vergi-drop-zone:hover,
+                #vergi-drop-zone.vergi-drag-over {
+                  border-color: var(--accent);
+                  background: var(--accent-dim);
+                }
+
+                #vergi-drop-zone.vergi-drag-over {
+                  border-style: solid;
+                }
+              </style>
+            </div>
+            <div class="detail-section-label">Maliyet Bilgileri</div>
+            <div class="detail-grid">
+              <div class="detail-field"><label>İhracat Beyanname TL</label><input id="edit-beyanname-tl" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>İhracat Beyanname EUR</label><input id="edit-beyanname-eur" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Araç Bekleme</label><input id="edit-bekleme" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Brokerage Fee & Other Costs EUR</label><input id="edit-brokerage" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Other Costs EUR</label><input id="edit-other-costs" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>Gümrük Vergisi EUR</label><input id="edit-gumruk-v" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>KDV EUR</label><input id="edit-kdv" type="number" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="detail-footer">
+            <button id="delete-shipment-btn" onclick="deleteShipment()" class="role-write-only"
+              style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--error);background:transparent;color:var(--error);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;margin-right:auto;">🗑
+              Sil</button>
+            <button id="grupla-btn" onclick="openGruplaModal()" class="role-write-only"
+              style="padding:7px 14px;border-radius:var(--radius-md);border:0.5px solid var(--accent);background:transparent;color:var(--accent);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;">🔗
+              Grupla</button>
+            <button class="btn-ghost" onclick="closeShipmentDetail()">İptal</button>
+            <button class="btn-secondary" onclick="saveShipmentDetail()">Kaydet</button>
+          </div>
+        </div>
+
+        <!-- ── INV+PL WIZARD ──────────────────────────────────────────────── -->
+        <div class="wizard-steps" id="wizardSteps" style="display:none;">
+          <div class="step-item">
+            <div class="step-dot active" id="dot1">1</div>
+            <span class="step-label active" id="lbl1">Depo & Ülke & Dosyalar</span>
+          </div>
+          <div class="step-line" id="line1"></div>
+          <div class="step-item">
+            <div class="step-dot idle" id="dot2">2</div>
+            <span class="step-label" id="lbl2">KG & Hesap</span>
+          </div>
+        </div>
+
+        <!-- Adım 2: Ülke & Dosyalar -->
+        <div class="panel" id="step2" style="display:none;">
+
+          <!-- Depo Tipi -->
+          <div class="depo-segment">
+            <button class="depo-segment-btn active" id="mode-serbest" onclick="selectDepo('serbest')">
+              <div class="depo-segment-icon"><i class="ti ti-building" aria-hidden="true"></i></div>
+              <div>
+                <div class="depo-segment-label">Serbest depo</div>
+              </div>
+            </button>
+            <button class="depo-segment-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
+              <div class="depo-segment-icon"><i class="ti ti-building-warehouse" aria-hidden="true"></i></div>
+              <div>
+                <div class="depo-segment-label">Antrepo</div>
+              </div>
+            </button>
+          </div>
+
+          <!-- Ülke Arama -->
+          <div class="search-compact">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input type="text" id="countrySearchInput" placeholder="Ülke ara..." oninput="filterCountryList()">
+          </div>
+
+          <!-- Kurumsal -->
+          <div class="cc2-section" id="cc2-kurumsal">
+            <div class="cc2-header">
+              <span class="cc2-label" id="cc-lbl-kurumsal">Kurumsal</span>
+              <span class="cc2-count">9</span>
+            </div>
+            <div class="cc2-grid" id="cc-grid-kurumsal">
+              <div class="cc2" id="country-rs" data-name="sırbistan" onclick="selectCountry('rs')">
+                <img src="https://flagcdn.com/40x30/rs.png" alt="Sırbistan">
+                <div class="cc2-info">
+                  <div class="cc2-name">Sırbistan</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-ba" data-name="bosna" onclick="selectCountry('ba')">
+                <img src="https://flagcdn.com/40x30/ba.png" alt="Bosna">
+                <div class="cc2-info">
+                  <div class="cc2-name">Bosna</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-ge" data-name="gürcistan" onclick="selectCountry('ge')">
+                <img src="https://flagcdn.com/40x30/ge.png" alt="Gürcistan">
+                <div class="cc2-info">
+                  <div class="cc2-name">Gürcistan</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-xk" data-name="kosova" onclick="selectCountry('xk')">
+                <img src="https://flagcdn.com/40x30/xk.png" alt="Kosova">
+                <div class="cc2-info">
+                  <div class="cc2-name">Kosova</div>
+                  <div class="cc2-cur">EUR</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-mk" data-name="makedonya" onclick="selectCountry('mk')">
+                <img src="https://flagcdn.com/40x30/mk.png" alt="Makedonya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Makedonya</div>
+                  <div class="cc2-cur">EUR</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-be" data-name="belçika" onclick="selectCountry('be')">
+                <img src="https://flagcdn.com/40x30/be.png" alt="Belçika">
+                <div class="cc2-info">
+                  <div class="cc2-name">Belçika</div>
+                  <div class="cc2-cur">EUR</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-de" data-name="almanya" onclick="selectCountry('de')">
+                <img src="https://flagcdn.com/40x30/de.png" alt="Almanya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Almanya</div>
+                  <div class="cc2-cur">EUR</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-nl" data-name="hollanda" onclick="selectCountry('nl')">
+                <img src="https://flagcdn.com/40x30/nl.png" alt="Hollanda">
+                <div class="cc2-info">
+                  <div class="cc2-name">Hollanda</div>
+                  <div class="cc2-cur">EUR</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-kz" data-name="kazakistan" onclick="selectCountry('kz')">
+                <img src="https://flagcdn.com/40x30/kz.png" alt="Kazakistan">
+                <div class="cc2-info">
+                  <div class="cc2-name">Kazakistan</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Franchise -->
+          <div class="cc2-section" id="cc2-franchise">
+            <div class="cc2-header">
+              <span class="cc2-label" id="cc-lbl-franchise">Franchise</span>
+              <span class="cc2-count">8</span>
+            </div>
+            <div class="cc2-grid" id="cc-grid-franchise">
+              <div class="cc2" id="country-cy" data-name="kıbrıs" onclick="selectCountry('cy')">
+                <img src="https://flagcdn.com/40x30/cy.png" alt="Kıbrıs">
+                <div class="cc2-info">
+                  <div class="cc2-name">Kıbrıs</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-iq" data-name="irak" onclick="selectCountry('iq')">
+                <img src="https://flagcdn.com/40x30/iq.png" alt="Irak">
+                <div class="cc2-info">
+                  <div class="cc2-name">Irak</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-ly" data-name="libya" onclick="selectCountry('ly')">
+                <img src="https://flagcdn.com/40x30/ly.png" alt="Libya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Libya</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-lr" data-name="liberya" onclick="selectCountry('lr')">
+                <img src="https://flagcdn.com/40x30/lr.png" alt="Liberya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Liberya</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-lb" data-name="lübnan" onclick="selectCountry('lb')">
+                <img src="https://flagcdn.com/40x30/lb.png" alt="Lübnan">
+                <div class="cc2-info">
+                  <div class="cc2-name">Lübnan</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-uz" data-name="özbekistan" onclick="selectCountry('uz')">
+                <img src="https://flagcdn.com/40x30/uz.png" alt="Özbekistan">
+                <div class="cc2-info">
+                  <div class="cc2-name">Özbekistan</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-ru" data-name="rusya" onclick="selectCountry('ru')">
+                <img src="https://flagcdn.com/40x30/ru.png" alt="Rusya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Rusya</div>
+                  <div class="cc2-cur">TRY</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-jo" data-name="ürdün" onclick="selectCountry('jo')">
+                <img src="https://flagcdn.com/40x30/jo.png" alt="Ürdün">
+                <div class="cc2-info">
+                  <div class="cc2-name">Ürdün</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toptan -->
+          <div class="cc2-section" id="cc2-toptan">
+            <div class="cc2-header">
+              <span class="cc2-label" id="cc-lbl-toptan">Toptan</span>
+              <span class="cc2-count">2</span>
+            </div>
+            <div class="cc2-grid" id="cc-grid-toptan">
+              <div class="cc2" id="country-abh" data-name="abhazya" onclick="selectCountry('abh')">
+                <img src="https://flagcdn.com/40x30/un.png" alt="Abhazya">
+                <div class="cc2-info">
+                  <div class="cc2-name">Abhazya</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+              <div class="cc2" id="country-mu" data-name="mauritius" onclick="selectCountry('mu')">
+                <img src="https://flagcdn.com/40x30/mu.png" alt="Mauritius">
+                <div class="cc2-info">
+                  <div class="cc2-name">Mauritius</div>
+                  <div class="cc2-cur">USD</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="countryNoResults"
+            style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
+          </div>
+
+          <!-- Kazakistan mod -->
+          <div id="kzModeSection" style="display:none;">
+            <div class="section-lbl">Çıktı Türü</div>
+            <div class="mode-options">
+              <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
+                <div class="mode-icon">🗜️</div>
+                <div>
+                  <div class="mode-title">Gruplandır</div>
+                  <div class="mode-desc">SKU bazında birleştir</div>
+                </div>
+              </div>
+              <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
+                <div class="mode-icon">📋</div>
+                <div>
+                  <div class="mode-title">Ham Veri</div>
+                  <div class="mode-desc">Tüm satırlar</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="dropZone" class="drop-zone" style="display:none;"
+            onclick="document.getElementById('fileInput').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault();this.classList.remove('dragover');handleMultiFile(event.dataTransfer.files)">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf" multiple onchange="handleMultiFile(this.files)" style="display:none;">
+            <div class="drop-icon"><i class="ti ti-file-upload" style="font-size:22px;color:var(--accent);"></i></div>
+            <h3>Excel ve PDF yükleyin</h3>
+            <p>Sürükleyin veya tıklayarak seçin · aynı anda ikisi de yüklenebilir</p>
+            <div class="drop-pills">
+              <span class="drop-pill">.xlsx</span>
+              <span class="drop-pill">.pdf</span>
+              <span class="drop-pill" id="fileName" style="display:none;"></span>
+              <span class="drop-pill" id="pdfFileName" style="display:none;"></span>
+            </div>
+          </div>
+
+          <!-- Bilgi alanları -->
+          <div id="dosyaNoSection" style="display:none;">
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:auto auto;gap:10px;align-items:end;">
+              <div class="form-field" style="grid-column:1;">
+                <label>İhracat Dosya No</label>
+                <div style="display:flex;align-items:center;gap:6px;height:36px;">
+                  <select id="yilSecici1" onchange="localStorage.setItem('app_yil',this.value)"
+                    style="width:70px;height:36px;padding:0 8px;border:0.5px solid var(--border2);border-radius:7px;font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--surface);outline:none;flex-shrink:0;">
+                    <option selected>2026</option>
+                    <option>2027</option>
+                    <option>2028</option>
+                  </select>
+                  <span style="font-family:var(--mono);font-size:13px;color:var(--text3);flex-shrink:0;">-</span>
+                  <input class="target-input" id="ihracatDosyaNo" type="text" inputmode="numeric" placeholder="örn: 226"
+                    style="flex:1;height:36px;min-width:0;">
+                </div>
+              </div>
+              <div class="form-field" id="plakaSection" style="display:none;grid-column:2;">
+                <label>Plaka</label>
+                <input class="target-input" id="plakaInput" type="text" placeholder="34ABC123" style="height:36px;">
+              </div>
+              <div class="form-field" id="nakliyeSection" style="display:none;grid-column:3;">
+                <label>Nakliye Firması</label>
+                <input class="target-input" id="nakliyeInput" type="text" placeholder="örn: RAPID" style="height:36px;">
+              </div>
+              <div class="form-field" id="yuklemeTarihiSection" style="display:none;grid-column:1;grid-row:2;">
+                <label>Yükleme Tarihi</label>
+                <input class="target-input" id="yuklemeTarihiInput" type="date" style="height:36px;">
+              </div>
+              <div class="form-field" id="gumrukTarihiSection" style="display:none;grid-column:2;grid-row:2;">
+                <label>Gümrük Tarihi</label>
+                <input class="target-input" id="gumrukTarihiInput" type="date" style="height:36px;">
+              </div>
+            </div>
+          </div>
+
+          <div id="pdfDropZone" style="display:none;"><input type="file" id="pdfInput" accept=".pdf"
+              onchange="handlePdf(this.files[0])"></div>
+
+          <div class="pdf-info" id="pdfInfo">
+            <div class="pdf-row"><span class="pdf-key">📦 PACKAGES</span><span class="pdf-val" id="pdfKap">—</span>
+            </div>
+            <div class="pdf-row"><span class="pdf-key">🚢 FREIGHT</span><span class="pdf-val" id="pdfNavlun">—</span>
+            </div>
+            <div class="pdf-row"><span class="pdf-key">🛡 INSURANCE</span><span class="pdf-val" id="pdfSigorta">—</span>
+            </div>
+          </div>
+
+          <div class="eur-section" id="eurSection">
+            <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+              <input class="target-input" id="eurRateInput" type="text" inputmode="decimal" placeholder="örn: 36,50"
+                oninput="onEurRateChanged()" style="flex:1;">
+              <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
+            </div>
+            <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
+            <div id="usdRateRow" style="display:none;gap:8px;align-items:center;margin-bottom:10px;">
+              <input class="target-input" id="usdRateInput" type="text" inputmode="decimal" placeholder="örn: 34,00"
+                style="flex:1;">
+              <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
+            </div>
+            <div id="koFreightSection" style="display:none;">
+              <div class="eur-label">Freight (EUR)</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+                  placeholder="örn: 1200,00" style="flex:1;">
+                <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+              </div>
+              <div class="eur-label">Insurance (EUR)</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+                  placeholder="örn: 300,00" style="flex:1;">
+                <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="nav-row">
+            <div></div>
+            <button class="btn-secondary" id="step2Next" onclick="checkDosyaNoAndProceed()" style="display:none;">Devam
+              →</button>
+          </div>
+        </div>
+        <!-- Adım 3: KG Hesaplama -->
+        <div class="panel" id="step3" style="display:none;">
+          
+          <div class="status-box" id="statusBox"></div>
+          <div class="kg-panel" id="kgPanel" style="display:none;">
+            <div class="kg-header" onclick="toggleKgTable()">
+              <div class="kg-header-title">⚖️ Grup Kiloları <span class="kg-header-badge" id="kgBadge"></span></div>
+              <span id="kgArrow" style="color:var(--accent);font-size:12px;">▼</span>
+            </div>
+            <div class="kg-body" id="kgBody">
+              <table class="kg-table" id="kgTable">
+                <tr>
+                  <th>ÜRÜN ARA GRUBU</th>
+                  <th>Birim Kilo (KG)</th>
+                  <th style="color:var(--gold);">0/Boş satır</th>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="sku-panel" id="skuPanel">
+            <div class="sku-header" onclick="toggleExSku()">
+              <div class="kg-header-title" style="font-size:12px;">⚠️ İstisna SKU Listesi</div>
+              <span id="skuArrow" style="color:var(--accent);font-size:12px;">▼</span>
+            </div>
+            <div class="sku-body" id="skuBody">
+              <div class="sku-input-row">
+                <input class="sku-input" id="newExSku" placeholder="SKU kodu">
+                <input class="sku-kg-input" id="newExKg" type="text" inputmode="decimal" placeholder="kg">
+                <button class="btn-secondary" onclick="addExceptionSku()"
+                  style="padding:6px 12px;font-size:12px;">Ekle</button>
+              </div>
+              <div class="sku-list" id="exSkuList"></div>
+            </div>
+          </div>
+          <button class="btn-secondary" onclick="applyGroupWeights()" style="width:100%;">✓ Kiloları Uygula ve
+            Hesapla</button>
+          <div id="adjustSection" style="display:none;">
+            <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">Hesaplanan
+              toplam
+              BRÜT: <span id="calcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg</div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
+            <div class="target-row">
+              <input class="target-input" id="targetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
+              <button class="btn-secondary" onclick="applyWeightAdjust()">Uygula</button>
+            </div>
+            <div class="adjust-result" id="adjustResult"></div>
+          </div>
+          <div id="antrepoSection" style="display:none;margin-top:12px;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef NET (kg)</div>
+            <div class="target-row">
+              <input class="target-input" id="targetNet" type="text" inputmode="decimal" placeholder="örn: 7650,00">
+              <button class="btn-secondary" onclick="applyNetAdjust()">Uygula</button>
+            </div>
+            <div class="adjust-result" id="netResult"></div>
+          </div>
+          <div id="menseTaslakSection" style="display:none;">
+            <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Taslağa Menşe Ekle</div>
+            <div class="section-lbl">ÜLKE</div>
+            <div class="country-grid" id="menseUlkeGrid" style="margin-bottom:12px;"></div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:5px;">Referans No</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+              <select id="yilSecici2" onchange="localStorage.setItem('app_yil',this.value)"
+                style="font-family:var(--mono);font-size:13px;color:var(--text3);border:none;background:transparent;cursor:pointer;outline:none;padding:0;">
+                <option selected>2026</option>
+                <option>2027</option>
+                <option>2028</option>
+              </select><span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
+              <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
+            </div>
+            <div id="menseTaslakListe" style="margin-bottom:10px;">
+              <div
+                style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+                Kayıtlı Taslaklar</div>
+              <div id="menseTaslakListeIcerik">
+                <div
+                  style="font-size:12px;color:var(--text3);padding:12px;background:var(--surface2);border-radius:var(--radius-md);">
+                  ⏳ Yükleniyor...</div>
+              </div>
+            </div>
+            <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">⬇
+              Menşe Taslak İndir</button>
+          </div>
+          <div class="mense-box" id="menseBox">
+            <div class="mense-row">
+              <div>
+                <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
+                <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mense-val" id="menseTrBrut">— kg</div>
+                <div class="mense-sub" id="menseTrNet">NET: —</div>
+              </div>
+            </div>
+            <div class="mense-row">
+              <div>
+                <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
+                <div class="mense-sub">Diğer tüm menşeler</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mense-val" id="menseOtherBrut">— kg</div>
+                <div class="mense-sub" id="menseOtherNet">NET: —</div>
+              </div>
+            </div>
+          </div>
+          <div class="nav-row"><button class="btn-ghost" onclick="goStep(1)">← Geri</button></div>
+          <button class="btn-primary" id="downloadBtn" onclick="downloadResult()">⬇ INV + PL İndir</button>
+        </div>
+
+        <!-- ── TASLAK DOLDUR ───────────────────────────────────────────────── -->
+        <div class="panel" id="stepTaslak" style="display:none;">
+          <div class="status-box" id="taslakStatus"></div>
+          <div id="taslakKayitliSection" style="display:none;margin-bottom:18px;">
+            <div class="section-lbl">Kayıtlı Taslaklar</div>
+            <div id="taslakKayitliListe"></div>
+          </div>
+          <div>
+            <div class="country-search-row">
+              <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
+                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+                <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              <input type="text" id="taslakCountrySearch" class="country-search-input" placeholder="Ülke ara..."
+                oninput="filterTaslakCountryList()">
+            </div>
+            <div class="country-groups-wrapper">
+              <div class="country-group" id="tcgroup-kurumsal">
+                <div class="country-group-header" onclick="toggleTaslakCountryGroup('kurumsal')">
+                  <span class="country-group-label">Kurumsal</span>
+                  <div class="country-group-meta"><span class="country-group-count" id="tccount-kurumsal">9</span><span
+                      class="country-group-chevron open" id="tcchevron-kurumsal">▼</span></div>
+                </div>
+                <div class="country-group-body open" id="tcbody-kurumsal"></div>
+              </div>
+              <div class="country-group" id="tcgroup-franchise">
+                <div class="country-group-header" onclick="toggleTaslakCountryGroup('franchise')">
+                  <span class="country-group-label">Franchise</span>
+                  <div class="country-group-meta"><span class="country-group-count" id="tccount-franchise">8</span><span
+                      class="country-group-chevron open" id="tcchevron-franchise">▼</span></div>
+                </div>
+                <div class="country-group-body open" id="tcbody-franchise"></div>
+              </div>
+              <div class="country-group" id="tcgroup-toptan">
+                <div class="country-group-header" onclick="toggleTaslakCountryGroup('toptan')">
+                  <span class="country-group-label">Toptan</span>
+                  <div class="country-group-meta"><span class="country-group-count" id="tccount-toptan">2</span><span
+                      class="country-group-chevron open" id="tcchevron-toptan">▼</span></div>
+                </div>
+                <div class="country-group-body open" id="tcbody-toptan"></div>
+              </div>
+              <div class="country-group" id="tcgroup-devir">
+                <div class="country-group-header" onclick="toggleTaslakCountryGroup('devir')">
+                  <span class="country-group-label">Devir</span>
+                  <div class="country-group-meta"><span class="country-group-count" id="tccount-devir">1</span><span
+                      class="country-group-chevron open" id="tcchevron-devir">▼</span></div>
+                </div>
+                <div class="country-group-body open" id="tcbody-devir"></div>
+              </div>
+            </div>
+            <div id="taslakCountryNoResults"
+              style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
+            </div>
+          </div>
+          <div id="taslakDepoSection" style="display:none;">
             <div class="section-lbl">Depo Tipi</div>
-            <div class="mode-options" id="step2Options">
-              <div class="mode-btn" id="mode-serbest" onclick="selectDepo('serbest')">
+            <div class="mode-options" style="margin-bottom:16px;">
+              <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
                 <div class="mode-icon">🏭</div>
                 <div>
                   <div class="mode-title">Serbest Depo</div>
                 </div>
               </div>
-              <div class="mode-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
+              <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
                 <div class="mode-icon">🏗️</div>
                 <div>
                   <div class="mode-title">Antrepo</div>
-                  <div class="mode-desc">NET elle girilir</div>
+                </div>
+              </div>
+            </div>
+            <div id="taslakKompleWrap" style="display:none;margin-bottom:16px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;padding:11px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);">
+                <input type="checkbox" id="taslakKomple" onchange="taslakKompleDegisti()">
+                <span>📦 <span id="taslakKompleLabel">Komple Depo</span></span>
+                <span style="font-size:11px;color:var(--text3);font-weight:400;">— navlun ve sigortanın tamamı</span>
+              </label>
+            </div>
+          </div>
+          <div id="taslakFormSection" style="display:none;">
+            <div class="section-lbl">Bilgileri Girin</div>
+            <div id="taslakFormAlanlari"></div>
+            <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
+            <div style="display:flex;gap:10px;margin-top:14px;">
+              <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()"
+                style="display:none;width:auto;flex:1;">⬇ Taslak İndir</button>
+              <button class="btn-secondary" id="taslakKaydet" onclick="kaydetTaslakDraft()"
+                style="display:none;flex:0 0 auto;">💾 Kaydet</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── MENŞE HESAPLA ──────────────────────────────────────────────── -->
+        <div class="panel" id="stepMense" style="display:none;">
+          <div class="panel-label">Menşe Hesapla</div>
+          <div class="panel-title">Menşe Ayrımı</div>
+          <div class="panel-desc">Master Excel yükleyin, grup kilolarını girin, TR/Yabancı ayrımını hesaplayın.</div>
+          <div class="status-box" id="menseStatus"></div>
+          <div class="drop-zone" id="menseDropZone">
+            <input type="file" id="menseFileInput" accept=".xlsx,.xls,.pdf" multiple
+              onchange="handleMenseMultiFile(this.files)">
+            <div class="drop-icon"><svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round" />
+                <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg></div>
+            <h3>Excel ve PDF birlikte sürükleyin</h3>
+            <p>veya tıklayarak seçin · aynı anda ikisi de yüklenebilir</p>
+            <div class="drop-pills"><span class="drop-pill">.xlsx</span><span class="drop-pill">.pdf</span></div>
+            <div class="file-badge" id="menseFileBadge" style="display:none;"></div>
+            <div class="file-badge" id="mensePdfBadge" style="display:none;margin-top:6px;"></div>
+          </div>
+          <div class="kg-panel" id="menseKgPanel" style="display:none;">
+            <div class="kg-header" onclick="toggleMenseKgTable()">
+              <div class="kg-header-title">⚖️ Grup Kiloları <span class="kg-header-badge" id="menseKgBadge"></span>
+              </div>
+              <span id="menseKgArrow" style="color:var(--accent);font-size:12px;">▼</span>
+            </div>
+            <div class="kg-body" id="menseKgBody">
+              <table class="kg-table" id="menseKgTable">
+                <tr>
+                  <th>ÜRÜN ARA GRUBU</th>
+                  <th>Birim Kilo (KG)</th>
+                  <th style="color:var(--gold);">0/Boş satır</th>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <button class="btn-secondary" id="menseApplyBtn" onclick="applyMenseWeights()"
+            style="display:none;width:100%;">✓ Kiloları Uygula ve Hesapla</button>
+          <div id="menseAdjustSection" style="display:none;">
+            <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">Hesaplanan
+              toplam
+              BRÜT: <span id="menseCalcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg</div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
+            <div class="target-row">
+              <input class="target-input" id="menseTargetWeight" type="text" inputmode="decimal"
+                placeholder="örn: 8500,00">
+              <button class="btn-secondary" onclick="applyMenseWeightAdjust()">Uygula</button>
+            </div>
+          </div>
+          <div class="mense-box" id="menseResultBox">
+            <div class="mense-row">
+              <div>
+                <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
+                <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mense-val" id="menseResTrBrut">— kg</div>
+                <div class="mense-sub" id="menseResTrNet">NET: —</div>
+              </div>
+            </div>
+            <div class="mense-row">
+              <div>
+                <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
+                <div class="mense-sub">Diğer tüm menşeler</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mense-val" id="menseResOtherBrut">— kg</div>
+                <div class="mense-sub" id="menseResOtherNet">NET: —</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── GTİP KONTROL ───────────────────────────────────────────────── -->
+        <div class="panel" id="stepGtip" style="display:none;">
+
+          <div class="status-box" id="gtipResultBox"></div>
+          <div class="drop-zone" id="gtipDropZone">
+            <input type="file" accept=".xlsx,.xls,.pdf" multiple onchange="handleGtipMultiFile(this.files)">
+            <div class="drop-icon">🔎</div>
+            <h3>Master Excel ve PDF yükleyin</h3>
+            <p>Excel zorunlu · PDF varsa menşe taslağına aktarılır</p>
+            <div class="drop-pills">
+              <span class="drop-pill">.xlsx</span>
+              <span class="drop-pill">.pdf</span>
+            </div>
+            <div class="file-badge" id="gtipFileName" style="display:none;"></div>
+            <div class="file-badge" id="gtipPdfName" style="display:none;margin-top:6px;"></div>
+          </div>
+          <div id="gtipErrorPanel" style="display:none;margin-top:14px;">
+            <div class="section-lbl">Sorunlu GTİP'ler</div>
+            <div id="gtipErrorList"></div>
+          </div>
+        </div>
+
+        <!-- ── EK EVRAK ───────────────────────────────────────────────────── -->
+        <!-- <div class="panel" id="stepEvrak" style="display:none;">
+          <div class="panel-label">Ek Evrak</div>
+          <div class="panel-title">Ek Evrak Üret</div>
+          <div class="panel-desc">Ülke ve evrak tipini seçin, bilgileri girin, PDF olarak indirin.</div>
+          <div class="status-box" id="evrakStatus"></div>
+          <div class="section-lbl" style="margin-top:4px;">Ülke</div>
+          <div class="country-grid" id="evrakUlkeGrid" style="margin-bottom:16px;"></div>
+          <div id="evrakTipSection" style="display:none;">
+            <div class="section-lbl">Evrak Türü</div>
+            <div id="evrakTipGrid" style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px;"></div>
+          </div>
+          <div id="evrakFormSection" style="display:none;">
+            <div class="section-lbl">Bilgileri Girin</div>
+            <div id="evrakFormAlanlari"></div>
+          </div>
+          <button class="btn-primary visible" id="evrakIndir" onclick="indirEvrak()"
+            style="display:none;margin-top:14px;">⬇ PDF İndir</button>
+        </div> -->
+
+        <!-- ── MALİYET EVRAK ─────────────────────────────────────────────── -->
+        <div class="panel me-shell" id="stepMaliyetEvrak" style="display:none;">
+
+          <div class="me-header">
+            <div class="me-heading">
+              <div class="me-kicker">Maliyet operasyonları</div>
+            </div>
+            <div class="me-header-metrics" aria-label="Maliyet evrak özeti">
+              <div class="me-metric">
+                <i class="ti ti-file-upload" aria-hidden="true"></i>
+                <div>
+                  <span>6</span>
+                  <small>PDF akışı</small>
+                </div>
+              </div>
+              <div class="me-metric">
+                <i class="ti ti-keyboard" aria-hidden="true"></i>
+                <div>
+                  <span>2</span>
+                  <small>Elle giriş</small>
+                </div>
+              </div>
+              <div class="me-metric">
+                <i class="ti ti-world" aria-hidden="true"></i>
+                <div>
+                  <span>8</span>
+                  <small>Ülke</small>
                 </div>
               </div>
             </div>
           </div>
 
-        <!-- Ülke arama -->
-        <div>
-          <div class="country-search-row">
-            <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input type="text" id="countrySearchInput" class="country-search-input" placeholder="Ülke ara..." oninput="filterCountryList()">
-          </div>
+          <div class="me-grid">
 
-          <div class="country-groups-wrapper">
-            <div class="country-group" id="cgroup-kurumsal">
-              <div class="country-group-header" onclick="toggleCountryGroup('kurumsal')">
-                <span class="country-group-label">Kurumsal</span>
-                <div class="country-group-meta">
-                  <span class="country-group-count" id="ccount-kurumsal">9</span>
-                  <span class="country-group-chevron open" id="cchevron-kurumsal">▼</span>
+            <!-- Sırbistan Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/rs.png" alt="RS">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Sırbistan</div>
+                  <div class="me-card-sub">Gümrük &amp; Brokerage PDF</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">Önce sevkiyatı seçin, PDF'i yükleyin — değerler otomatik yazılır.</div>
+              <div class="me-select-row">
+                <select id="me-rs-select" class="me-select">
+                  <option value="">— Sırbistan sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadRsShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-rs-select-status" class="me-select-status"></div>
+              <div id="me-rs-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleRsPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-rs-input').click()">
+                <input type="file" id="me-rs-input" accept=".pdf" style="display:none;" onchange="meHandleRsPdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-rs-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
                 </div>
               </div>
-              <div class="country-group-body open" id="cbody-kurumsal">
-                <div class="country-row" id="country-rs" onclick="selectCountry('rs')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/rs.png" alt="">
-                  <span class="country-row-name">Sırbistan</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div id="me-rs-result" class="me-result" style="display:none;"></div>
+            </div>
+
+            <!-- Bosna Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/ba.png" alt="BA">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Bosna</div>
+                  <div class="me-card-sub">Spediter (Broker) &amp; ASYCUDA Vergi Evrakı</div>
                 </div>
-                <div class="country-row" id="country-kz" onclick="selectCountry('kz')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/kz.png" alt="">
-                  <span class="country-row-name">Kazakistan</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="me-pill me-pill-manual">Elle Giriş</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, tutarları BAM olarak elle girin. Broker = Osnovica − Carinski dug (OBRACUN CARINSKOG DUGA) otomatik hesaplanır. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
+              </div>
+              <div class="me-select-row">
+                <select id="me-ba-select" class="me-select">
+                  <option value="">— Bosna sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadBaShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-ba-select-status" class="me-select-status"></div>
+
+              <div class="me-manual-box">
+                <div class="me-manual-formula"><i class="ti ti-calculator"></i> Broker = Osnovica − Carinski dug</div>
+                <div class="me-field-grid cols-2">
+                  <div class="me-field">
+                    <label>Osnovica (BAM)</label>
+                    <input type="number" id="me-ba-manual-osnovica" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                  </div>
+                  <div class="me-field">
+                    <label>Carinski dug (BAM)</label>
+                    <input type="number" id="me-ba-manual-carinski" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                  </div>
                 </div>
-                <div class="country-row" id="country-ba" onclick="selectCountry('ba')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/ba.png" alt="">
-                  <span class="country-row-name">Bosna</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div id="me-ba-manual-broker-eur" class="me-manual-total">Broker = 0,00 BAM → 0,00 €</div>
+
+                <div class="me-field-grid cols-2">
+                  <div class="me-field">
+                    <label>Vergi / 001 (BAM)</label>
+                    <input type="number" id="me-ba-manual-vergi" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <div id="me-ba-manual-vergi-eur" class="me-field-eur">= 0,00 €</div>
+                  </div>
+                  <div class="me-field">
+                    <label>KDV / 090 (BAM)</label>
+                    <input type="number" id="me-ba-manual-kdv" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <div id="me-ba-manual-kdv-eur" class="me-field-eur">= 0,00 €</div>
+                  </div>
                 </div>
-                <div class="country-row" id="country-ge" onclick="selectCountry('ge')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/ge.png" alt="">
-                  <span class="country-row-name">Gürcistan</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-xk" onclick="selectCountry('xk')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/xk.png" alt="">
-                  <span class="country-row-name">Kosova</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-mk" onclick="selectCountry('mk')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/mk.png" alt="">
-                  <span class="country-row-name">Makedonya</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-be" onclick="selectCountry('be')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/be.png" alt="">
-                  <span class="country-row-name">Belçika</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-de" onclick="selectCountry('de')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/de.png" alt="">
-                  <span class="country-row-name">Almanya</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-nl" onclick="selectCountry('nl')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/nl.png" alt="">
-                  <span class="country-row-name">Hollanda</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
+                <button class="me-btn-save" onclick="meBaManualSave()">Kaydet</button>
+                <div id="me-ba-manual-status" class="me-manual-status"></div>
               </div>
             </div>
 
-            <div class="country-group" id="cgroup-franchise">
-              <div class="country-group-header" onclick="toggleCountryGroup('franchise')">
-                <span class="country-group-label">Franchise</span>
-                <div class="country-group-meta">
-                  <span class="country-group-count" id="ccount-franchise">7</span>
-                  <span class="country-group-chevron open" id="cchevron-franchise">▼</span>
+            <!-- Makedonya Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/mk.png" alt="MK">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Makedonya</div>
+                  <div class="me-card-sub">Gümrük Vergi Evrakı (Elle Giriş)</div>
+                </div>
+                <span class="me-pill me-pill-manual">Elle Giriş</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, tutarları MKD (Makedon Dinarı) olarak elle girin — taranmış evraktan otomatik okunamaz, sevk başına tek kayıt vardır. Broker her sevkiyata otomatik 120 € yazılır, gerekirse düzenleyin. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
+              </div>
+              <div class="me-select-row">
+                <select id="me-mk-select" class="me-select">
+                  <option value="">— Makedonya sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadMkShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-mk-select-status" class="me-select-status"></div>
+
+              <div class="me-manual-box">
+                <div class="me-field">
+                  <label>Broker (EUR, sevk başına otomatik)</label>
+                  <input type="number" id="me-mk-manual-broker" step="0.01" placeholder="120.00" oninput="meMkManualPreview()">
+                </div>
+                <div class="me-field-grid cols-3">
+                  <div class="me-field">
+                    <label>Vergi / Tax (MKD)</label>
+                    <input type="number" id="me-mk-manual-vergi" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <div id="me-mk-manual-vergi-eur" class="me-field-eur">= 0,00 €</div>
+                  </div>
+                  <div class="me-field">
+                    <label>KDV (MKD)</label>
+                    <input type="number" id="me-mk-manual-kdv" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <div id="me-mk-manual-kdv-eur" class="me-field-eur">= 0,00 €</div>
+                  </div>
+                  <div class="me-field">
+                    <label>Other Costs (MKD)</label>
+                    <input type="number" id="me-mk-manual-other" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <div id="me-mk-manual-other-eur" class="me-field-eur">= 0,00 €</div>
+                  </div>
+                </div>
+                <button class="me-btn-save" onclick="meMkManualSave()">Kaydet</button>
+                <div id="me-mk-manual-status" class="me-manual-status"></div>
+              </div>
+            </div>
+
+            <!-- Gürcistan Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/ge.png" alt="GE">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Gürcistan</div>
+                  <div class="me-card-sub">Broker &amp; İthalat Beyannamesi PDF</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, PDF tipini belirtin ve yükleyin. Gruplu araçlarda broker/KDV fatura bedellerine orantılı dağıtılır; vergi ANT faturasına yazılır.
+              </div>
+              <div class="me-select-row">
+                <select id="me-ge-select" class="me-select">
+                  <option value="">— Gürcistan sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadGeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-ge-select-status" class="me-select-status"></div>
+              <div id="me-ge-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleGePdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-ge-input').click()">
+                <input type="file" id="me-ge-input" accept=".pdf" style="display:none;" onchange="meHandleGePdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-ge-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın (Broker veya IM)</div>
                 </div>
               </div>
-              <div class="country-group-body open" id="cbody-franchise">
-                <div class="country-row" id="country-cy" onclick="selectCountry('cy')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/cy.png" alt="">
-                  <span class="country-row-name">Kıbrıs</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div id="me-ge-result" class="me-result" style="display:none;"></div>
+            </div>
+
+            <!-- Kosova Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/xk.png" alt="XK">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Kosova</div>
+                  <div class="me-card-sub">Gümrük Ödeme Emri (Urdhërpagesë)</div>
                 </div>
-                <div class="country-row" id="country-iq" onclick="selectCountry('iq')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/iq.png" alt="">
-                  <span class="country-row-name">Irak</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-ly" onclick="selectCountry('ly')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/ly.png" alt="">
-                  <span class="country-row-name">Libya</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-lr" onclick="selectCountry('lr')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/lr.png" alt="">
-                  <span class="country-row-name">Liberya</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-lb" onclick="selectCountry('lb')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/lb.png" alt="">
-                  <span class="country-row-name">Lübnan</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-uz" onclick="selectCountry('uz')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/uz.png" alt="">
-                  <span class="country-row-name">Özbekistan</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="country-row" id="country-ru" onclick="selectCountry('ru')">
-                  <img class="country-row-flag" src="https://flagcdn.com/40x30/ru.png" alt="">
-                  <span class="country-row-name">Rusya</span>
-                  <svg class="country-row-check" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin ve PDF'i yükleyin. Gruplu araçlarda vergi (Dogana) ve KDV (TVSH), fatura bedellerine orantılı dağıtılır. Broker masrafı her sevkiyata otomatik 300 EUR yazılır.
+              </div>
+              <div class="me-select-row">
+                <select id="me-ko-select" class="me-select">
+                  <option value="">— Kosova sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadKoShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-ko-select-status" class="me-select-status"></div>
+              <div id="me-ko-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleKoPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-ko-input').click()">
+                <input type="file" id="me-ko-input" accept=".pdf" style="display:none;" onchange="meHandleKoPdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-ko-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
                 </div>
               </div>
+              <div id="me-ko-result" class="me-result" style="display:none;"></div>
             </div>
-          </div>
 
-          <div id="countryNoResults" style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı</div>
-        </div>
-
-        <!-- KZ gruplandırma modu -->
-        <div id="kzModeSection" style="display:none;">
-          <div class="section-lbl">Çıktı Türü</div>
-          <div class="mode-options">
-            <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
-              <div class="mode-icon">🗜️</div>
-              <div><div class="mode-title">Gruplandır</div><div class="mode-desc">SKU bazında birleştir</div></div>
+            <!-- Kazakistan Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/kz.png" alt="KZ">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Kazakistan</div>
+                  <div class="me-card-sub">Gümrük Beyannamesi &amp; Broker Faturası</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, PDF'i yükleyin. Beyannamede kod 1010+2010 → vergi, kod 5060 → KDV. Broker faturasında "Итого" (KDV hariç) → brokerage. Her fatura/beyanname sadece seçili sevkiyata yazılır — gruplu araçlarda dağıtım yapılmaz.
+              </div>
+              <div class="me-select-row">
+                <select id="me-kz-select" class="me-select">
+                  <option value="">— Kazakistan sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadKzShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-kz-select-status" class="me-select-status"></div>
+              <div id="me-kz-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleKzPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-kz-input').click()">
+                <input type="file" id="me-kz-input" accept=".pdf" style="display:none;" onchange="meHandleKzPdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-kz-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın (Beyanname veya Broker)</div>
+                </div>
+              </div>
+              <div id="me-kz-result" class="me-result" style="display:none;"></div>
             </div>
-            <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
-              <div class="mode-icon">📋</div>
-              <div><div class="mode-title">Ham Veri</div><div class="mode-desc">Tüm satırlar</div></div>
+
+            <!-- Almanya Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/de.png" alt="DE">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Almanya</div>
+                  <div class="me-card-sub">Rechnung (Gümrük/Zollservice Faturası)</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, PDF'i yükleyin. Tutarlar zaten EUR — kur çevrimi yapılmaz. Tek evrak sadece seçili sevkiyata yazılır, oranlama yapılmaz.
+              </div>
+              <div class="me-select-row">
+                <select id="me-de-select" class="me-select">
+                  <option value="">— Almanya sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadDeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-de-select-status" class="me-select-status"></div>
+              <div id="me-de-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleDePdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-de-input').click()">
+                <input type="file" id="me-de-input" accept=".pdf" style="display:none;" onchange="meHandleDePdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-de-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
+                </div>
+              </div>
+              <div id="me-de-result" class="me-result" style="display:none;"></div>
             </div>
-          </div>
-        </div>
 
-        <!-- ── DOSYA YÜKLEME ALANI ──────────────────────────────────────── -->
-        <div id="dropZone" class="drop-zone" style="display:none;">
-          <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf" multiple
-                 onchange="handleMultiFile(this.files)">
-          <div class="drop-icon">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3>Excel ve PDF sürükleyin veya seçin</h3>
-          <p>Aynı anda ikisi de yüklenebilir</p>
-          <div class="drop-pills">
-            <span class="drop-pill">.xlsx</span>
-            <span class="drop-pill">.pdf</span>
-          </div>
-          <div class="file-badge" id="fileName" style="display:none;"></div>
-          <div class="file-badge" id="pdfFileName" style="display:none;margin-top:6px;"></div>
-        </div>
-
-        <!-- Gizli pdf input — wizard.js uyumluluğu -->
-        <div id="pdfDropZone" style="display:none;">
-          <input type="file" id="pdfInput" accept=".pdf" onchange="handlePdf(this.files[0])">
-        </div>
-
-        <!-- PDF bilgileri -->
-        <div class="pdf-info" id="pdfInfo">
-          <div class="pdf-row">
-            <span class="pdf-key">📦 PACKAGES</span>
-            <span class="pdf-val" id="pdfKap">—</span>
-          </div>
-          <div class="pdf-row">
-            <span class="pdf-key">🚢 FREIGHT</span>
-            <span class="pdf-val" id="pdfNavlun">—</span>
-          </div>
-          <div class="pdf-row">
-            <span class="pdf-key">🛡 INSURANCE</span>
-            <span class="pdf-val" id="pdfSigorta">—</span>
-          </div>
-        </div>
-
-        <!-- EUR/USD kur girişi -->
-        <div class="eur-section" id="eurSection">
-          <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-            <input class="target-input" id="eurRateInput" type="text" inputmode="decimal"
-              placeholder="örn: 36,50" oninput="onEurRateChanged()" style="flex:1;">
-            <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
-          </div>
-          <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
-          <div id="usdRateRow" style="display:none;gap:8px;align-items:center;margin-bottom:10px;">
-            <input class="target-input" id="usdRateInput" type="text" inputmode="decimal"
-              placeholder="örn: 34,00" style="flex:1;">
-            <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
-          </div>
-          <div id="koFreightSection" style="display:none;">
-            <div class="eur-label">Freight (EUR)</div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-              <input class="target-input" id="koFreightInput" type="text" inputmode="decimal" placeholder="örn: 1200,00" style="flex:1;">
-              <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+            <!-- Hollanda Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/nl.png" alt="NL">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Hollanda</div>
+                  <div class="me-card-sub">NedLine Gümrük/Broker Faturası</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                Sevkiyatı seçin, PDF'i yükleyin. Tutarlar zaten EUR — kur çevrimi yapılmaz. CC + T1 + CCHS → Broker and other costs; Invoerrechten + Fee (TAX + TAXFEE) → Tax. Tek evrak sadece seçili sevkiyata yazılır, oranlama yapılmaz.
+              </div>
+              <div class="me-select-row">
+                <select id="me-nl-select" class="me-select">
+                  <option value="">— Hollanda sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadNlShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-nl-select-status" class="me-select-status"></div>
+              <div id="me-nl-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleNlPdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-nl-input').click()">
+                <input type="file" id="me-nl-input" accept=".pdf" style="display:none;" onchange="meHandleNlPdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-nl-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
+                </div>
+              </div>
+              <div id="me-nl-result" class="me-result" style="display:none;"></div>
             </div>
-            <div class="eur-label">Insurance (EUR)</div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-              <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal" placeholder="örn: 300,00" style="flex:1;">
-              <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+
+            <!-- Belçika Bölümü -->
+            <div class="me-card">
+              <div class="me-card-head">
+                <img class="me-flag" src="https://flagcdn.com/48x36/be.png" alt="BE">
+                <div class="me-card-head-text">
+                  <div class="me-card-title">Belçika</div>
+                  <div class="me-card-sub">Intertrans Broker Faturası (ANT+IHR Birleşik)</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF</span>
+              </div>
+              <div class="me-card-desc">
+                ANT veya IHR sevkiyatını seçin, tek faturayı yükleyin — grup otomatik bulunur. INVOERRECHTEN → ANT vergi, BIJKOMENDE DOUANE-TARIEVEN → IHR vergi; ADMINISTRATIEVE KOSTEN + IMPORT DOUANEFORMALITEITEN yarı yarıya her iki broker alanına yazılır. Tutarlar zaten EUR.
+              </div>
+              <div class="me-select-row">
+                <select id="me-be-select" class="me-select">
+                  <option value="">— Belçika sevkiyatı seçin —</option>
+                </select>
+                <button class="me-refresh-btn" onclick="meLoadBeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+              </div>
+              <div id="me-be-select-status" class="me-select-status"></div>
+              <div id="me-be-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleBePdf(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-be-input').click()">
+                <input type="file" id="me-be-input" accept=".pdf" style="display:none;" onchange="meHandleBePdf(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-be-status" class="me-dz-status">PDF'i buraya sürükleyin veya tıklayın</div>
+                </div>
+              </div>
+              <div id="me-be-result" class="me-result" style="display:none;"></div>
             </div>
+
           </div>
         </div>
 
-        <div class="nav-row">
-          <div></div>
-          <button class="btn-secondary" id="step2Next" onclick="goStep(2)" style="display:none;">Devam →</button>
-        </div>
-      </div>
-
-      <!-- ── ADIM 3: KG HESAPLAMA ───────────────────────────────────────── -->
-      <div class="panel" id="step3" style="display:none;">
-        <div class="panel-label">Adım 3</div>
-        <div class="panel-title">Kilo Hesaplama</div>
-        <div class="panel-desc">BRÜT/NET kilolarını girin ve hesaplayın.</div>
-
-        <div class="status-box" id="statusBox"></div>
-
-        <div class="kg-panel" id="kgPanel" style="display:none;">
-          <div class="kg-header" onclick="toggleKgTable()">
-            <div class="kg-header-title">
-              ⚖️ Grup Kiloları
-              <span class="kg-header-badge" id="kgBadge"></span>
-            </div>
-            <span id="kgArrow" style="color:var(--accent);font-size:12px;">▼</span>
-          </div>
-          <div class="kg-body" id="kgBody">
-            <table class="kg-table" id="kgTable">
-              <tr>
-                <th>ÜRÜN ARA GRUBU</th>
-                <th>Birim Kilo (KG)</th>
-                <th style="color:var(--gold);">0/Boş satır</th>
-              </tr>
-            </table>
-          </div>
+        <!-- ── SON İŞLEMLER ───────────────────────────────────────────────── -->
+        <div class="panel" id="stepGecmis" style="display:none;">
+          <div class="panel-label">Son İşlemler</div>
+          <div class="panel-title">Kayıtlı Dosyalar</div>
+          <div class="panel-desc">Son 36 saatteki işlemler. Seçince dosyayı tekrar indirebilirsin.</div>
+          <div class="status-box" id="gecmisStatus"></div>
+          <div id="gecmisList" style="margin-top:8px;"></div>
         </div>
 
-        <div class="sku-panel" id="skuPanel">
-          <div class="sku-header" onclick="toggleExSku()">
-            <div class="kg-header-title" style="font-size:12px;">⚠️ İstisna SKU Listesi</div>
-            <span id="skuArrow" style="color:var(--accent);font-size:12px;">▼</span>
-          </div>
-          <div class="sku-body" id="skuBody">
-            <div class="sku-input-row">
-              <input class="sku-input" id="newExSku" placeholder="SKU kodu">
-              <input class="sku-kg-input" id="newExKg" type="text" inputmode="decimal" placeholder="kg">
-              <button class="btn-secondary" onclick="addExceptionSku()" style="padding:6px 12px;font-size:12px;">Ekle</button>
-            </div>
-            <div class="sku-list" id="exSkuList"></div>
-          </div>
-        </div>
+        <!-- ── KULLANICILAR ────────────────────────────────────────────────── -->
+        <div class="panel" id="stepUsers" style="display:none;"></div>
 
-        <button class="btn-secondary" onclick="applyGroupWeights()" style="width:100%;">
-          ✓ Kiloları Uygula ve Hesapla
-        </button>
+        <div class="panel" id="stepPermissions" style="display:none;"></div>
 
-        <div id="adjustSection" style="display:none;">
-          <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">
-            Hesaplanan toplam BRÜT: <span id="calcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg
-          </div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
-          <div class="target-row">
-            <input class="target-input" id="targetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
-            <button class="btn-secondary" onclick="applyWeightAdjust()">Uygula</button>
-          </div>
-          <div class="adjust-result" id="adjustResult"></div>
-        </div>
-
-        <div id="antrepoSection" style="display:none;margin-top:12px;">
-          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef NET (kg)</div>
-          <div class="target-row">
-            <input class="target-input" id="targetNet" type="text" inputmode="decimal" placeholder="örn: 7650,00">
-            <button class="btn-secondary" onclick="applyNetAdjust()">Uygula</button>
-          </div>
-          <div class="adjust-result" id="netResult"></div>
-        </div>
-
-        <div id="menseTaslakSection" style="display:none;">
-          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Taslağa Menşe Ekle</div>
-          <div class="section-lbl">ÜLKE</div>
-          <div class="country-grid" id="menseUlkeGrid" style="margin-bottom:12px;"></div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:5px;">Referans No</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-            <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">2026-</span>
-            <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
-          </div>
-          <div class="file-badge" id="menseTaslakYuklendi" style="display:none;margin-bottom:10px;"></div>
-          <div class="drop-zone" id="menseTaslakDropZone" style="padding:18px;margin-bottom:10px;">
-            <input type="file" accept=".xlsx,.xls" onchange="handleMenseTaslakFile(this.files[0])">
-            <div class="drop-icon" style="font-size:18px;">📂</div>
-            <h3 style="font-size:13px;">Doldurulmuş taslağı yükle</h3>
-            <p style="font-size:11px;">Taslak Doldur'dan indirdiğin dosyayı yükle</p>
-            <div class="file-badge" id="menseTaslakDosya" style="display:none;"></div>
-          </div>
-          <button class="btn-secondary" id="menseTaslakIndir" onclick="triggerMenseTaslak()" style="width:100%;">
-            ⬇ Menşe Taslak İndir
-          </button>
-        </div>
-
-        <div class="mense-box" id="menseBox">
-          <div class="mense-row">
+        <div class="panel" id="stepAudit" style="display:none;">
+          <div class="panel-label">Yönetim</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div>
-              <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
-              <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
+              <div class="panel-title">İşlem Kayıtları</div>
+              <div class="panel-desc">Kim, ne zaman, hangi işlemi yaptı — sadece admin görebilir.</div>
             </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseTrBrut">— kg</div>
-              <div class="mense-sub" id="menseTrNet">NET: —</div>
-            </div>
+            <button class="btn-secondary" onclick="downloadAuditLogExcel()">⬇ Excel indir</button>
           </div>
-          <div class="mense-row">
-            <div>
-              <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
-              <div class="mense-sub">Diğer tüm menşeler</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseOtherBrut">— kg</div>
-              <div class="mense-sub" id="menseOtherNet">NET: —</div>
-            </div>
-          </div>
+          <div class="status-box" id="auditStatus"></div>
+          <div id="auditLogContainer"></div>
         </div>
 
-        <div class="nav-row">
-          <button class="btn-ghost" onclick="goStep(1)">← Geri</button>
-        </div>
+      </div><!-- /content-area -->
+    </div><!-- /main-area -->
+  </div><!-- /app-shell -->
 
-        <button class="btn-primary" id="downloadBtn" onclick="downloadResult()">
-          ⬇ INV + PL İndir
-        </button>
-      </div>
+  <script src="js/utils.js"></script>
+  <script src="js/countries.js"></script>
+  <script src="js/processor.js"></script>
+  <script src="js/sku.js"></script>
+  <script src="js/wizard.js"></script>
+  <script src="js/taslak.js?v=20260728-all-draft-save"></script>
+  <script src="js/gtip.js"></script>
+  <script src="js/evrak.js"></script>
+  <script src="js/t1ayrimi.js?v=20260729-be-baslik"></script>
+  <script src="js/mense.js"></script>
+  <script src="js/nebim-delivery.js?v=20260710-start-dashboard"></script>
+  <script src="js/shell.js?v=20260729-be-baslik"></script>
+  <script src="js/gecmis.js"></script>
+  <script src="js/auth.js?v=20260710-login-refresh"></script>
+  <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
+  <script src="js/users.js?v=20260710-admin-portal"></script>
+  <script src="js/audit-log.js"></script>
+  <script src="js/dashboard.js?v=20260710-ulke-donut-2"></script>
+  <script src="js/shipments.js?v=20260714-all-date-updates"></script>
+  <script src="js/landed-cost.js?v=20260703-modern-lc"></script>
+  <script src="js/vendor/chart.umd.js"></script>
+  <script src="js/maliyet.js?v=20260714-hide-all-country-detail"></script>
+  <script src="js/navlun.js?v=20260721-navlun-kaydet-btn-fix"></script>
+  <script src="js/import.js"></script>
 
-      <!-- ── TASLAK DOLDUR PANELİ ──────────────────────────────────────── -->
-      <div class="panel" id="stepTaslak" style="display:none;">
-        <div class="panel-label">Taslak Doldur</div>
-        <div class="panel-title">Fatura Taslağı</div>
-        <div class="panel-desc">Ülkeyi ve depo tipini seçin, formu doldurun.</div>
-        <div class="status-box" id="taslakStatus"></div>
+  <!-- ── İÇE AKTAR MODAL ───────────────────────────────────────────────── -->
+  <div id="import-overlay" onclick="closeImportModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;"></div>
+  <div id="import-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xl);
+    box-shadow:0 8px 32px rgba(0,0,0,0.16);z-index:301;
+    width:min(780px,92vw);max-height:85vh;overflow-y:auto;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 24px 14px;border-bottom:0.5px solid var(--border2);
+                position:sticky;top:0;background:var(--surface);z-index:1;
+                border-radius:var(--radius-xl) var(--radius-xl) 0 0;">
+      <div style="font-size:15px;font-weight:600;color:var(--text);">⬆ Toplu İçe Aktar</div>
+      <button onclick="closeImportModal()" style="width:28px;height:28px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
+               background:var(--surface2);color:var(--text2);font-size:16px;cursor:pointer;
+               display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+    <div style="padding:20px 24px;" id="stepImport"></div>
+  </div>
 
-        <!-- Ülke arama -->
-        <div>
-          <div class="country-search-row">
-            <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input type="text" id="taslakCountrySearch" class="country-search-input" placeholder="Ülke ara..." oninput="filterTaslakCountryList()">
-          </div>
-
-          <div class="country-groups-wrapper">
-            <div class="country-group" id="tcgroup-kurumsal">
-              <div class="country-group-header" onclick="toggleTaslakCountryGroup('kurumsal')">
-                <span class="country-group-label">Kurumsal</span>
-                <div class="country-group-meta">
-                  <span class="country-group-count" id="tccount-kurumsal">9</span>
-                  <span class="country-group-chevron open" id="tcchevron-kurumsal">▼</span>
-                </div>
-              </div>
-              <div class="country-group-body open" id="tcbody-kurumsal">
-                <!-- taslak.js buildTaslakUlkeGrid() ile doldurulur -->
-              </div>
-            </div>
-
-            <div class="country-group" id="tcgroup-franchise">
-              <div class="country-group-header" onclick="toggleTaslakCountryGroup('franchise')">
-                <span class="country-group-label">Franchise</span>
-                <div class="country-group-meta">
-                  <span class="country-group-count" id="tccount-franchise">7</span>
-                  <span class="country-group-chevron open" id="tcchevron-franchise">▼</span>
-                </div>
-              </div>
-              <div class="country-group-body open" id="tcbody-franchise">
-                <!-- taslak.js buildTaslakUlkeGrid() ile doldurulur -->
-              </div>
-            </div>
-          </div>
-
-          <div id="taslakCountryNoResults" style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı</div>
-        </div>
-
-        <div id="taslakDepoSection" style="display:none;">
-          <div class="section-lbl">Depo Tipi</div>
-          <div class="mode-options" style="margin-bottom:16px;">
-            <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
-              <div class="mode-icon">🏭</div>
-              <div><div class="mode-title">Serbest Depo</div></div>
-            </div>
-            <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
-              <div class="mode-icon">🏗️</div>
-              <div><div class="mode-title">Antrepo</div><div class="mode-desc">NET elle girilir</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div id="taslakFormSection" style="display:none;">
-          <div class="section-lbl">Bilgileri Girin</div>
-          <div id="taslakFormAlanlari"></div>
-          <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
-          <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()" style="display:none;margin-top:14px;">
-            ⬇ Taslak İndir
-          </button>
-        </div>
-      </div>
-
-      <!-- ── MENŞE HESAPLA PANELİ ──────────────────────────────────────── -->
-      <div class="panel" id="stepMense" style="display:none;">
-        <div class="panel-label">Menşe Hesapla</div>
-        <div class="panel-title">Menşe Ayrımı</div>
-        <div class="panel-desc">Master Excel yükleyin, grup kilolarını girin, TR/Yabancı ayrımını hesaplayın.</div>
-
-        <div class="status-box" id="menseStatus"></div>
-
-        <div class="drop-zone" id="menseDropZone">
-          <input type="file" id="menseFileInput" accept=".xlsx,.xls,.pdf" multiple
-                 onchange="handleMenseMultiFile(this.files)">
-          <div class="drop-icon">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M10 13V5M7 8l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3>Excel ve PDF birlikte sürükleyin</h3>
-          <p>veya tıklayarak seçin · aynı anda ikisi de yüklenebilir</p>
-          <div class="drop-pills">
-            <span class="drop-pill">.xlsx</span>
-            <span class="drop-pill">.pdf</span>
-          </div>
-          <div class="file-badge" id="menseFileBadge" style="display:none;"></div>
-          <div class="file-badge" id="mensePdfBadge" style="display:none;margin-top:6px;"></div>
-        </div>
-
-        <div class="kg-panel" id="menseKgPanel" style="display:none;">
-          <div class="kg-header" onclick="toggleMenseKgTable()">
-            <div class="kg-header-title">⚖️ Grup Kiloları <span class="kg-header-badge" id="menseKgBadge"></span></div>
-            <span id="menseKgArrow" style="color:var(--accent);font-size:12px;">▼</span>
-          </div>
-          <div class="kg-body" id="menseKgBody">
-            <table class="kg-table" id="menseKgTable">
-              <tr><th>ÜRÜN ARA GRUBU</th><th>Birim Kilo (KG)</th><th style="color:var(--gold);">0/Boş satır</th></tr>
-            </table>
-          </div>
-        </div>
-
-        <button class="btn-secondary" id="menseApplyBtn" onclick="applyMenseWeights()" style="display:none;width:100%;">
-          ✓ Kiloları Uygula ve Hesapla
-        </button>
-
-        <div id="menseAdjustSection" style="display:none;">
-          <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:6px;">
-            Hesaplanan toplam BRÜT: <span id="menseCalcTotal" style="color:var(--accent-text);font-weight:600;">—</span> kg
-          </div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:6px;">Hedef BRÜT (kg)</div>
-          <div class="target-row">
-            <input class="target-input" id="menseTargetWeight" type="text" inputmode="decimal" placeholder="örn: 8500,00">
-            <button class="btn-secondary" onclick="applyMenseWeightAdjust()">Uygula</button>
-          </div>
-        </div>
-
-        <div class="mense-box" id="menseResultBox">
-          <div class="mense-row">
-            <div>
-              <div class="mense-label mense-tr">🇹🇷 TR Menşe</div>
-              <div class="mense-sub">MENŞEİ Açıklama = TURKIYE</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseResTrBrut">— kg</div>
-              <div class="mense-sub" id="menseResTrNet">NET: —</div>
-            </div>
-          </div>
-          <div class="mense-row">
-            <div>
-              <div class="mense-label mense-other">🌍 Yabancı Menşe</div>
-              <div class="mense-sub">Diğer tüm menşeler</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="mense-val" id="menseResOtherBrut">— kg</div>
-              <div class="mense-sub" id="menseResOtherNet">NET: —</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── GTİP KONTROL PANELİ ──────────────────────────────────────── -->
-      <div class="panel" id="stepGtip" style="display:none;">
-        <div class="panel-label">GTİP Kontrol</div>
-        <div class="panel-title">GTİP Doğrulama</div>
-        <div class="panel-desc">Master Excel yükleyin. GTİP'ler referans listeye göre otomatik kontrol edilir.</div>
-
-        <div class="status-box" id="gtipResultBox"></div>
-
-        <div class="drop-zone" id="gtipDropZone">
-          <input type="file" accept=".xlsx,.xls" onchange="handleGtipFile(this.files[0])">
-          <div class="drop-icon">🔎</div>
-          <h3>Master Excel Yükle</h3>
-          <p>xlsx/xls dosyasını sürükleyin veya seçin</p>
-          <div class="file-badge" id="gtipFileName" style="display:none;"></div>
-        </div>
-
-        <div id="gtipErrorPanel" style="display:none;margin-top:14px;">
-          <div class="section-lbl">Sorunlu GTİP'ler</div>
-          <div id="gtipErrorList"></div>
-        </div>
-      </div>
-
-      <!-- ── EK EVRAK PANELİ ──────────────────────────────────────────── -->
-      <div class="panel" id="stepEvrak" style="display:none;">
-        <div class="panel-label">Ek Evrak</div>
-        <div class="panel-title">Ek Evrak Üret</div>
-        <div class="panel-desc">Ülke ve evrak tipini seçin, bilgileri girin, PDF olarak indirin.</div>
-        <div class="status-box" id="evrakStatus"></div>
-        <div class="section-lbl" style="margin-top:4px;">Ülke</div>
-        <div class="country-grid" id="evrakUlkeGrid" style="margin-bottom:16px;"></div>
-        <div id="evrakTipSection" style="display:none;">
-          <div class="section-lbl">Evrak Türü</div>
-          <div id="evrakTipGrid" style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px;"></div>
-        </div>
-        <div id="evrakFormSection" style="display:none;">
-          <div class="section-lbl">Bilgileri Girin</div>
-          <div id="evrakFormAlanlari"></div>
-        </div>
-        <button class="btn-primary visible" id="evrakIndir" onclick="indirEvrak()" style="display:none;margin-top:14px;">
-          ⬇ PDF İndir
-        </button>
-      </div>
-
-      <!-- ── SON İŞLEMLER PANELİ ─────────────────────────────────────────────── -->
-      <div class="panel" id="stepGecmis" style="display:none;">
-        <div class="panel-label">Son İşlemler</div>
-        <div class="panel-title">Kayıtlı Dosyalar</div>
-        <div class="panel-desc">Son 36 saatteki işlemler. Seçince dosyayı tekrar indirebilirsin.</div>
-        <div class="status-box" id="gecmisStatus"></div>
-        <div id="gecmisList" style="margin-top:8px;"></div>
-      </div>
-
-      <!-- ── KULLANICILAR PANELİ (admin only) ────────────────────────────────── -->
-      <div class="panel" id="stepUsers" style="display:none;">
-        <div class="panel-label">Yönetim</div>
-        <div class="panel-title">Kullanıcılar</div>
-        <div class="panel-desc">Kullanıcı ekle, sil veya şifre sıfırla.</div>
-
-        <div class="status-box" id="usersStatus"></div>
-
-        <!-- Kendi şifreni değiştir -->
-        <div class="card" style="margin-bottom:14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <div class="card-title" style="margin-bottom:0;">Şifremi Değiştir</div>
-            <button class="btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="showSelfChangePassForm()">🔑 Değiştir</button>
-          </div>
-          <div id="selfChangePassForm" style="display:none;margin-top:12px;">
-            <div class="users-field">
-              <label>Mevcut Şifre</label>
-              <input class="users-input" id="selfOldPass" type="password" placeholder="••••••">
-            </div>
-            <div class="users-field">
-              <label>Yeni Şifre</label>
-              <input class="users-input" id="selfNewPass" type="password" placeholder="en az 4 karakter">
-            </div>
-            <div class="users-form-btns">
-              <button class="btn-secondary" onclick="submitSelfChangePass()">Kaydet</button>
-              <button class="btn-ghost" onclick="document.getElementById('selfChangePassForm').style.display='none'">İptal</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Kullanıcı ekle butonu -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <div class="section-lbl" style="margin-bottom:0;">Kullanıcı Listesi</div>
-          <button class="btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="showAddUserForm()">+ Kullanıcı Ekle</button>
-        </div>
-
-        <!-- Kullanıcı ekleme formu -->
-        <div class="users-add-form" id="usersAddForm" style="display:none;">
-          <div class="users-form-title">Yeni Kullanıcı</div>
-          <div class="users-field">
-            <label>Ad Soyad</label>
-            <input class="users-input" id="newUserName" type="text" placeholder="örn: Ayşe Kaya">
-          </div>
-          <div class="users-field">
-            <label>Kullanıcı Adı</label>
-            <input class="users-input" id="newUserUsername" type="text" placeholder="örn: ayse (küçük harf)">
-          </div>
-          <div class="users-field">
-            <label>Şifre</label>
-            <input class="users-input" id="newUserPassword" type="password" placeholder="en az 4 karakter">
-          </div>
-          <div class="users-field">
-            <label>Rol</label>
-            <select class="users-select" id="newUserRole">
-              <option value="user">Kullanıcı</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div class="users-form-btns">
-            <button class="btn-secondary" onclick="submitAddUser()">Ekle</button>
-            <button class="btn-ghost" onclick="showAddUserForm()">İptal</button>
-          </div>
-        </div>
-
-        <!-- Şifre sıfırlama formu -->
-        <div class="users-change-pass-form" id="usersChangePassForm" style="display:none;">
-          <div class="users-form-title">Şifre Sıfırla — <span id="resetPassDisplayName"></span></div>
-          <input type="hidden" id="resetPassUsername">
-          <div class="users-field">
-            <label>Yeni Şifre</label>
-            <input class="users-input" id="resetPassNew" type="password" placeholder="en az 4 karakter">
-          </div>
-          <div class="users-form-btns">
-            <button class="btn-secondary" onclick="submitResetPass()">Kaydet</button>
-            <button class="btn-ghost" onclick="hideResetPassForm()">İptal</button>
-          </div>
-        </div>
-
-        <!-- Kullanıcı listesi -->
-        <div id="usersListContainer"></div>
-      </div>
-
-    </div><!-- /content-area -->
-  </div><!-- /main-area -->
-</div><!-- /app-shell -->
-
-<script src="js/countries.js"></script>
-<script src="js/processor.js"></script>
-<script src="js/sku.js"></script>
-<script src="js/wizard.js"></script>
-<script src="js/taslak.js"></script>
-<script src="js/gtip.js"></script>
-<script src="js/evrak.js"></script>
-<script src="js/mense.js"></script>
-<script src="js/shell.js"></script>
-<script src="js/gecmis.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/users.js"></script>
+  <!-- ── GRUPLAMA MODAL ─────────────────────────────────────────────────── -->
+  <div id="grupla-overlay" onclick="closeGruplaModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;"></div>
+  <div id="grupla-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xl);
+    padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.16);z-index:301;">
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">🔗 Sefer Grubu Oluştur</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">
+      Bu sevkiyatı aynı araca yüklenen diğer sevkiyatlarla grupla. Gruplanmış kayıtlar dashboard'da 1 sefer sayılır.
+    </div>
+    <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px;">Eklenecek sevkiyatlar:</div>
+    <div id="grupla-liste"
+      style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:16px;"></div>
+    <div id="grupla-status" style="font-size:12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeGruplaModal()"
+        style="padding:9px 20px;border-radius:var(--radius-md);border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);font-size:13px;cursor:pointer;">
+        İptal
+      </button>
+      <button onclick="saveGruplama()"
+        style="padding:9px 20px;border-radius:var(--radius-md);border:none;background:var(--accent);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;">
+        Grupla
+      </button>
+    </div>
+  </div>
 
 </body>
+
 </html>

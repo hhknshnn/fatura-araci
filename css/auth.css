@@ -7,15 +7,121 @@
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  padding: 20px;
+}
+
+.login-shell {
+  display: flex;
+  width: 100%;
+  max-width: 880px;
+  min-height: 520px;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(15,23,42,0.18);
+}
+
+/* ── SOL: TANITIM PANELİ ──────────────────────────────────────────────────── */
+.login-brand {
+  flex: 1.1;
+  background: linear-gradient(155deg, var(--sb-bg) 0%, #16213E 55%, var(--accent-text) 140%);
+  color: #E2E8F0;
+  padding: 40px 38px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+
+.login-brand-headline {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.4px;
+  margin-top: 36px;
+  color: #F8FAFC;
+}
+
+.login-brand-headline span {
+  color: #93C5FD;
+}
+
+.login-brand-sub {
+  font-size: 13px;
+  color: #94A3B8;
+  margin-top: 14px;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.login-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #CBD5E1;
+}
+
+.login-feature i {
+  font-size: 15px;
+  color: #93C5FD;
+  width: 18px;
+  text-align: center;
+}
+
+/* Temsili grafik — sabit, gerçek veriye bağlı olmayan görsel süsleme */
+.login-decor-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 72px;
+  margin-top: auto;
+  padding-top: 30px;
+}
+
+.login-decor-bar {
+  flex: 1;
+  height: var(--h);
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #60A5FA 0%, rgba(96,165,250,0.15) 100%);
+  opacity: 0.85;
+}
+
+.login-logo-mobile {
+  display: none;
 }
 
 .login-box {
+  flex: 1;
   background: var(--surface);
-  border: 0.5px solid var(--border2);
-  border-radius: var(--radius-xl);
-  padding: 36px 32px 28px;
-  width: 340px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  padding: 44px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: auto;
+}
+
+.login-form-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 22px;
 }
 
 .login-logo {
@@ -24,6 +130,13 @@
   gap: 10px;
   margin-bottom: 28px;
   justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .login-brand { display: none; }
+  .login-logo-mobile { display: flex; }
+  .login-shell { max-width: 400px; min-height: 0; box-shadow: none; }
+  .login-box { padding: 36px 30px 28px; border: 0.5px solid var(--border2); border-radius: var(--radius-xl); }
 }
 
 .login-title {
@@ -69,6 +182,25 @@
 .login-input:focus {
   border-color: var(--accent);
   background: var(--surface);
+}
+
+.login-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 12px;
+  color: var(--text2);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-remember input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .login-btn {

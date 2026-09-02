@@ -27,7 +27,7 @@ function handleMultiFile(files) {
   // Kıbrıs'a özel — dosyaları ayrı dizilere topla
   if (currentCountry === 'cy') {
     cyExcelFiles = [];
-    cyPdfFiles   = [];
+    cyPdfFiles = [];
     for (const file of files) {
       const ext = file.name.split('.').pop().toLowerCase();
       if (ext === 'pdf') cyPdfFiles.push(file);
@@ -39,6 +39,25 @@ function handleMultiFile(files) {
     badge.style.display = 'inline-flex';
     const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
     if (nextBtn && cyExcelFiles.length > 0) nextBtn.style.display = 'block';
+    // Kıbrıs: en az 1 dosya seçilince loaded ekle
+    const dz = document.getElementById('dropZone');
+    if (dz) dz.classList.add('loaded');
+
+    // Dosya bilgi alanlarını göster (Kıbrıs dahil tüm ülkelerde ortak)
+    if (cyExcelFiles.length > 0) {
+      const dosyaSec = document.getElementById('dosyaNoSection');
+      if (dosyaSec) dosyaSec.style.display = 'block';
+      const plakaSec = document.getElementById('plakaSection');
+      if (plakaSec) plakaSec.style.display = 'block';
+      const nakliyeSec = document.getElementById('nakliyeSection');
+      if (nakliyeSec) nakliyeSec.style.display = 'block';
+      const yuklemeSec = document.getElementById('yuklemeTarihiSection');
+      if (yuklemeSec) yuklemeSec.style.display = 'block';
+      const gumrukSec = document.getElementById('gumrukTarihiSection');
+      if (gumrukSec) gumrukSec.style.display = 'block';
+      const gumrukEl = document.getElementById('gumrukTarihiInput');
+      if (gumrukEl && !gumrukEl.value) gumrukEl.value = new Date().toISOString().split('T')[0];
+    }
     return;
   }
   // Diğer ülkeler — mevcut kod aynen
@@ -58,10 +77,33 @@ function handleFile(file) {
   const badge = document.getElementById('fileName');
   badge.textContent = '✓ ' + file.name;
   badge.style.display = 'inline-flex';
+  const dosyaSec = document.getElementById('dosyaNoSection');
+  if (dosyaSec) dosyaSec.style.display = 'block';
+  const plakaSec = document.getElementById('plakaSection');
+  if (plakaSec) plakaSec.style.display = 'block';
+  const nakliyeSec = document.getElementById('nakliyeSection');
+  if (nakliyeSec) nakliyeSec.style.display = 'block';
+  const yuklemeSec = document.getElementById('yuklemeTarihiSection');
+  if (yuklemeSec) yuklemeSec.style.display = 'block';
+  const gumrukSec = document.getElementById('gumrukTarihiSection');
+  if (gumrukSec) gumrukSec.style.display = 'block';
+  const gumrukEl = document.getElementById('gumrukTarihiInput');
+  if (gumrukEl && !gumrukEl.value) gumrukEl.value = new Date().toISOString().split('T')[0];
+  // Excel yüklenince drop zone'a loaded class ekle
+  const dz = document.getElementById('dropZone');
+  if (dz) dz.classList.add('loaded');
+  window._excelLoading = true;
+  const nextBtnEarly = document.getElementById('step2Next') || document.getElementById('step4Next');
+  if (nextBtnEarly) nextBtnEarly.style.display = 'none';
+
   const r = new FileReader();
   r.onload = e => {
     lastFileData = e.target.result;
     loadFile(lastFileData);
+  };
+  r.onerror = () => {
+    window._excelLoading = false;
+    if (badge) { badge.textContent = '⚠ Excel okunamadı'; badge.style.color = 'var(--error)'; }
   };
   r.readAsArrayBuffer(file);
 }
@@ -71,6 +113,11 @@ function handlePdf(file) {
   const badge = document.getElementById('pdfFileName');
   badge.textContent = '⏳ PDF okunuyor... (0s)';
   badge.style.display = 'inline-flex';
+
+  // PDF okunurken Devam butonunu gizle — okuma bitmeden ilerlenmesin
+  window._pdfLoading = true;
+  const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
+  if (nextBtn) nextBtn.style.display = 'none';
 
   let elapsed = 0;
   const timer = setInterval(() => {
@@ -83,8 +130,11 @@ function handlePdf(file) {
     lastPdfData = e.target.result;
     try {
       const b = new Uint8Array(lastPdfData);
+      const chunkSize = 8192;
       let s = '';
-      for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
+      for (let i = 0; i < b.byteLength; i += chunkSize) {
+        s += String.fromCharCode(...b.subarray(i, i + chunkSize));
+      }
       const pdfB64 = btoa(s);
       const resp = await fetch('/api/taslak', {
         method: 'POST',
@@ -95,27 +145,33 @@ function handlePdf(file) {
       if (data.success && data.pdfFields) {
         const pf = data.pdfFields;
         if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
-        if (pf.netKg  && pf.netKg  > 0) window._pdfNetKg  = pf.netKg;
+        if (pf.netKg && pf.netKg > 0) window._pdfNetKg = pf.netKg;
         if (pf.kur && pf.kur > 0) {
           window._pdfKur = pf.kur;
-          // Sadece EUR ülkelerinde kur input'una yaz (USD ülkeleri kur kullanmıyor)
-          const isEurUlke = ['be','de','nl','xk','mk'].includes(currentCountry);
-          if (isEurUlke) {
-            const el = document.getElementById('eurRateInput');
-            if (el) el.value = String(pf.kur).replace('.', ',');
-          }
         }
-        // Adım 4'teki kur ekranı görünürlüğünü güncelle
+        // Her durumda updateEurSectionStep4 çağır — kur gelsin gelmesin
         if (typeof updateEurSectionStep4 === 'function') {
           updateEurSectionStep4();
         }
       }
-    } catch(e) {
+    } catch (e) {
       console.warn('PDF parse hatası:', e);
     } finally {
       clearInterval(timer);
       badge.textContent = `✓ PDF okundu (${elapsed}s)`;
+      // PDF yüklenince drop zone'a loaded class ekle
+      const dz = document.getElementById('dropZone');
+      if (dz) dz.classList.add('loaded');
+      window._pdfLoading = false;
+      // Excel de yüklenmişse Devam butonunu tekrar göster
+      if (masterRows && nextBtn) nextBtn.style.display = 'block';
     }
+  };
+  r.onerror = () => {
+    clearInterval(timer);
+    window._pdfLoading = false;
+    badge.textContent = '⚠ PDF okunamadı';
+    if (masterRows && nextBtn) nextBtn.style.display = 'block';
   };
   r.readAsArrayBuffer(file);
 }
@@ -127,7 +183,7 @@ function loadFile(data) {
   if (nextBtn) nextBtn.style.display = 'none';
 
   try {
-    const wb   = XLSX.read(data, { type: 'array' });
+    const wb = XLSX.read(data, { type: 'array' });
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
 
     if (!rows.length) throw new Error('Dosya boş.');
@@ -140,32 +196,34 @@ function loadFile(data) {
 
     masterRows = rows;
 
-    // Devam butonunu göster
-    if (nextBtn) nextBtn.style.display = 'block';
+    // Devam butonunu göster — ancak PDF hâlâ okunuyorsa gizli kalsın
+    if (nextBtn && !window._pdfLoading) nextBtn.style.display = 'block';
 
     // fileName badge güncelle
     const badge = document.getElementById('fileName');
     if (badge) badge.textContent = '✓ ' + rows.length.toLocaleString('tr') + ' satır yüklendi';
 
-  } catch(err) {
+  } catch (err) {
     // Hata durumunda badge'e yaz — statusBox adım 5'te olduğu için güvenli değil
     const badge = document.getElementById('fileName');
     if (badge) { badge.textContent = '⚠ ' + err.message; badge.style.color = 'var(--error)'; }
     console.error('loadFile hatası:', err.message);
+  } finally {
+    window._excelLoading = false;
   }
 }
 
 // ── EXCEL ÇIKTI ÜRETME ────────────────────────────────────────────────────────
 function buildOutput(rows) {
   try {
-    if      (currentCountry === 'kz') buildKZ(rows);
+    if (currentCountry === 'kz') buildKZ(rows);
     else if (currentCountry === 'rs') buildRS(rows);
     else if (SIMPLE_MAPS[currentCountry]) buildSimple(rows, SIMPLE_MAPS[currentCountry]);
     else {
       showStatus('error', '⚠ Bu ülke için sütun tanımı henüz eklenmemiş.');
       document.getElementById('downloadBtn').classList.remove('visible');
     }
-  } catch(err) {
+  } catch (err) {
     showStatus('error', '⚠ ' + err.message);
     document.getElementById('downloadBtn').classList.remove('visible');
   }
@@ -192,7 +250,7 @@ function getVal(row, src) {
 
 function getEurRate() {
   const el = document.getElementById('eurRateInput');
-  const v  = el ? parseNum(el.value) : 0;
+  const v = el ? parseNum(el.value) : 0;
   return (v && v > 0) ? v : null;
 }
 
@@ -213,8 +271,8 @@ function buildKZ(rows) {
       if (!grouped[sku]) { grouped[sku] = { ...row }; order.push(sku); }
       else {
         grouped[sku]['Miktar'] = parseNum(grouped[sku]['Miktar']) + parseNum(row['Miktar']);
-        grouped[sku]['BRÜT']   = parseNum(grouped[sku]['BRÜT'])   + parseNum(row['BRÜT']);
-        grouped[sku]['NET']    = parseNum(grouped[sku]['NET'])     + parseNum(row['NET']);
+        grouped[sku]['BRÜT'] = parseNum(grouped[sku]['BRÜT']) + parseNum(row['BRÜT']);
+        grouped[sku]['NET'] = parseNum(grouped[sku]['NET']) + parseNum(row['NET']);
       }
     }
     result = order.map(sku => { const r = {}; KZ_COLS.forEach(c => r[c] = grouped[sku][c] ?? ''); return r; });
@@ -241,7 +299,7 @@ function buildRS(rows) {
 // ── DİĞER ÜLKELER ─────────────────────────────────────────────────────────────
 function buildSimple(rows, colMap) {
   const headers = colMap.map(m => m.out);
-  const result  = rows.map(row => { const r = {}; colMap.forEach(m => r[m.out] = getVal(row, m.src)); return r; });
+  const result = rows.map(row => { const r = {}; colMap.forEach(m => r[m.out] = getVal(row, m.src)); return r; });
   processedWB = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(processedWB, makeWS(result, headers), 'Sheet');
   const label = COUNTRIES[currentCountry]?.label || currentCountry;

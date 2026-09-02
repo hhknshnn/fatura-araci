@@ -11,12 +11,12 @@
     "navlun": {
       "hucre": "C3",
       "tip": "sayi",
-      "label": "Navlun (USD)"
+      "label": "Navlun (TRY)"
     },
     "sigorta": {
       "hucre": "C4",
       "tip": "sayi",
-      "label": "Sigorta (USD)"
+      "label": "Sigorta (TRY)"
     },
     "kap": {
       "hucre": "C5",
@@ -54,5 +54,19 @@
       "tip": "metin",
       "format": "{deger} KG"
     }
-  }
+  },
+  "menseTemizle": [
+    "E3",
+    "E4",
+    "F3",
+    "F4",
+    "G3",
+    "G4",
+    "F5",
+    "G5",
+    "B9",
+    "C9",
+    "B10",
+    "C10"
+  ]
 }

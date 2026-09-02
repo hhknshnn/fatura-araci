@@ -1,12 +1,11 @@
-from http.server import BaseHTTPRequestHandler
 import json
-import base64
 import io
 import os
-import traceback
 import re
-import pdfplumber
+from pypdf import PdfReader
 import openpyxl
+
+_ULKE_KODU_RE = re.compile(r'^[a-z]{2,4}$')
 
 def _normalize_pdf_text(text):
     return re.sub(r'\s+', ' ', (text or '').replace('\u00a0', ' ')).strip()
@@ -31,59 +30,96 @@ def _extract_pdf_amount(text, patterns):
             return _parse_pdf_amount(m.group(1))
     return 0.0
 
+def _extract_amount_near_keywords(text, keywords, window=140):
+    money_re = re.compile(
+        r'(?:TRY|TL|₺)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2,4})|[0-9]+[.,][0-9]{2,4})\s*(?:TRY|TL|₺)?',
+        re.IGNORECASE,
+    )
+    for keyword in keywords:
+        for match in re.finditer(keyword, text, re.IGNORECASE):
+            snippet = text[match.start():match.end() + window]
+            amounts = [
+                _extract_pdf_amount(m.group(1), [r'([\d.,]+)'])
+                for m in money_re.finditer(snippet)
+            ]
+            amounts = [n for n in amounts if n > 0]
+            if amounts:
+                return amounts[0]
+    return 0.0
+
 def parse_pdf_fields(pdf_bytes):
     result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0, 'kur': 0.0}
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            # Bilgiler son sayfalarda — sadece son 2 sayfayı oku
-            page_texts = [_normalize_pdf_text(page.extract_text() or '') for page in pdf.pages[-2:]]
-            text = ' '.join(part for part in page_texts if part).strip()
-            if not text:
-                return result
-            result['navlun'] = _extract_pdf_amount(text, [
-                r'\bNAVLUN\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bFREIGHT\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
-            result['sigorta'] = _extract_pdf_amount(text, [
-                r'S[İI]G(?:ORTA)?\.?\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-                r'\bINSURANCE\b\s*[:.]?\s*(?:TRY|TL)?\s*([\d.,]+)',
-            ])
-            # Kap sayısı
-            kap_patterns = [
-                r'[*\-]?\s*KAP\s+ADET[İI]\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'[*\-]?\s*KAP\s+SAYISI\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'[*\-]?\s*KAP\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-                r'\bPACKAGES?\s*[:.]?\s*(\d+(?:\s*\([^)]*\))?)',
-            ]
-            for p in kap_patterns:
-                m = re.search(p, text, re.IGNORECASE)
-                if m:
-                    result['kap'] = m.group(1).strip()
-                    break
-            # Kur bilgisi
-            result['kur'] = _extract_pdf_amount(text, [
-                r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*([\d.,]+)',
-            ])    
-            # BRÜT kilo
-            result['brutKg'] = _extract_pdf_amount(text, [
-                r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
-                r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
-                r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-                r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
-            ])
-            # NET kilo
-            result['netKg'] = _extract_pdf_amount(text, [
-                r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
-                r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
-                r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-                r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
-            ])
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        page_count = len(reader.pages)
+
+        def _page_text(i):
+            return _normalize_pdf_text(reader.pages[i].extract_text() or '')
+
+        last_two_text = ' '.join(
+            t for t in (_page_text(i) for i in range(max(0, page_count - 2), page_count)) if t
+        ).strip()
+
+        # NAVLUN/SİGORTA özet bloğu faturalarda hep son sayfa altbilgisinde
+        # yer alır — tüm sayfaları taramak (pdfplumber/pypdf fark etmez) çok
+        # pahalıdır ve pratikte hiçbir zaman ek veri bulmaz.
+        text = last_two_text
+        if not text:
+            return result
+        result['navlun'] = _extract_pdf_amount(text, [
+            r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+            r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+        ]) or _extract_amount_near_keywords(text, [
+            r'\bNAVLUN\b',
+            r'\bFREIGHT\b',
+            r'\bTA[SŞ]IMA\b',
+        ])
+        result['sigorta'] = _extract_pdf_amount(text, [
+            r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+            r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
+        ]) or _extract_amount_near_keywords(text, [
+            r'\bS[İI]GORTA\b',
+            r'\bSIGORTA\b',
+            r'\bINSURANCE\b',
+        ])
+        # Kap sayısı
+        kap_patterns = [
+            r'[*\-]?\s*KAP\s+ADET[İI]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s+SAYISI\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'[*\-]?\s*KAP\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+            r'\bPACKAGES?\s*:\s*(\d+(?:\s*\([^)]*\))?)',
+        ]
+        for p in kap_patterns:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                result['kap'] = m.group(1).strip()
+                break
+        # Kur bilgisi
+        result['kur'] = _extract_pdf_amount(text, [
+            r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
+        ])
+        # BRÜT kilo
+        result['brutKg'] = _extract_pdf_amount(text, [
+            r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
+            r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
+            r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+            r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
+        ])
+        # NET kilo
+        result['netKg'] = _extract_pdf_amount(text, [
+            r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
+            r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
+            r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
+            r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
+        ])
     except Exception:
         pass
     return result
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_config(ulke_kodu):
     """Ülkeye göre taslak config dosyasını yükle."""
+    if not _ULKE_KODU_RE.match(str(ulke_kodu or '')):
+        raise ValueError(f'Geçersiz ülke kodu: {ulke_kodu}')
     # Vercel'de çalışma dizini /var/task, config klasörü oradan erişilebilir
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, 'config', f'taslak_{ulke_kodu}.json')
@@ -119,6 +155,9 @@ def doldur_kibris(taslak_bytes, config, form_data):
     # Dosya no — her 3 sütuna da yaz (A8, D8, G8)
     ref_no = str(form_data.get('referansNo', ''))
     prefix = dosya_cfg.get('prefix', '')
+    # Frontend zaten yıl+no gönderiyor (örn: 2027-100), prefix'i atla
+    if ref_no and '-' in ref_no:
+        prefix = ''
     for hucre in ['B8', 'E8', 'H8']:
         ws[hucre] = prefix + ref_no
 
@@ -128,12 +167,13 @@ def doldur_kibris(taslak_bytes, config, form_data):
     buf.seek(0)
     return buf.getvalue(), dosya_adi
 
-def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
+def doldur_taslak(taslak_bytes, config, form_data, mense_data=None, depo_tipi=None):
     """
     Taslak Excel'e form ve menşe verilerini yaz.
-    
+
     form_data: {referansNo, navlun, sigorta, kap, brutKg, netKg}
     mense_data: {yabanciKg, trKg} — opsiyonel, menşe adımında gelir
+    depo_tipi: 'serbest' (IHR) | 'antrepo' (ANT) — antrepo'da menşe ayrımı olmaz
     """
     wb = openpyxl.load_workbook(io.BytesIO(taslak_bytes))
     sheet_name = config.get('sheet', wb.sheetnames[0])
@@ -158,7 +198,12 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
             try:    ws[hucre] = int(deger)
             except: ws[hucre] = deger
         elif tip == 'metin':
-            ws[hucre] = prefix + str(deger)
+            # Frontend zaten yıl+no gönderiyor (örn: 2026-284), prefix'i tekrar ekleme
+            deger_str = str(deger)
+            if prefix and deger_str.startswith(prefix):
+                ws[hucre] = deger_str
+            else:
+                ws[hucre] = prefix + deger_str
 
     # ── MENŞE ALANLARI (opsiyonel) ────────────────────────────────────────────
     if mense_data:
@@ -191,100 +236,25 @@ def doldur_taslak(taslak_bytes, config, form_data, mense_data=None):
                 try:    ws[hucre] = float(deger)
                 except: ws[hucre] = deger
 
+    # ── ANTREPO (ANT): menşe ayrımı yok ────────────────────────────────────────
+    if depo_tipi == 'antrepo':
+        for hucre in config.get('menseTemizle', []):
+            ws[hucre] = None
+
     # ── DOSYA ADI ─────────────────────────────────────────────────────────────
     ref_no  = form_data.get('referansNo', '')
     prefix  = config['alanlar']['referansNo'].get('prefix', '')
-    ulke    = config.get('dosyaAdi', 'Taslak')
-    dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
+    # Frontend zaten yıl+no gönderiyor (örn: 2027-100), prefix'i atla
+    if ref_no and '-' in ref_no:
+            prefix = ''
+    sablon = config.get('dosyaAdiSablon')
+    if sablon:
+        dosya_adi = sablon.replace('{refNo}', f'{prefix}{ref_no}') + '.xlsx'
+    else:
+        ulke    = config.get('dosyaAdi', 'Taslak')
+        dosya_adi = f"Fatura Taslak_{ulke} {prefix}{ref_no}.xlsx"
     # ── BYTES OLARAK DÖNDÜR ───────────────────────────────────────────────────
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue(), dosya_adi
-
-# ── VERCEL HANDLER ────────────────────────────────────────────────────────────
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
-        self.end_headers()
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps({'status': 'ok', 'service': 'taslak'}).encode())
-
-
-
-    def do_POST(self):
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-            body   = json.loads(self.rfile.read(length))
-
-            # Parametreler
-            # do_POST başında, ulke_kodu'ndan önce:
-            action = body.get('action', 'fill')
-
-            if action == 'parsePdf':
-                pdf_b64 = body.get('pdf', '')
-                if not pdf_b64:
-                    raise ValueError('PDF verisi boş')
-                pdf_bytes_data = base64.b64decode(pdf_b64)
-                pdf_fields = parse_pdf_fields(pdf_bytes_data)
-                result = json.dumps({'success': True, 'pdfFields': pdf_fields})
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(result.encode('utf-8'))
-                return
-            ulke_kodu  = body.get('ulkeKodu', 'rs')
-            taslak_b64 = body.get('taslak', '')
-            form_data  = body.get('formData', {})
-            mense_data = body.get('menseData', None)
-
-            # Taslak Excel bytes
-            if not taslak_b64:
-                raise ValueError('Taslak Excel verisi boş geldi (taslak_b64 empty)')
-            taslak_bytes = base64.b64decode(taslak_b64)
-
-            # Config yükle
-            config = load_config(ulke_kodu)
-
-            # Doldur - Kıbrıs özel mantık
-            if config.get('tip') == 'kibris':
-                excel_out, dosya_adi = doldur_kibris(taslak_bytes, config, form_data)
-            else:
-                excel_out, dosya_adi = doldur_taslak(
-                    taslak_bytes, config, form_data, mense_data)
-
-            result = json.dumps({
-                'success':  True,
-                'excel':    base64.b64encode(excel_out).decode('utf-8'),
-                'dosyaAdi': dosya_adi,
-            })
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(result.encode('utf-8'))
-
-        except Exception as e:
-            err = json.dumps({
-                'success': False,
-                'error':   str(e),
-                'trace':   traceback.format_exc()
-            })
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(err.encode('utf-8'))
-
-    def log_message(self, format, *args):
-        pass  # Vercel loglarını temiz tut

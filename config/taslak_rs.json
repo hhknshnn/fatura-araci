@@ -3,17 +3,70 @@
   "dosyaAdi": "Sirbistan",
   "sheet": "ft.",
   "alanlar": {
-    "referansNo": { "hucre": "C11", "prefix": "2026-", "tip": "metin" },
-    "navlun":     { "hucre": "C3",  "tip": "sayi",  "label": "Navlun (EUR)" },
-    "sigorta":    { "hucre": "C4",  "tip": "sayi",  "label": "Sigorta (EUR)" },
-    "kap":        { "hucre": "C5",  "tip": "tam",   "label": "Kap Sayısı" },
-    "brutKg":     { "hucre": "C6",  "tip": "sayi",  "label": "Toplam BRÜT (kg)" },
-    "netKg":      { "hucre": "C7",  "tip": "sayi",  "label": "Toplam NET (kg)", "formul": "=C6*0.9" }
+    "referansNo": {
+      "hucre": "C11",
+      "prefix": "2026-",
+      "tip": "metin"
+    },
+    "navlun": {
+      "hucre": "C3",
+      "tip": "sayi",
+      "label": "Navlun (TRY)"
+    },
+    "sigorta": {
+      "hucre": "C4",
+      "tip": "sayi",
+      "label": "Sigorta (TRY)"
+    },
+    "kap": {
+      "hucre": "C5",
+      "tip": "tam",
+      "label": "Kap Sayısı"
+    },
+    "brutKg": {
+      "hucre": "C6",
+      "tip": "sayi",
+      "label": "Toplam BRÜT (kg)"
+    },
+    "netKg": {
+      "hucre": "C7",
+      "tip": "sayi",
+      "label": "Toplam NET (kg)",
+      "formul": "=C6*0.9"
+    }
   },
   "menseAlanlar": {
-    "yabanciKg":  { "hucre": "F3",  "tip": "sayi" },
-    "trKg":       { "hucre": "F4",  "tip": "sayi" },
-    "yabanciMetin":{ "hucre": "C9", "tip": "metin", "format": "{deger} KG" },
-    "trMetin":    { "hucre": "C10", "tip": "metin", "format": "{deger} KG" }
-  }
+    "yabanciKg": {
+      "hucre": "F3",
+      "tip": "sayi"
+    },
+    "trKg": {
+      "hucre": "F4",
+      "tip": "sayi"
+    },
+    "yabanciMetin": {
+      "hucre": "C9",
+      "tip": "metin",
+      "format": "{deger} KG"
+    },
+    "trMetin": {
+      "hucre": "C10",
+      "tip": "metin",
+      "format": "{deger} KG"
+    }
+  },
+  "menseTemizle": [
+    "E3",
+    "E4",
+    "F3",
+    "F4",
+    "G3",
+    "G4",
+    "F5",
+    "G5",
+    "B9",
+    "C9",
+    "B10",
+    "C10"
+  ]
 }
