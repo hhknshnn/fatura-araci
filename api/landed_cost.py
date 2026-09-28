@@ -11,6 +11,19 @@ KURUMSAL_ULKELER = {
     'BELÇİKA', 'ALMANYA', 'HOLLANDA', 'KAZAKİSTAN',
 }
 
+# Landed cost ülke adı → ulke_navlun kodu (Navlun Tanımları tablosu).
+LC_ULKE_KOD = {
+    'SIRBİSTAN': 'rs',
+    'BOSNA': 'ba',
+    'GÜRCİSTAN': 'ge',
+    'KOSOVA': 'xk',
+    'MAKEDONYA': 'mk',
+    'BELÇİKA': 'be',
+    'HOLLANDA': 'nl',
+    'KAZAKİSTAN': 'kz',
+    'ALMANYA': 'de',
+}
+
 
 def _to_float(value):
     try:
@@ -100,7 +113,8 @@ def _query_rows():
         SELECT id, ihracat_dosya_no, fatura_no, ulke, nakliye_firmasi, plaka,
                fatura_bedeli_eur, navlun_eur, sigorta_eur, yukleme_tarihi,
                ihracat_beyanname_eur, arac_bekleme, brokerage_eur,
-               other_costs_eur, gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id, durum
+               other_costs_eur, gumruk_vergisi_eur, kdv_eur, musteri_tipi, sefer_id, durum,
+               palet, navlun_usd, usd_kuru, eur_kuru
         FROM shipments
         WHERE 1=1
     '''
@@ -235,6 +249,8 @@ def _build_payload(rows, pending_rows=None):
         'months': months,
         'detail': detail,
         'pending': _pending_payload(pending_rows),
+        'navlun_tanimlar': _navlun_tanimlar(),
+        'navlun_satirlar': _navlun_satirlar(rows),
         'cost_labels': {
             'operasyon_eur': 'Operasyon',
             'navlun_eur': 'Navlun',
@@ -242,6 +258,75 @@ def _build_payload(rows, pending_rows=None):
             'sigorta_eur': 'Sigorta',
         },
     }
+
+
+def _navlun_tanimlar():
+    """Navlun Tanımları tablosunun güncel satırları — senaryo editörünün eskisi."""
+    from api.navlun import KURUMSAL_ULKELER as NAVLUN_ULKELER
+    kod_to_label = {kod: ad for kod, ad in NAVLUN_ULKELER.items()}
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute('''
+            SELECT ulke_kodu, para_birimi, navlun_ihr, navlun_ant_ihr,
+                   navlun_ant, sigorta_baz
+            FROM ulke_navlun
+            ORDER BY ulke_kodu
+        ''')
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+    out = []
+    for kod, para, ihr, ant_ihr, ant, sigorta in rows:
+        out.append({
+            'ulkeKodu': kod,
+            'ulkeAdi': kod_to_label.get(kod, (kod or '').upper()),
+            'paraBirimi': para or 'EUR',
+            'navlunIhr': _to_float(ihr),
+            'navlunAntIhr': _to_float(ant_ihr),
+            'navlunAnt': _to_float(ant),
+            'sigortaBaz': _to_float(sigorta),
+        })
+    return out
+
+
+def _navlun_satir_senaryo(row):
+    if row.get('sefer_id'):
+        return 'gruplu'
+    if _depo_from_fatura(row.get('fatura_no')) == 'ANT':
+        return 'ant'
+    return 'ihr'
+
+
+def _navlun_satirlar(rows):
+    """Senaryo hesabı için kompakt sevkiyat satırları (yalnız LC'ye giren kayıtlar)."""
+    out = []
+    for row in rows:
+        ulke = row.get('ulke') or ''
+        costs = _cost_parts([row])
+        out.append({
+            'id': row.get('id'),
+            'ulke': ulke,
+            'ulkeKodu': LC_ULKE_KOD.get(_norm(ulke), ''),
+            'fatura_no': row.get('fatura_no') or '',
+            'ihracat_dosya_no': row.get('ihracat_dosya_no') or '',
+            'depo': _depo_from_fatura(row.get('fatura_no')),
+            'sefer_id': row.get('sefer_id'),
+            'palet': row.get('palet') or '',
+            'yukleme_tarihi': str(row.get('yukleme_tarihi') or ''),
+            'navlun_eur': _to_float(row.get('navlun_eur')),
+            'navlun_usd': _to_float(row.get('navlun_usd')),
+            'eur_kuru': _to_float(row.get('eur_kuru')),
+            'usd_kuru': _to_float(row.get('usd_kuru')),
+            'senaryo': _navlun_satir_senaryo(row),
+            'fatura_eur': costs['fatura_eur'],
+            'operasyon_eur': costs['operasyon_eur'],
+            'vergi_eur': costs['vergi_eur'],
+            'sigorta_eur': costs['sigorta_eur'],
+            'landed_cost_eur': costs['landed_cost_eur'],
+        })
+    return out
 
 
 def landed_cost_get():
@@ -355,4 +440,309 @@ def landed_cost_export():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
         download_name='landed_cost_raporu.xlsx',
+    )
+
+
+def _lc_fill(hex_color):
+    from openpyxl.styles import PatternFill
+    return PatternFill('solid', fgColor=hex_color)
+
+
+def _lc_font(**kwargs):
+    from openpyxl.styles import Font
+    kwargs.setdefault('name', 'Calibri')
+    return Font(**kwargs)
+
+
+def _lc_border():
+    from openpyxl.styles import Border, Side
+    side = Side(style='thin', color='CBD5E1')
+    return Border(left=side, right=side, top=side, bottom=side)
+
+
+def _lc_num(v):
+    if v is None or v == '':
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _lc_apply_cell(cell, value, kind, delta=False):
+    """kind: text | int | eur | pct | pp"""
+    from openpyxl.styles import Alignment
+    cell.border = _lc_border()
+    cell.alignment = Alignment(horizontal='left' if kind == 'text' else 'right', vertical='center')
+    if kind == 'text':
+        cell.value = value if value not in (None, '') else None
+        return
+    num = _lc_num(value)
+    cell.value = num
+    if num is None:
+        return
+    if kind == 'int':
+        cell.number_format = '#,##0'
+        cell.font = _lc_font(size=10)
+        return
+    if kind == 'eur':
+        cell.number_format = '#,##0.00 "€"'
+        cell.font = _lc_font(size=10)
+        if delta:
+            cell.fill = _lc_fill('DCFCE7' if num > 0.005 else ('FEE2E2' if num < -0.005 else 'F8FAFC'))
+            cell.font = _lc_font(size=10, bold=True, color='166534' if num > 0 else ('991B1B' if num < 0 else '334155'))
+        else:
+            cell.fill = _lc_fill('EFF6FF')
+        return
+    if kind == 'amt':
+        cell.number_format = '#,##0.00'
+        cell.font = _lc_font(size=10)
+        if delta:
+            cell.fill = _lc_fill('DCFCE7' if num > 0.005 else ('FEE2E2' if num < -0.005 else 'F8FAFC'))
+            cell.font = _lc_font(size=10, bold=True, color='166534' if num > 0 else ('991B1B' if num < 0 else '334155'))
+        else:
+            cell.fill = _lc_fill('EFF6FF')
+        return
+    if kind == 'pct':
+        cell.value = num / 100.0
+        cell.number_format = '0.00%'
+        cell.fill = _lc_fill('FEF3C7')
+        cell.font = _lc_font(size=10, bold=True, color='92400E')
+        return
+    if kind == 'pp':
+        cell.number_format = '+0.00" pp";-0.00" pp";0.00" pp"'
+        cell.fill = _lc_fill('DCFCE7' if num > 0.005 else ('FEE2E2' if num < -0.005 else 'FEF3C7'))
+        cell.font = _lc_font(size=10, bold=True, color='166534' if num > 0 else ('991B1B' if num < 0 else '92400E'))
+
+
+def _lc_header_row(ws, row, headers, kinds):
+    from openpyxl.styles import Alignment
+    fills = {
+        'text': '1F3864',
+        'int': '334155',
+        'eur': '1D4ED8',
+        'amt': '1D4ED8',
+        'pct': 'B45309',
+        'pp': '0F766E',
+    }
+    for col, (title, kind) in enumerate(zip(headers, kinds), start=1):
+        cell = ws.cell(row=row, column=col, value=title)
+        cell.fill = _lc_fill(fills.get(kind, '1F3864'))
+        cell.font = _lc_font(bold=True, color='FFFFFF', size=10)
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = _lc_border()
+    ws.row_dimensions[row].height = 28
+
+
+def _lc_section_title(ws, row, col, text, color='0F766E', span=4):
+    from openpyxl.styles import Alignment
+    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + span - 1)
+    cell = ws.cell(row=row, column=col, value=text)
+    cell.fill = _lc_fill(color)
+    cell.font = _lc_font(bold=True, color='FFFFFF', size=11)
+    cell.alignment = Alignment(horizontal='left', vertical='center')
+    ws.row_dimensions[row].height = 22
+    return cell
+
+
+def landed_cost_senaryo_export():
+    """POST /api/landed-cost/senaryo-export — navlun senaryosunu renkli xlsx olarak indir."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return jsonify({'success': False, 'error': 'openpyxl kurulu değil'}), 500
+
+    body = request.get_json(silent=True) or {}
+    meta = body.get('meta') if isinstance(body.get('meta'), dict) else {}
+    tutarlar = body.get('tutarlar') if isinstance(body.get('tutarlar'), list) else []
+    oranlar = body.get('oranlar') if isinstance(body.get('oranlar'), list) else []
+    tarifeler = body.get('tarifeler') if isinstance(body.get('tarifeler'), list) else []
+    kirilim = body.get('kirilim') if isinstance(body.get('kirilim'), list) else []
+    ulkeler = body.get('ulkeler') if isinstance(body.get('ulkeler'), list) else []
+    faturalar = body.get('faturalar') if isinstance(body.get('faturalar'), list) else []
+
+    wb = Workbook()
+
+    # ── Özet: tutarlar ve oranlar ayrı blok ────────────────────────────────
+    ws = wb.active
+    ws.title = 'Ozet'
+    ws.sheet_view.showGridLines = False
+    ws.merge_cells('A1:D1')
+    title = ws['A1']
+    title.value = 'Navlun Senaryosu'
+    title.font = _lc_font(bold=True, size=18, color='0F172A')
+    title.alignment = Alignment(vertical='center')
+    ws.row_dimensions[1].height = 28
+
+    meta_rows = [
+        ('Ülke', meta.get('ulkeler') or 'Tüm ülkeler'),
+        ('Başlangıç', meta.get('date_from') or ''),
+        ('Bitiş', meta.get('date_to') or ''),
+        ('Depo', meta.get('depo') or 'Tümü'),
+        ('Sefer tipi', meta.get('group_type') or 'all'),
+        ('KZ tarif dönemi', meta.get('kz_tarife') or ''),
+        ('Dönem referansı', meta.get('kz_ref') or ''),
+    ]
+    r = 3
+    for label, val in meta_rows:
+        ws.cell(r, 1, label).font = _lc_font(bold=True, size=10, color='64748B')
+        ws.cell(r, 2, val).font = _lc_font(size=10, color='0F172A')
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        r += 1
+
+    r += 1
+    _lc_section_title(ws, r, 1, 'TUTARLAR  ·  euro', '1D4ED8', 4)
+    r += 1
+    _lc_header_row(ws, r, ['Kalem', 'Kayıtlı €', 'Senaryo €', 'Fark €'], ['text', 'eur', 'eur', 'eur'])
+    r += 1
+    for item in tutarlar:
+        ws.cell(r, 1, item.get('kalem') or '').font = _lc_font(bold=True, size=10)
+        ws.cell(r, 1).border = _lc_border()
+        ws.cell(r, 1).fill = _lc_fill('F8FAFC')
+        _lc_apply_cell(ws.cell(r, 2), item.get('kayitli'), 'eur')
+        _lc_apply_cell(ws.cell(r, 3), item.get('senaryo'), 'eur')
+        _lc_apply_cell(ws.cell(r, 4), item.get('fark'), 'eur', delta=True)
+        r += 1
+
+    r += 1
+    _lc_section_title(ws, r, 1, 'ORANLAR  ·  yüzde', 'B45309', 4)
+    r += 1
+    _lc_header_row(ws, r, ['Kalem', 'Kayıtlı %', 'Senaryo %', 'Fark'], ['text', 'pct', 'pct', 'pp'])
+    r += 1
+    for item in oranlar:
+        ws.cell(r, 1, item.get('kalem') or '').font = _lc_font(bold=True, size=10)
+        ws.cell(r, 1).border = _lc_border()
+        ws.cell(r, 1).fill = _lc_fill('FFFBEB')
+        _lc_apply_cell(ws.cell(r, 2), item.get('kayitli'), 'pct')
+        _lc_apply_cell(ws.cell(r, 3), item.get('senaryo'), 'pct')
+        fark_kind = 'pp' if item.get('fark_pp', True) else 'pct'
+        _lc_apply_cell(ws.cell(r, 4), item.get('fark'), fark_kind)
+        r += 1
+
+    ws.column_dimensions['A'].width = 32
+    ws.column_dimensions['B'].width = 16
+    ws.column_dimensions['C'].width = 16
+    ws.column_dimensions['D'].width = 16
+    ws.freeze_panes = 'A3'
+
+    def _write_typed_sheet(name, headers, kinds, rows, widths, depo_col=None):
+        sh = wb.create_sheet(name)
+        sh.sheet_view.showGridLines = False
+        _lc_header_row(sh, 1, headers, kinds)
+        for i, row in enumerate(rows, start=2):
+            depo = ''
+            if depo_col is not None:
+                depo = str(row[depo_col] if depo_col < len(row) else '') or ''
+            for c, (val, kind) in enumerate(zip(row, kinds), start=1):
+                cell = sh.cell(row=i, column=c)
+                if kind == 'text':
+                    cell.value = val if val not in (None, '') else None
+                    cell.font = _lc_font(size=10)
+                    cell.border = _lc_border()
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+                    if depo == 'IHR':
+                        cell.fill = _lc_fill('ECFDF5')
+                    elif depo == 'ANT':
+                        cell.fill = _lc_fill('FEF2F2')
+                    elif i % 2 == 0:
+                        cell.fill = _lc_fill('F8FAFC')
+                elif kind in ('eur', 'amt'):
+                    is_delta = 'Δ' in headers[c - 1] or headers[c - 1].startswith('Fark')
+                    _lc_apply_cell(cell, val, kind, delta=is_delta)
+                else:
+                    _lc_apply_cell(cell, val, kind)
+        for i, w in enumerate(widths, start=1):
+            sh.column_dimensions[get_column_letter(i)].width = w
+        sh.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(1, len(rows) + 1)}"
+        sh.freeze_panes = 'A2'
+        sh.row_dimensions[1].height = 32
+        return sh
+
+    _write_typed_sheet(
+        'Tarifeler',
+        ['Ülke', 'PB', 'Senaryo kolon', 'Kayıtlı', 'Yeni', 'Fark'],
+        ['text', 'text', 'text', 'amt', 'amt', 'amt'],
+        [
+            [
+                t.get('ulke'), t.get('pb'), t.get('kolon'),
+                t.get('kayitli'), t.get('yeni'),
+                None if t.get('kayitli') is None else (_lc_num(t.get('yeni')) or 0) - (_lc_num(t.get('kayitli')) or 0),
+            ]
+            for t in tarifeler
+        ],
+        [18, 8, 22, 14, 14, 14],
+    )
+
+    _write_typed_sheet(
+        'Kirilim',
+        ['Depo', 'Tip', 'Fatura sayısı', 'Kayıtlı LC €', 'Yeni LC €', 'Δ Navlun €',
+         'LC değişimi %', 'Navlun payı %', 'Yeni navlun payı %',
+         'Landed Cost %', 'Senaryo Landed Cost %', 'Δ Landed Cost'],
+        ['text', 'text', 'int', 'eur', 'eur', 'eur', 'pct', 'pct', 'pct', 'pct', 'pct', 'pp'],
+        [
+            [
+                k.get('depo'), k.get('tip'), k.get('fatura_sayisi'),
+                k.get('kayitli_lc'), k.get('yeni_lc'), k.get('delta_navlun'),
+                k.get('lc_pct'), k.get('navlun_pay'), k.get('yeni_navlun_pay'),
+                k.get('kayitli_oran'), k.get('yeni_oran'), k.get('oran_delta'),
+            ]
+            for k in kirilim
+        ],
+        [10, 12, 14, 16, 14, 16, 16, 16, 20, 16, 22, 16],
+        depo_col=0,
+    )
+
+    _write_typed_sheet(
+        'Ulkeler',
+        ['Ülke', 'Komple', 'Gruplu', 'Kayıtlı LC €', 'Yeni LC €', 'Kayıtlı navlun €',
+         'Senaryo navlun €', 'Navlun payı %', 'Yeni navlun payı %', 'Δ Navlun €', 'LC değişimi %'],
+        ['text', 'int', 'int', 'eur', 'eur', 'eur', 'eur', 'pct', 'pct', 'eur', 'pct'],
+        [
+            [
+                u.get('ulke'), u.get('komple'), u.get('gruplu'),
+                u.get('kayitli_lc'), u.get('yeni_lc'),
+                u.get('kayitli_navlun'), u.get('yeni_navlun'),
+                u.get('navlun_pay'), u.get('yeni_navlun_pay'),
+                u.get('delta_navlun'), u.get('lc_pct'),
+            ]
+            for u in ulkeler
+        ],
+        [16, 10, 10, 16, 14, 18, 18, 16, 18, 16, 16],
+    )
+
+    _write_typed_sheet(
+        'Faturalar',
+        ['Ülke', 'Fatura no', 'Dosya no', 'Depo', 'Senaryo', 'Sefer id', 'Palet',
+         'Kayıtlı LC €', 'Yeni LC €', 'Kayıtlı navlun €', 'Senaryo navlun €',
+         'Δ Navlun €', 'Navlun payı %', 'Yeni navlun payı %', 'LC değişimi %', 'Para birimi'],
+        ['text', 'text', 'text', 'text', 'text', 'text', 'text',
+         'eur', 'eur', 'eur', 'eur', 'eur', 'pct', 'pct', 'pct', 'text'],
+        [
+            [
+                f.get('ulke'), f.get('fatura_no'), f.get('dosya_no'),
+                f.get('depo'), f.get('senaryo'), f.get('sefer_id'), f.get('palet'),
+                f.get('kayitli_lc'), f.get('yeni_lc'),
+                f.get('kayitli_navlun'), f.get('yeni_navlun'),
+                f.get('delta_navlun'),
+                f.get('navlun_pay'), f.get('yeni_navlun_pay'), f.get('lc_pct'),
+                f.get('para_birimi'),
+            ]
+            for f in faturalar
+        ],
+        [16, 18, 14, 8, 20, 12, 10, 14, 14, 16, 16, 14, 14, 18, 14, 12],
+        depo_col=3,
+    )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    slug = re.sub(r'[^\wÇĞİÖŞÜçğıöşü-]+', '_', str(meta.get('ulkeler') or 'TUM'))[:40]
+    tarih = str(meta.get('date_to') or '')[:10] or 'rapor'
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'navlun_senaryo_{slug}_{tarih}.xlsx',
     )

@@ -21,6 +21,55 @@ function round2(n) {
   return Math.round(parseNum(n) * 100) / 100;
 }
 
+// ── MENŞEİ = TÜRKİYE KARŞILAŞTIRMA ───────────────────────────────────────────
+// Kaynak Excel'de "MENŞEİ Açıklama" hücresi/başlığı "TÜRKİYE", "Türkiye", "turkiye",
+// hatta "Menşei Açıklama" gibi büyük/küçük harf veya Türkçe karakter varyasyonlarıyla
+// gelebiliyor. Ham ASCII "TURKIYE" karşılaştırması bunları eşleştiremeyip ülkeye göre
+// ya tüm satırları "Yabancı" ya da (başlık eşleşmesi başka bir metinle çakışınca) hepsini
+// tek gruba düşürüyordu (Kosova + Sırbistan taslaklarında görüldü).
+function normalizeTrText(val) {
+  return String(val).trim()
+    .replace(/[İI]/g, 'I').replace(/ı/g, 'i')
+    .replace(/[Üü]/g, (m) => m === 'Ü' ? 'U' : 'u')
+    .replace(/[Öö]/g, (m) => m === 'Ö' ? 'O' : 'o')
+    .replace(/[Şş]/g, (m) => m === 'Ş' ? 'S' : 's')
+    .replace(/[Çç]/g, (m) => m === 'Ç' ? 'C' : 'c')
+    .replace(/[Ğğ]/g, (m) => m === 'Ğ' ? 'G' : 'g')
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
+function isTurkiyeMensei(val) {
+  return normalizeTrText(val) === 'TURKIYE';
+}
+
+// Satırdaki "MENŞEİ Açıklama" değerini döndürür. Önce birebir anahtarı dener,
+// bulamazsa (başlıkta boşluk/büyük-küçük harf/Türkçe karakter farkı olabileceği
+// için) sütun başlıklarını normalize ederek eşleşen anahtarı arar.
+function getMenseiAciklama(row) {
+  if (!row) return '';
+  if (row['MENŞEİ Açıklama'] !== undefined) return row['MENŞEİ Açıklama'];
+  for (const k of Object.keys(row)) {
+    if (normalizeTrText(k) === 'MENSEI ACIKLAMA') return row[k];
+  }
+  return '';
+}
+
+// Menşe ayrımı beklenmedik çıkarsa (hepsi TR ya da hepsi Yabancı) teşhis için
+// satırlardaki farklı MENŞEİ Açıklama değerlerini özetler.
+function menseiDegerOzeti(rows, limit) {
+  const counts = new Map();
+  for (const r of rows) {
+    const raw = String(getMenseiAciklama(r)).trim();
+    const key = raw === '' ? '(boş)' : raw;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, limit || 5)
+    .map(([val, n]) => `"${val}" (${n})`).join(', ');
+  return sorted.length > (limit || 5) ? top + ', …' : top;
+}
+
 // ── DOSYA YÜKLEME ─────────────────────────────────────────────────────────────
 function handleMultiFile(files) {
 
@@ -114,6 +163,10 @@ function handlePdf(file) {
   badge.textContent = '⏳ PDF okunuyor... (0s)';
   badge.style.display = 'inline-flex';
 
+  window._pdfKur = null;
+  const eurRateEl = document.getElementById('eurRateInput');
+  if (eurRateEl) eurRateEl.value = '';
+
   // PDF okunurken Devam butonunu gizle — okuma bitmeden ilerlenmesin
   window._pdfLoading = true;
   const nextBtn = document.getElementById('step2Next') || document.getElementById('step4Next');
@@ -129,6 +182,9 @@ function handlePdf(file) {
   r.onload = async e => {
     lastPdfData = e.target.result;
     try {
+      // Önceki faturadan kalan PDF değerleri yeni faturaya sızmasın
+      window._pdfBrutKg = 0;
+      window._pdfNetKg = 0;
       const b = new Uint8Array(lastPdfData);
       const chunkSize = 8192;
       let s = '';
@@ -149,10 +205,6 @@ function handlePdf(file) {
         if (pf.kur && pf.kur > 0) {
           window._pdfKur = pf.kur;
         }
-        // Her durumda updateEurSectionStep4 çağır — kur gelsin gelmesin
-        if (typeof updateEurSectionStep4 === 'function') {
-          updateEurSectionStep4();
-        }
       }
     } catch (e) {
       console.warn('PDF parse hatası:', e);
@@ -165,6 +217,9 @@ function handlePdf(file) {
       window._pdfLoading = false;
       // Excel de yüklenmişse Devam butonunu tekrar göster
       if (masterRows && nextBtn) nextBtn.style.display = 'block';
+      if (typeof updateEurSectionStep4 === 'function') {
+        updateEurSectionStep4();
+      }
     }
   };
   r.onerror = () => {
@@ -172,6 +227,9 @@ function handlePdf(file) {
     window._pdfLoading = false;
     badge.textContent = '⚠ PDF okunamadı';
     if (masterRows && nextBtn) nextBtn.style.display = 'block';
+    if (typeof updateEurSectionStep4 === 'function') {
+      updateEurSectionStep4();
+    }
   };
   r.readAsArrayBuffer(file);
 }

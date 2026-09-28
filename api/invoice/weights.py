@@ -9,13 +9,52 @@ from .constants import DARK_BLUE
 from .helpers  import parse_num
 
 
+def _oransal_dagit(ham_list, hedef_toplam):
+    """
+    hedef_toplam'i ham_list oranina gore satirlara dagitir (kurus bazli).
+
+    En buyuk kalan (largest remainder) yontemi: her satir once asagi yuvarlanir,
+    artan kuruslar en buyuk ondalik kalana sahip satirlara birer birer dagitilir.
+    - Toplam her zaman tam olarak hedef_toplam'a esittir.
+    - Hicbir satir negatif olamaz; yuvarlama farki tek bir satira yuklenmez.
+    - Negatif ham degerler 0 kabul edilir.
+    """
+    n = len(ham_list)
+    if n == 0:
+        return []
+
+    # Negatif ham deger (or. iade satirindan gelen eksi Miktar) paya girmez —
+    # aksi halde o satir eksi kg olarak yazilirdi.
+    ham_list = [h if h > 0 else 0.0 for h in ham_list]
+
+    ham_toplam = sum(ham_list)
+    hedef_kurus = int(round(hedef_toplam * 100))
+
+    if ham_toplam <= 0 or hedef_kurus <= 0:
+        return [0.0] * n
+
+    paylar = [(h / ham_toplam) * hedef_kurus for h in ham_list]
+    taban  = [int(p) for p in paylar]           # asagi yuvarla (paylar >= 0)
+    kalan  = hedef_kurus - sum(taban)
+
+    if kalan > 0:
+        # Artan kuruslar yalnizca payi olan satirlara gider; hepsi sifirsa
+        # (tek satir hedefi tasiyorsa) siralama yine de tum satirlara duser.
+        aday = [i for i in range(n) if ham_list[i] > 0] or list(range(n))
+        aday.sort(key=lambda i: (paylar[i] - taban[i], ham_list[i]), reverse=True)
+        for k in range(kalan):
+            taban[aday[k % len(aday)]] += 1
+
+    return [round(t / 100.0, 2) for t in taban]
+
+
 def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     """
     Her satır için brüt ve net kg hesaplar.
     - SKU istisna listesindeyse o ağırlığı kullan
     - Ürün ağırlığı varsa onu kullan
     - Yoksa grup ağırlığını kullan
-    Toplam hedef_brut'a göre orantılanır, son satır yuvarlama farkını alır.
+    Toplam hedef_brut'a göre orantılanır, yuvarlama farkı satırlara dağıtılır.
     Net = brüt × 0.9
     """
     ham_list = []
@@ -38,30 +77,12 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
     if ham_toplam <= 0:
         return [0.0] * len(ham_list), [0.0] * len(ham_list)
 
-    carpan = hedef_brut / ham_toplam
+    # Brüt — yuvarlama farkı en büyük kalanlara dağıtılır
+    brut_list = _oransal_dagit(ham_list, hedef_brut)
 
-    # Brüt — son satır yuvarlama farkını alır
-    brut_list = []
-    toplam_yuvarlanmis = 0.0
-    for i, h in enumerate(ham_list):
-        if i < len(ham_list) - 1:
-            val = round(h * carpan, 2)
-            brut_list.append(val)
-            toplam_yuvarlanmis += val
-        else:
-            brut_list.append(round(hedef_brut - toplam_yuvarlanmis, 2))
-
-    # Net = brüt × 0.9, aynı yuvarlama mantığı
+    # Net = brüt × 0.9, aynı dağıtım mantığı
     hedef_net_serbest = round(hedef_brut * 0.9, 2)
-    net_list  = []
-    toplam_net = 0.0
-    for i, b in enumerate(brut_list):
-        if i < len(brut_list) - 1:
-            val = round(b * 0.9, 2)
-            net_list.append(val)
-            toplam_net += val
-        else:
-            net_list.append(round(hedef_net_serbest - toplam_net, 2))
+    net_list = _oransal_dagit(brut_list, hedef_net_serbest)
 
     return brut_list, net_list
 
@@ -69,22 +90,10 @@ def calculate_weights(df, grup_kilolari, hedef_brut, exception_skus):
 def _dagit_net(brut_list, hedef_net_toplam):
     """
     Verilen hedef_net_toplam'ı brüt oranına göre satırlara dağıtır.
-    Son satır yuvarlama farkını alır — toplam her zaman hedef_net_toplam'a eşit.
+    Yuvarlama farkı en büyük kalanlara dağıtılır — toplam her zaman
+    hedef_net_toplam'a eşit, hiçbir satır negatif olmaz.
     """
-    toplam_brut = sum(brut_list)
-    if toplam_brut <= 0:
-        return [0.0] * len(brut_list)
-
-    net_list   = []
-    toplam_net = 0.0
-    for i, b in enumerate(brut_list):
-        if i < len(brut_list) - 1:
-            val = round((b / toplam_brut) * hedef_net_toplam, 2)
-            net_list.append(val)
-            toplam_net += val
-        else:
-            net_list.append(round(hedef_net_toplam - toplam_net, 2))
-    return net_list
+    return _oransal_dagit(brut_list, hedef_net_toplam)
 
 
 def get_net_list(brut_list, hedef_net, depo_tipi, hedef_brut=None):

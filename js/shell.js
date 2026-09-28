@@ -36,22 +36,53 @@ function toggleNavGroup(id) {
 }
 
 // ── SIDEBAR TOGGLE — mini mod ─────────────────────────────────────────────────
-function toggleSidebar() {
-  // Sidebar elementini al
+let _sidebarAutoMini = false;
+let _sidebarPrevMini = false;
+
+function syncSidebarChrome() {
   const sb = document.getElementById('mainSidebar') || document.querySelector('.sidebar');
   if (!sb) return;
-
-  // mini class'ı toggle et (CSS transition ile 220px ↔ 60px geçişi)
-  sb.classList.toggle('mini');
-
-  // Fake scrollbar varsa konumunu güncelle
+  const isMini = sb.classList.contains('mini');
   const fakeScroll = document.getElementById('fake-scrollbar');
   if (fakeScroll) {
-    const isMini = sb.classList.contains('mini');
     const sidebarW = isMini
       ? getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w-mini').trim()
       : getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
     fakeScroll.style.left = sidebarW;
+  }
+  const icon = document.getElementById('toggleIcon');
+  if (icon) {
+    icon.className = isMini ? 'ti ti-layout-sidebar-right-collapse' : 'ti ti-layout-sidebar-left-collapse';
+  }
+}
+
+function setSidebarMini(on) {
+  const sb = document.getElementById('mainSidebar') || document.querySelector('.sidebar');
+  if (!sb) return;
+  sb.classList.toggle('mini', !!on);
+  syncSidebarChrome();
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('mainSidebar') || document.querySelector('.sidebar');
+  if (!sb) return;
+  sb.classList.toggle('mini');
+  syncSidebarChrome();
+}
+
+function applySidebarForModule(mod) {
+  const sb = document.getElementById('mainSidebar') || document.querySelector('.sidebar');
+  if (!sb) return;
+  const autoMini = mod === 'maliyet-takip';
+  if (autoMini) {
+    if (!_sidebarAutoMini) {
+      _sidebarPrevMini = sb.classList.contains('mini');
+      _sidebarAutoMini = true;
+    }
+    setSidebarMini(true);
+  } else if (_sidebarAutoMini) {
+    _sidebarAutoMini = false;
+    setSidebarMini(_sidebarPrevMini);
   }
 }
 
@@ -59,21 +90,148 @@ function toggleSidebar() {
 function hideAllPanels() {
   const contentArea = document.getElementById('contentArea');
   contentArea.style.padding = '';
+  contentArea.style.overflow = '';
   contentArea.classList.remove('fu-content-area');
   contentArea.classList.remove('ops-content-area');
+  contentArea.classList.remove('m2-fill');
 
   ['step2', 'step3', 'stepMense', 'stepTaslak', 'stepGtip', 'stepEvrak',
     'stepGecmis', 'stepUsers', 'stepPermissions', 'stepAudit', 'stepDashboard', 'stepSevkiyatlar',
     'stepFaturaUret', 'stepMaliyetEvrak', 'stepLandedCost', 'stepNebimDelivery', 'stepMaliyetTakip',
-    'stepNavlunTanim'].forEach(id => {
+    'stepMaliyetTakip2', 'stepNavlunTanim', 'stepKurYonetimi'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
   document.getElementById('wizardSteps').style.display = 'none';
+
+  // Sevkiyatlar'daki çoklu seçim çubuğu body'ye fixed ekleniyor; modül değişince
+  // seçimi temizle ki başka sekmede alt çubuk asılı kalmasın.
+  if (typeof secimIptal === 'function') secimIptal();
+}
+
+// ── SPA ROTASI ────────────────────────────────────────────────────────────────
+// Adres çubuğu modül (+ Fatura Üret / Maliyet Evrak sekmesi) tutar.
+// Yenileme ve paylaşılan link açılışta bu path'ten restore edilir.
+const APP_MODULES = [
+  'dashboard', 'sevkiyatlar', 'fatura-uret', 'maliyet-evrak', 'landed-cost',
+  'nebim-delivery', 'navlun-tanim', 'maliyet-takip', 'kur-yonetimi',
+  'gecmis', 'permissions', 'users', 'audit',
+  'sonrasi', 'oncesi', 'taslak', 'gtip', 'evrak',
+];
+const APP_MODULE_ALIASES = {
+  'maliyet-takip-2': 'maliyet-takip',
+};
+const FATURA_URET_TABS = ['taslak', 'gtip', 'invpl', 't1'];
+const MALIYET_EVRAK_TABS = ['ulkeler', 'aksu'];
+const FATURA_URET_TAB_ALIASES = {
+  taslak: { mod: 'fatura-uret', tab: 'taslak' },
+  gtip: { mod: 'fatura-uret', tab: 'gtip' },
+  sonrasi: { mod: 'fatura-uret', tab: 'invpl' },
+  oncesi: { mod: 'fatura-uret', tab: 'gtip' },
+};
+
+let _routeSyncing = false;
+let _currentMod = '';
+let _fuCurrentTab = 'taslak';
+let _meCurrentTab = 'ulkeler';
+let _fuPendingTab = null;
+let _mePendingTab = null;
+let _fuInvplOpened = false;
+
+function normalizeAppPathname(pathname) {
+  const raw = String(pathname || '/').split('?')[0].split('#')[0];
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed || '/';
+}
+
+function canAccessModule(mod) {
+  if (mod === 'permissions' || mod === 'users' || mod === 'audit') {
+    return window.currentUser?.role === 'admin';
+  }
+  return true;
+}
+
+function fallbackModule(mod) {
+  if (canAccessModule(mod)) return mod;
+  return mod === 'audit' ? 'sonrasi' : 'dashboard';
+}
+
+function buildAppPath(mod, tab) {
+  if (mod === 'fatura-uret') {
+    const t = FATURA_URET_TABS.includes(tab) ? tab : (_fuCurrentTab || 'taslak');
+    return '/fatura-uret/' + t;
+  }
+  if (mod === 'maliyet-evrak') {
+    const t = MALIYET_EVRAK_TABS.includes(tab) ? tab : (_meCurrentTab || 'ulkeler');
+    return '/maliyet-evrak/' + t;
+  }
+  return '/' + (mod || 'dashboard');
+}
+
+function parseAppRoute(pathname) {
+  const normalized = normalizeAppPathname(pathname);
+  const parts = normalized.replace(/^\//, '').split('/').filter(Boolean).map(p => p.toLowerCase());
+  if (!parts.length) {
+    return { mod: 'dashboard', tab: null, path: '/dashboard' };
+  }
+
+  let mod = APP_MODULE_ALIASES[parts[0]] || parts[0];
+  const mapped = FATURA_URET_TAB_ALIASES[mod];
+  if (mapped) {
+    return { mod: mapped.mod, tab: mapped.tab, path: buildAppPath(mapped.mod, mapped.tab) };
+  }
+  if (!APP_MODULES.includes(mod)) {
+    return { mod: 'dashboard', tab: null, path: '/dashboard' };
+  }
+
+  let tab = null;
+  if (mod === 'fatura-uret') {
+    tab = FATURA_URET_TABS.includes(parts[1]) ? parts[1] : 'taslak';
+  } else if (mod === 'maliyet-evrak') {
+    tab = MALIYET_EVRAK_TABS.includes(parts[1]) ? parts[1] : 'ulkeler';
+  }
+  return { mod, tab, path: buildAppPath(mod, tab) };
+}
+
+function syncAppUrl(mod, tab) {
+  if (_routeSyncing) return;
+  const newPath = buildAppPath(mod, tab);
+  if (normalizeAppPathname(location.pathname) === newPath) return;
+  history.pushState(null, '', newPath);
+}
+
+function applyRoute(route) {
+  let mod = fallbackModule(route.mod);
+  let tab = (mod === route.mod) ? route.tab : null;
+  _routeSyncing = true;
+  try {
+    if (mod === 'fatura-uret') _fuPendingTab = tab || 'taslak';
+    if (mod === 'maliyet-evrak') _mePendingTab = tab || 'ulkeler';
+    sidebarSelect(mod);
+  } finally {
+    _routeSyncing = false;
+  }
+  const actual = buildAppPath(
+    _currentMod,
+    _currentMod === 'fatura-uret' ? _fuCurrentTab
+      : (_currentMod === 'maliyet-evrak' ? _meCurrentTab : null)
+  );
+  if (normalizeAppPathname(location.pathname) !== actual) {
+    history.replaceState(null, '', actual);
+  }
 }
 
 // ── SIDEBAR NAVİGASYON ────────────────────────────────────────────────────────
 function sidebarSelect(mod) {
+  if (typeof mod === 'string' && mod.includes('/')) {
+    const nested = parseAppRoute('/' + mod);
+    if (nested.mod === 'fatura-uret') _fuPendingTab = nested.tab;
+    if (nested.mod === 'maliyet-evrak') _mePendingTab = nested.tab;
+    mod = nested.mod;
+  }
+  // Eski /maliyet-takip-2 URL'leri yeni Maliyet Takip'e yönlendir
+  if (mod === 'maliyet-takip-2') mod = 'maliyet-takip';
+
   // Tüm nav-item'lardan active'i kaldır
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -90,6 +248,7 @@ function sidebarSelect(mod) {
   if (mod === 'audit' && navAudit) navAudit.classList.add('active');
 
   hideAllPanels();
+  applySidebarForModule(mod);
 
   const titles = {
     sonrasi: 'INV + PL Oluştur',
@@ -108,6 +267,7 @@ function sidebarSelect(mod) {
     'landed-cost': 'Landed Cost',
     'nebim-delivery': 'Nebim İrsaliye',
     'maliyet-takip': 'Maliyet Takip',
+    'kur-yonetimi': 'Kur Yönetimi',
     'navlun-tanim': 'Navlun Tanımları',
   };
   document.getElementById('topbarTitle').textContent = titles[mod] || mod;
@@ -180,8 +340,8 @@ function sidebarSelect(mod) {
   } else if (mod === 'fatura-uret') {
     document.getElementById('contentArea').classList.add('fu-content-area');
     document.getElementById('contentArea').classList.add('ops-content-area');
-    // Hub'a her yeni girişte INV+PL sekmesi ilk açılışında bir kez sıfırlansın
-    _fuInvplOpened = false;
+    // Hub'a başka modülden girişte INV+PL sekmesi ilk açılışında bir kez sıfırlansın
+    if (_currentMod !== 'fatura-uret') _fuInvplOpened = false;
     // Fatura Üret — sekme yapısı (Taslak, GTİP & Menşe, INV+PL, Ek Evrak)
     let panel = document.getElementById('stepFaturaUret');
     if (!panel) {
@@ -245,8 +405,9 @@ function sidebarSelect(mod) {
       document.getElementById('contentArea').appendChild(panel);
     }
     panel.style.display = 'block';
-    // İlk açılışta Taslak sekmesini göster
-    switchFaturaUretTab('taslak');
+    const fuTab = FATURA_URET_TABS.includes(_fuPendingTab) ? _fuPendingTab : 'taslak';
+    _fuPendingTab = null;
+    switchFaturaUretTab(fuTab, { skipHistory: true });
 
   } else if (mod === 'maliyet-evrak') {
     document.getElementById('contentArea').style.padding = '0';
@@ -254,6 +415,9 @@ function sidebarSelect(mod) {
     const panel = document.getElementById('stepMaliyetEvrak');
     panel.style.display = 'block';
     initMaliyetEvrakAccordion(panel);
+    const meTab = MALIYET_EVRAK_TABS.includes(_mePendingTab) ? _mePendingTab : 'ulkeler';
+    _mePendingTab = null;
+    if (typeof switchMaliyetEvrakTab === 'function') switchMaliyetEvrakTab(meTab, { skipHistory: true });
     // Her navigate'te PDF upload state'ini sıfırla
     const meStatus = document.getElementById('me-rs-status');
     const meResult = document.getElementById('me-rs-result');
@@ -331,16 +495,23 @@ function sidebarSelect(mod) {
     if (meBeInput)  meBeInput.value = '';
     if (typeof meLoadBeShipments === 'function') meLoadBeShipments();
   } else if (mod === 'landed-cost') {
-    document.getElementById('contentArea').style.padding = '0';
-    document.getElementById('contentArea').classList.add('ops-content-area');
+    const contentArea = document.getElementById('contentArea');
+    contentArea.style.padding = '0';
+    contentArea.style.overflow = 'hidden';
+    contentArea.classList.add('ops-content-area');
+    contentArea.classList.add('m2-fill');
     let panel = document.getElementById('stepLandedCost');
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'stepLandedCost';
       panel.className = 'panel';
-      document.getElementById('contentArea').appendChild(panel);
+      contentArea.appendChild(panel);
     }
-    panel.style.display = 'block';
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    panel.style.flex = '1';
+    panel.style.minHeight = '0';
+    panel.style.height = '100%';
     if (typeof initLandedCostPanel === 'function') initLandedCostPanel();
   } else if (mod === 'nebim-delivery') {
     document.getElementById('contentArea').style.padding = '0';
@@ -355,17 +526,36 @@ function sidebarSelect(mod) {
     panel.style.display = 'block';
     if (typeof initNebimDeliveryPanel === 'function') initNebimDeliveryPanel();
   } else if (mod === 'maliyet-takip') {
-    document.getElementById('contentArea').style.padding = '0';
-    document.getElementById('contentArea').classList.add('ops-content-area');
-    let panel = document.getElementById('stepMaliyetTakip');
+    const contentArea = document.getElementById('contentArea');
+    contentArea.style.padding = '0';
+    contentArea.style.overflow = 'hidden';
+    contentArea.classList.add('ops-content-area');
+    contentArea.classList.add('m2-fill');
+    let panel = document.getElementById('stepMaliyetTakip2');
     if (!panel) {
       panel = document.createElement('div');
-      panel.id = 'stepMaliyetTakip';
+      panel.id = 'stepMaliyetTakip2';
+      panel.className = 'panel';
+      contentArea.appendChild(panel);
+    }
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    panel.style.flex = '1';
+    panel.style.minHeight = '0';
+    panel.style.height = '100%';
+    if (typeof initMaliyet2Panel === 'function') initMaliyet2Panel();
+  } else if (mod === 'kur-yonetimi') {
+    document.getElementById('contentArea').style.padding = '0';
+    document.getElementById('contentArea').classList.add('ops-content-area');
+    let panel = document.getElementById('stepKurYonetimi');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'stepKurYonetimi';
       panel.className = 'panel';
       document.getElementById('contentArea').appendChild(panel);
     }
     panel.style.display = 'block';
-    if (typeof initMaliyetPanel === 'function') initMaliyetPanel();
+    if (typeof initKurPanel === 'function') initKurPanel();
   } else if (mod === 'navlun-tanim') {
     // Navlun Tanımları — kurumsal ülkelerin navlun/sigorta değerleri (admin)
     document.getElementById('contentArea').style.padding = '0';
@@ -381,36 +571,58 @@ function sidebarSelect(mod) {
     if (typeof initNavlunTanimPanel === 'function') initNavlunTanimPanel();
   }
 
-  // ── URL GÜNCELLEMESİ ───────────────────────────────────────────────────────
-  const newPath = '/' + mod;
-  if (location.pathname !== newPath) {
-    history.pushState(null, '', newPath);
-  }
+  _currentMod = mod;
+  const tab = mod === 'fatura-uret' ? _fuCurrentTab
+    : (mod === 'maliyet-evrak' ? _meCurrentTab : null);
+  syncAppUrl(mod, tab);
 }
 
 function initMaliyetEvrakAccordion(panel) {
   if (!panel || panel.dataset.accordionReady === '1') return;
   panel.dataset.accordionReady = '1';
 
-  panel.querySelectorAll('.me-card-head').forEach(head => {
+  const ulkePanel = panel.querySelector('#me-tab-ulkeler') || panel;
+
+  ulkePanel.querySelectorAll('.me-card-head').forEach(head => {
     head.setAttribute('role', 'button');
     head.setAttribute('tabindex', '0');
     head.setAttribute('aria-expanded', 'false');
   });
 
-  panel.addEventListener('click', event => {
+  ulkePanel.addEventListener('click', event => {
     const head = event.target.closest('.me-card-head');
-    if (!head || !panel.contains(head)) return;
+    if (!head || !ulkePanel.contains(head)) return;
     toggleMaliyetEvrakCard(head.closest('.me-card'));
   });
 
-  panel.addEventListener('keydown', event => {
+  ulkePanel.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const head = event.target.closest('.me-card-head');
-    if (!head || !panel.contains(head)) return;
+    if (!head || !ulkePanel.contains(head)) return;
     event.preventDefault();
     toggleMaliyetEvrakCard(head.closest('.me-card'));
   });
+}
+
+function switchMaliyetEvrakTab(tab, opts) {
+  if (!MALIYET_EVRAK_TABS.includes(tab)) tab = 'ulkeler';
+  _meCurrentTab = tab;
+  const tabs = ['aksu', 'ulkeler'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('me-tab-btn-' + t);
+    const panel = document.getElementById('me-tab-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'ulkeler') {
+    ['Rs', 'Ba', 'Mk', 'Ge', 'Ko', 'Kz', 'De', 'Nl', 'Be'].forEach(code => {
+      const fn = window['meLoad' + code + 'Shipments'];
+      if (typeof fn === 'function') fn();
+    });
+  }
+  if (!opts || !opts.skipHistory) {
+    if (_currentMod === 'maliyet-evrak' || !_currentMod) syncAppUrl('maliyet-evrak', tab);
+  }
 }
 
 function toggleMaliyetEvrakCard(card) {
@@ -431,8 +643,18 @@ function toggleMaliyetEvrakCard(card) {
 
 // Tarayıcı geri/ileri düğmesi
 window.addEventListener('popstate', () => {
-  const mod = location.pathname.replace(/^\//, '') || 'dashboard';
-  sidebarSelect(mod);
+  const route = parseAppRoute(location.pathname);
+  const mod = fallbackModule(route.mod);
+  const tab = (mod === route.mod) ? route.tab : null;
+  if (_currentMod === 'fatura-uret' && mod === 'fatura-uret') {
+    switchFaturaUretTab(tab || 'taslak', { skipHistory: true });
+    return;
+  }
+  if (_currentMod === 'maliyet-evrak' && mod === 'maliyet-evrak') {
+    switchMaliyetEvrakTab(tab || 'ulkeler', { skipHistory: true });
+    return;
+  }
+  applyRoute({ mod, tab });
 });
 
 // ── WIZARD ADIM GÖSTERGELERİ ─────────────────────────────────────────────────
@@ -532,9 +754,9 @@ function filterCountryList() {
 
 // ── FATURA ÜRET — SEKME GEÇİŞİ ───────────────────────────────────────────────
 // Orijinal panelleri taşır — innerHTML kopyası değil, gerçek DOM elemanları
-let _fuInvplOpened = false;
-
-function switchFaturaUretTab(tab) {
+function switchFaturaUretTab(tab, opts) {
+  if (!FATURA_URET_TABS.includes(tab)) tab = 'taslak';
+  _fuCurrentTab = tab;
   // Sekme butonlarını güncelle
   ['taslak', 'gtip', 'invpl', 't1' /*, 'evrak' */].forEach(t => {
     const btn = document.getElementById('fu-tab-' + t);
@@ -592,19 +814,23 @@ function switchFaturaUretTab(tab) {
   // else if (tab === 'evrak' && typeof initEvrakPanel === 'function') {
   //   setTimeout(initEvrakPanel, 0);
   // }
+  if (!opts || !opts.skipHistory) {
+    if (_currentMod === 'fatura-uret' || !_currentMod) syncAppUrl('fatura-uret', tab);
+  }
 }
 
-async function startAppAtDashboard() {
+async function startAppFromRoute() {
   await initYilAyari();
   await loadCountriesConfig();
   updateYilSelects();
-  const initMod = 'dashboard';
-  if (location.pathname !== '/dashboard') {
-    history.replaceState(null, '', '/dashboard');
-  }
-  sidebarSelect(initMod);
+  applyRoute(parseAppRoute(location.pathname));
   if (typeof checkGecmisCount === 'function') checkGecmisCount();
   if (typeof checkNebimWarningCount === 'function') checkNebimWarningCount();
+}
+
+// Login ve eski çağrılar bu ismi kullanıyor; rota restore eder.
+async function startAppAtDashboard() {
+  return startAppFromRoute();
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
@@ -612,5 +838,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // window.currentUser'ın rol kontrollerinden (bkz. sidebarSelect) önce
   // kesin belirlenmiş olması için oturum kontrolünü bekle.
   if (window.authReadyPromise) await window.authReadyPromise;
-  await startAppAtDashboard();
+  if (!window.currentUser) return;
+  await startAppFromRoute();
 });

@@ -3,13 +3,15 @@ import io
 import json
 import logging
 import os
+import re
 import sys
+from urllib.parse import urlparse
 
 import pandas as pd
 from flask import Flask, jsonify, request, send_file, send_from_directory, g
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
-from api.landed_cost import landed_cost_get, landed_cost_export
-from api.kur import get_tcmb_kurlar
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, bulk_update_durum, durum_tarih_kolonu, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
+from api.landed_cost import landed_cost_get, landed_cost_export, landed_cost_senaryo_export
+from api.kur import get_tcmb_kurlar, maliyet_kur_panel_get
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'api'))
@@ -27,16 +29,31 @@ from api.users import users_get, users_post, users_delete
 from api.storage import storage_get, storage_post, storage_delete
 from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_store_indir, taslak_store_sil
 from api.taslak_form import taslak_form_kaydet, taslak_form_liste, taslak_form_getir, taslak_form_sil, taslak_form_koru
-from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_be_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
+from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_be_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_aksu_beyanname_excel, apply_aksu_beyanname, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 from api.nebim import nebim_delivery_get, nebim_delivery_put
 from api.audit import log_action, audit_log_get, audit_log_export
 from api.maliyet.meta import maliyet_meta_get, maliyet_kalem_post, maliyet_kalem_put, maliyet_kalem_delete, maliyet_depo_ayar_put
 from api.maliyet.tarife import maliyet_tarife_get, maliyet_tarife_post, maliyet_tarife_delete
+from api.maliyet.excel_aktar import maliyet_excel_onizle_post, maliyet_excel_aktar_post
 from api.maliyet.hareket import maliyet_hareket_get, maliyet_hareket_bulk_post, maliyet_hareket_import_post, maliyet_hareket_delete
 from api.maliyet.hesap import maliyet_beklenen_get, maliyet_karsilastirma_get, maliyet_analiz_get, maliyet_depolama_get
 from api.maliyet.fatura import (maliyet_fatura_get, maliyet_fatura_post,
     maliyet_fatura_put, maliyet_fatura_delete, maliyet_fatura_pdf_post,
     maliyet_gercek_get)
+from api.maliyet.bosna_excel import maliyet_bosna_rapor_get, maliyet_bosna_export, maliyet_bosna_ciro_post
+from api.maliyet.ulke_tablo import (
+    maliyet_ulke_tablo_get, maliyet_ulke_tablo_post, maliyet_ulke_ciro_post, maliyet_ulke_tablo_export,
+)
+from api.maliyet.tablo_drop import maliyet_tablo_drop_post
+from api.maliyet.gurcistan import maliyet_ge_seed_post, maliyet_ge_onizle_get
+from api.maliyet.belcika import maliyet_be_seed_post, maliyet_be_onizle_get
+from api.maliyet.hollanda import maliyet_nl_seed_post, maliyet_nl_onizle_get
+from api.maliyet.kosova import maliyet_xk_seed_post, maliyet_xk_onizle_get
+from api.maliyet.makedonya import maliyet_mk_seed_post, maliyet_mk_onizle_get
+from api.maliyet.sirbistan import maliyet_rs_seed_post, maliyet_rs_onizle_get
+from api.maliyet.kazakistan import maliyet_kz_seed_post, maliyet_kz_onizle_get
+from api.maliyet.oran_karsilastirma import maliyet_oran_karsilastirma_get
+from api.maliyet.tum_export import maliyet_tum_export
 from api.maliyet.rapor import maliyet_rapor_get, maliyet_tarife_rapor_get
 from api.navlun import (navlun_tanim_liste, navlun_tanim_kaydet, navlun_hesapla,
     navlun_tahsis_olustur, navlun_bekleyen_sorgu, navlun_tahsis_kullan,
@@ -52,9 +69,27 @@ def read_port():
 
 
 app = Flask(__name__, static_folder=None)
+app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024
 init_db()
 
-STATIC_DIRS = {'css', 'js', 'templates', 'fonts', 'assets', 'config'}
+# Tarayıcıya açık statik yüzey: yalnızca UI'nın ihtiyaç duyduğu dosyalar.
+# Fatura sablonları (ref_*.xlsx), imza, PDF evrak, taslak/evrak JSON config
+# ve kaynak kod bu listede yoktur.
+_UI_STATIC_DIRS = {
+    'css': {'.css'},
+    'js': {'.js'},
+    'fonts': {'.woff', '.woff2', '.ttf', '.eot', '.otf'},
+    'assets': {'.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico', '.gif'},
+}
+_TASLAK_TEMPLATE_RE = re.compile(r'^taslak_[a-z0-9]{2,8}\.xlsx$')
+_GENERIC_FAIL = 'İşlem başarısız oldu.'
+_INTERNAL_ERROR_HINTS = (
+    'traceback', 'psycopg', 'permission denied', 'no such file',
+    'filenotfound', 'operationalerror', 'could not connect',
+    'connection refused', 'syntaxerror', 'file "',
+    '/root/', '/var/', '/home/', '/usr/', '/tmp/', '\\users\\',
+    '.py:', 'pgcode', 'sqlstate',
+)
 PERMISSIONS_PORTAL_PATH = os.path.join(BASE_DIR, 'data', 'permissions_portal.json')
 
 DEFAULT_PERMISSIONS_PORTAL = {
@@ -199,26 +234,116 @@ def _write_permissions_portal(data):
     with open(PERMISSIONS_PORTAL_PATH, 'w', encoding='utf-8') as f:
         json.dump(_normalize_permissions_portal(data), f, ensure_ascii=False, indent=2)
 
-# Boş bırakılırsa (varsayılan) eski davranış korunur: tüm origin'lere izin verilir.
-# Belirli origin'lere kısıtlamak için virgülle ayrılmış liste ver, örn:
+# Varsayılan: çapraz origin yok (yalnızca aynı host). Ek origin için:
 #   CORS_ALLOWED_ORIGINS=https://fatura.ornek.com,https://app.ornek.com
 _CORS_ALLOWED = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
 
 
-def _cors(response):
+def _normalize_public_path(filename):
+    if not filename or '\0' in filename:
+        return None
+    path = filename.replace('\\', '/').lstrip('/')
+    if not path or '//' in path or '..' in path.split('/'):
+        return None
+    return path
+
+
+def _is_public_static(filename):
+    """UI'nın yüklediği dosyalar. Fatura sablonları ve iç config burada yok."""
+    path = _normalize_public_path(filename)
+    if not path:
+        return False
+    if path == 'config/countries.json':
+        return True
+    parts = path.split('/')
+    if len(parts) == 2 and parts[0] == 'templates':
+        name = parts[1].lower()
+        return name == 'gtip_ref.xlsx' or bool(_TASLAK_TEMPLATE_RE.match(name))
+    if parts[0] in _UI_STATIC_DIRS and not any(p.startswith('.') for p in parts):
+        ext = os.path.splitext(parts[-1])[1].lower()
+        return ext in _UI_STATIC_DIRS[parts[0]]
+    return False
+
+
+def _looks_internal_error(text):
+    if not text:
+        return False
+    low = str(text).lower()
+    if BASE_DIR.lower() in low:
+        return True
+    return any(hint in low for hint in _INTERNAL_ERROR_HINTS)
+
+
+def _public_error(exc):
+    msg = str(exc).strip() if exc else ''
+    if isinstance(exc, ValueError) and msg and len(msg) <= 240 and not _looks_internal_error(msg):
+        return msg
+    return _GENERIC_FAIL
+
+
+def _origin_allowed(origin):
+    if not origin:
+        return False
     if _CORS_ALLOWED:
-        origin = request.headers.get('Origin')
-        if origin in _CORS_ALLOWED:
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Vary'] = 'Origin'
-    else:
-        response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        return origin in _CORS_ALLOWED
+    try:
+        return urlparse(origin).netloc.lower() == (request.host or '').lower()
+    except Exception:
+        return False
+
+
+def _after_request(response):
+    origin = request.headers.get('Origin')
+    if origin and _origin_allowed(origin):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Vary'] = 'Origin'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'same-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https://flagcdn.com; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    if response.status_code >= 400 and response.mimetype == 'application/json':
+        data = response.get_json(silent=True)
+        if isinstance(data, dict):
+            changed = False
+            err = data.get('error')
+            if isinstance(err, str) and _looks_internal_error(err):
+                data['error'] = _GENERIC_FAIL
+                changed = True
+            hatalar = data.get('hatalar')
+            if isinstance(hatalar, list):
+                cleaned = []
+                for item in hatalar:
+                    if isinstance(item, str) and _looks_internal_error(item):
+                        cleaned.append('Satır işlenemedi.')
+                        changed = True
+                    else:
+                        cleaned.append(item)
+                data['hatalar'] = cleaned
+            if changed:
+                response.set_data(json.dumps(data, ensure_ascii=False))
+                response.headers['Content-Type'] = 'application/json; charset=utf-8'
     return response
 
 
-app.after_request(_cors)
+app.after_request(_after_request)
+
+
+@app.errorhandler(413)
+def _too_large(_e):
+    return jsonify({'success': False, 'error': 'Dosya çok büyük.'}), 413
 
 
 def _log_if_success(resp, action, description):
@@ -236,6 +361,18 @@ def index():
     return send_file(os.path.join(BASE_DIR, 'index.html'))
 
 
+@app.route('/mockup')
+def serve_kabuk_mockup():
+    """Tasarim onerisi — canli uygulamayi degistirmez."""
+    return send_file(os.path.join(BASE_DIR, 'mockups', 'kabuk.html'))
+
+
+@app.route('/mockup/taslak')
+def serve_taslak_mockup():
+    """Taslak ekrani tasarim onerisi — canli taslak akisina dokunmaz."""
+    return send_file(os.path.join(BASE_DIR, 'mockups', 'taslak.html'))
+
+
 @app.route('/config.json')
 def serve_config_json():
     return send_file(os.path.join(BASE_DIR, 'config.json'), mimetype='application/json')
@@ -243,10 +380,15 @@ def serve_config_json():
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    top = filename.split('/')[0]
-    if top in STATIC_DIRS:
+    if _is_public_static(filename):
         return send_from_directory(BASE_DIR, filename)
-    # Bilinmeyen frontend rotaları için SPA entry point
+    top = filename.split('/')[0].lower()
+    if top in {'api', 'data', 'migrations', 'venv', 'cleanup_backups',
+               'templates', 'config'} or top.startswith('.'):
+        return ('', 404)
+    last = filename.split('/')[-1]
+    if '.' in last:
+        return ('', 404)
     return send_file(os.path.join(BASE_DIR, 'index.html'))
 
 
@@ -315,6 +457,10 @@ def api_generate():
         df          = pd.read_excel(io.BytesIO(excel_bytes), engine='openpyxl')
         df_original = df.copy()
 
+        from invoice.helpers import apply_pdf_fatura_fallback
+        apply_pdf_fatura_fallback(df, pdf_fields)
+        apply_pdf_fatura_fallback(df_original, pdf_fields)
+
         price_list_out = None
         mill_test_out  = None
 
@@ -343,7 +489,7 @@ def api_generate():
         logger.error("İstek hatası: %s", request.path, exc_info=True)
         return jsonify({
             'success': False,
-            'error':   str(e),
+            'error':   _public_error(e),
         }), 500
 
 # ── /api/taslak ───────────────────────────────────────────────────────────────
@@ -393,7 +539,7 @@ def api_taslak():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 # ── /api/evrak ────────────────────────────────────────────────────────────────
@@ -427,7 +573,7 @@ def api_evrak():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 @app.route('/api/t1-ayrimi', methods=['POST', 'OPTIONS'])
@@ -484,7 +630,7 @@ def api_t1_ayrimi():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 @app.route('/api/auth', methods=['GET', 'POST', 'OPTIONS'])
@@ -547,7 +693,7 @@ def api_shipments_repair_freight():
         return repair_shipment_freight()
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/repair-usd', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -560,7 +706,7 @@ def api_shipments_repair_usd():
         return repair_shipment_usd(sid=body.get('id'), fatura_no=body.get('fatura_no', ''))
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 @app.route('/api/shipments/bulk-repair-usd', methods=['POST', 'OPTIONS'])
@@ -574,7 +720,7 @@ def api_shipments_bulk_repair_usd():
         return jsonify({'success': True, 'onarilan': onarilan, 'atlanan': atlanan, 'hatalar': hatalar})
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 @app.route('/api/shipments/bulk-repair-freight-kzge', methods=['POST', 'OPTIONS'])
@@ -588,7 +734,7 @@ def api_shipments_bulk_repair_freight_kzge():
         return jsonify({'success': True, 'onarilan': onarilan, 'atlanan': atlanan, 'hatalar': hatalar})
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
         
 @app.route('/api/shipments/bulk-import', methods=['POST', 'OPTIONS'])
@@ -610,7 +756,7 @@ def api_shipments_bulk_import():
             'hatalar': hatalar,
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/bulk-update', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -631,7 +777,7 @@ def api_shipments_bulk_update():
             'hatalar': hatalar,
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 
 @app.route('/api/shipments/bulk-delete', methods=['POST', 'OPTIONS'])
@@ -648,8 +794,35 @@ def api_shipments_bulk_delete():
         log_action(getattr(g, 'user', None), 'shipment_bulk_delete', f"Toplu silme: {deleted} sevkiyat")
         return jsonify({'success': True, 'silinen': deleted})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-    
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
+
+@app.route('/api/shipments/bulk-status', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_shipments_bulk_status():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body  = request.get_json(force=True)
+        ids   = body.get('ids', [])
+        durum = body.get('durum', '')
+        tarih = (body.get('tarih') or '').strip()
+        if not ids:
+            return jsonify({'success': False, 'error': 'id listesi boş'}), 400
+        if not durum:
+            return jsonify({'success': False, 'error': 'durum boş'}), 400
+        # Duruma karşılık gelen bir tarih kolonu varsa tarih zorunludur
+        kolon = durum_tarih_kolonu(durum)
+        if kolon and not tarih:
+            return jsonify({'success': False, 'error': 'Tarih boş olamaz'}), 400
+        if tarih and not re.match(r'^\d{4}-\d{2}-\d{2}$', tarih):
+            return jsonify({'success': False, 'error': 'Tarih formatı geçersiz (YYYY-AA-GG)'}), 400
+        updated = bulk_update_durum(ids, durum, tarih)
+        log_action(getattr(g, 'user', None), 'shipment_bulk_status', f"Toplu durum güncelleme: {updated} sevkiyat → {durum}" + (f" ({kolon} = {tarih})" if kolon and tarih else ''))
+        return jsonify({'success': True, 'guncellenen': updated})
+    except Exception as e:
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
 @require_auth()
 def api_shipments_export():
@@ -682,6 +855,14 @@ def api_landed_cost_export():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return landed_cost_export()
+
+
+@app.route('/api/landed-cost/senaryo-export', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_landed_cost_senaryo_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return landed_cost_senaryo_export()
 
 
 # ── MALİYET TAKİP (dış depo 3PL maliyetleri) ─────────────────────────────────
@@ -734,6 +915,208 @@ def api_maliyet_tarife_export():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return maliyet_tarife_rapor_get()
+
+
+@app.route('/api/maliyet/bosna/rapor', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_bosna_rapor():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_bosna_rapor_get()
+
+
+@app.route('/api/maliyet/ge/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ge_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_ge_onizle_get()
+
+
+@app.route('/api/maliyet/ge/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ge_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_ge_seed_post()
+
+
+@app.route('/api/maliyet/be/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_be_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_be_onizle_get()
+
+
+@app.route('/api/maliyet/be/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_be_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_be_seed_post()
+
+
+@app.route('/api/maliyet/nl/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_nl_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_nl_onizle_get()
+
+
+@app.route('/api/maliyet/nl/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_nl_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_nl_seed_post()
+
+
+@app.route('/api/maliyet/xk/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_xk_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_xk_onizle_get()
+
+
+@app.route('/api/maliyet/xk/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_xk_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_xk_seed_post()
+
+
+@app.route('/api/maliyet/mk/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_mk_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_mk_onizle_get()
+
+
+@app.route('/api/maliyet/mk/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_mk_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_mk_seed_post()
+
+
+@app.route('/api/maliyet/rs/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_rs_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_rs_onizle_get()
+
+
+@app.route('/api/maliyet/rs/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_rs_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_rs_seed_post()
+
+
+@app.route('/api/maliyet/kz/onizle', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_kz_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_kz_onizle_get()
+
+
+@app.route('/api/maliyet/kz/seed', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_kz_seed():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_kz_seed_post()
+
+
+@app.route('/api/maliyet/oran-karsilastirma', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_maliyet_oran_karsilastirma():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_oran_karsilastirma_get()
+
+
+@app.route('/api/maliyet/tum/export', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_tum_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_tum_export()
+
+
+@app.route('/api/maliyet/bosna/ciro', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_bosna_ciro():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_bosna_ciro_post()
+
+
+@app.route('/api/maliyet/ciro', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ulke_ciro():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_ulke_ciro_post()
+
+
+@app.route('/api/maliyet/tablo', methods=['GET', 'POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ulke_tablo():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'POST':
+        return maliyet_ulke_tablo_post()
+    return maliyet_ulke_tablo_get()
+
+
+@app.route('/api/maliyet/tablo/export', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ulke_tablo_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_ulke_tablo_export()
+
+
+@app.route('/api/maliyet/tablo/drop', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_ulke_tablo_drop():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_tablo_drop_post()
+
+
+@app.route('/api/maliyet/bosna/export', methods=['GET', 'POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_bosna_export():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_bosna_export()
+
+
+@app.route('/api/maliyet/excel-onizle', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_excel_onizle():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_excel_onizle_post()
+
+
+@app.route('/api/maliyet/excel-aktar', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_maliyet_excel_aktar():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_excel_aktar_post()
 
 
 @app.route('/api/maliyet/hareket', methods=['GET', 'OPTIONS'])
@@ -827,6 +1210,7 @@ def api_maliyet_fatura_pdf_oku():
 
 
 @app.route('/api/maliyet/gercek', methods=['GET', 'OPTIONS'])
+@app.route('/api/maliyet/ozet', methods=['GET', 'OPTIONS'])
 @require_auth()
 def api_maliyet_gercek():
     if request.method == 'OPTIONS':
@@ -1016,7 +1400,7 @@ def api_parse_vergi_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-ge-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1076,7 +1460,7 @@ def api_parse_ge_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-ko-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1102,7 +1486,7 @@ def api_parse_ko_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-de-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1133,7 +1517,7 @@ def api_parse_de_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-nl-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1162,7 +1546,7 @@ def api_parse_nl_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-be-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1193,7 +1577,7 @@ def api_parse_be_pdf():
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-aksu-pdf', methods=['POST', 'OPTIONS'])
 @require_auth(write=('admin',))
@@ -1201,88 +1585,33 @@ def api_parse_aksu_pdf():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     try:
-        body    = request.get_json(force=True)
-        pdf_b64 = body.get('pdf', '')
-        if not pdf_b64:
-            return jsonify({'success': False, 'error': 'PDF boş'}), 400
+        body      = request.get_json(force=True) or {}
+        pdf_b64   = body.get('pdf', '')
+        excel_b64 = body.get('excel', '')
+        if not pdf_b64 and not excel_b64:
+            return jsonify({'success': False, 'error': 'PDF veya Excel boş'}), 400
 
-        pdf_bytes = base64.b64decode(pdf_b64)
+        if excel_b64:
+            faturalar = parse_aksu_beyanname_excel(base64.b64decode(excel_b64))
+            if not faturalar:
+                return jsonify({'success': False, 'error': 'Excel\'den beyanname tutarı okunamadı. İhracat Dosya No / Fatura No ve İhracat Beyanname TL kolonları gerekli.'}), 400
+        else:
+            faturalar = parse_aksu_beyanname_pdf(base64.b64decode(pdf_b64))
+            if not faturalar:
+                return jsonify({'success': False, 'error': 'PDF\'den fatura bilgisi çıkarılamadı'}), 400
 
-        # 1. PDF parse — tüm faturaları çek
-        faturalar = parse_aksu_beyanname_pdf(pdf_bytes)
-        if not faturalar:
-            return jsonify({'success': False, 'error': 'PDF\'den fatura bilgisi çıkarılamadı'}), 400
-
-        # 2. Veritabanında eşleştir ve güncelle
-        conn = get_conn()
-        cur  = conn.cursor()
-
-        eslesen, atlanan, hatalar = 0, 0, []
-
-        for f in faturalar:
-            ref_no    = f.get('ref_no')
-            fatura_no = f.get('fatura_no')
-            tutar_tl  = f.get('tutar_tl', 0)
-
-            if not tutar_tl:
-                atlanan += 1
-                hatalar.append(f'{ref_no or fatura_no}: tutar çıkarılamadı')
-                continue
-
-            # Önce fatura_no ile eşleştir, yoksa ihracat_dosya_no ile dene
-            shipment_id = None
-            eur_kuru    = 0.0
-
-            if fatura_no:
-                cur.execute(
-                    'SELECT id, eur_kuru FROM shipments WHERE fatura_no = %s',
-                    (fatura_no,)
-                )
-                row = cur.fetchone()
-                if row:
-                    shipment_id = row[0]
-                    eur_kuru    = float(row[1] or 0)
-
-            if not shipment_id and ref_no:
-                cur.execute(
-                    'SELECT id, eur_kuru FROM shipments WHERE ihracat_dosya_no = %s',
-                    (ref_no,)
-                )
-                row = cur.fetchone()
-                if row:
-                    shipment_id = row[0]
-                    eur_kuru    = float(row[1] or 0)
-
-            if not shipment_id:
-                atlanan += 1
-                hatalar.append(f'{ref_no or fatura_no}: eşleşen kayıt bulunamadı')
-                continue
-
-            tutar_eur = round(tutar_tl / eur_kuru, 2) if eur_kuru else 0.0
-
-            cur.execute('''
-                UPDATE shipments
-                SET ihracat_beyanname_tl  = %s,
-                    ihracat_beyanname_eur = %s
-                WHERE id = %s
-            ''', (tutar_tl, tutar_eur, shipment_id))
-            eslesen += 1
-            hatalar.append(f'✓ REF:{ref_no} / FATURA:{fatura_no} → {tutar_tl:,.2f} TL / {tutar_eur:,.2f} EUR güncellendi')
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
+        eslesen, atlanan, hatalar = apply_aksu_beyanname(faturalar)
         return jsonify({
-            'success':  True,
-            'eslesen':  eslesen,
-            'atlanan':  atlanan,
-            'hatalar':  hatalar,
+            'success': True,
+            'eslesen': eslesen,
+            'atlanan': atlanan,
+            'hatalar': hatalar,
+            'okunan':  len(faturalar),
         })
 
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
     
 @app.route('/api/shipments/bulk-update-palet', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1302,7 +1631,7 @@ def api_bulk_update_palet():
             'hatalar':     hatalar,
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-kz-pdf', methods=['POST', 'OPTIONS'])
 @require_auth()
@@ -1329,26 +1658,33 @@ def api_parse_kz_pdf():
                 if not b['vergi'] and not b['kdv']:
                     return jsonify({'success': False, 'error': 'Beyanname okunamadı. "В ПОДРОБНОСТИ ПОДСЧЕТА" bölümü bulunamadı.'}), 422
 
-                kzt_per_eur = 0.0
-                try:
-                    import urllib.request as _urllib
-                    url = 'https://api.exchangerate-api.com/v4/latest/EUR'
-                    req = _urllib.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with _urllib.urlopen(req, timeout=5) as resp:
-                        rates = json.loads(resp.read()).get('rates', {})
-                    kzt_per_eur = float(rates.get('KZT', 0) or 0)
-                except Exception as kur_err:
-                    print(f'[KZ beyanname] Kur hatası: {kur_err}')
+                from api.kur import get_tcmb_kurlar
+                kzt_per_eur = float((get_tcmb_kurlar() or {}).get('KZT') or 0)
+                # 1 EUR ≈ yüzlerce KZT. ~1 veya ters kur tenge'yi EUR alanına yazar.
+                if kzt_per_eur < 50 or kzt_per_eur > 2000:
+                    return jsonify({
+                        'success': False,
+                        'error': 'KZT/EUR kuru alınamadı veya geçersiz. Tenge tutarı EUR alanına yazılmadı.',
+                    }), 422
 
                 def to_eur(kzt):
-                    return round(kzt / kzt_per_eur, 2) if kzt_per_eur else 0.0
+                    return round(float(kzt) / kzt_per_eur, 2)
+
+                eur_vergi = to_eur(b['vergi'])
+                eur_kdv = to_eur(b['kdv'])
+                if b['kdv'] >= 1000 and eur_kdv >= 50000:
+                    return jsonify({
+                        'success': False,
+                        'error': 'KDV çevrimi tenge tutarını EUR gibi bırakırdı; kayıt durduruldu.',
+                    }), 422
 
                 return jsonify({
                     'success': True,
                     'tip':     'beyanname',
                     'kzt':     {'vergi': b['vergi'], 'kdv': b['kdv']},
-                    'eur':     {'vergi': to_eur(b['vergi']), 'kdv': to_eur(b['kdv'])},
+                    'eur':     {'vergi': eur_vergi, 'kdv': eur_kdv},
                     'kur':     {'kzt_per_eur': kzt_per_eur},
+                    'fatura_nolar': b.get('fatura_nolar') or [],
                 })
 
         if image_b64:
@@ -1365,16 +1701,18 @@ def api_parse_kz_pdf():
 
         return jsonify({
             'success':         True,
+            'tip':             'broker',
             'brokerage_kzt':   result['brokerage_kzt'],
             'other_costs_kzt': result['other_costs_kzt'],
             'brokerage_eur':   result['brokerage_eur'],
             'other_costs_eur': result['other_costs_eur'],
             'kzt_per_eur':     result['kzt_per_eur'],
             'kalemler':        result['kalemler'],
+            'fatura_nolar':    result.get('fatura_nolar') or [],
         })
     except Exception as e:
         logger.error("İstek hatası: %s", request.path, exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/parse-fr-pdf', methods=['POST', 'OPTIONS'])
 @require_auth(write=('admin',))
@@ -1399,6 +1737,14 @@ def api_kur():
         return app.make_default_options_response()
     kurlar = get_tcmb_kurlar()
     return jsonify({'success': True, 'kurlar': kurlar})
+
+
+@app.route('/api/kur/panel', methods=['GET', 'OPTIONS'])
+@require_auth()
+def api_kur_panel():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return maliyet_kur_panel_get()
 
 @app.route('/api/audit-log', methods=['GET', 'OPTIONS'])
 @require_auth(read=('admin',), write=('admin',))

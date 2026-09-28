@@ -1,0 +1,205 @@
+{
+  "ulke": "kz",
+  "aylar": [
+    {
+      "ay": "2026-01",
+      "ciro_eur": 588375.0,
+      "lojistik": 65370.15,
+      "inbound": {
+        "miktar": 28329.0,
+        "tutar": 5200.92
+      },
+      "storage": {
+        "miktar": 22067.0,
+        "tutar": 25035.0
+      },
+      "outbound": {
+        "miktar": 11921.0,
+        "tutar": 2188.58
+      },
+      "depolama": {
+        "miktar": 22067.0,
+        "tutar": 32424.5
+      },
+      "transport": {
+        "miktar": 596.05,
+        "tutar": 32945.65
+      }
+    },
+    {
+      "ay": "2026-02",
+      "ciro_eur": 476123.0,
+      "lojistik": 44194.37,
+      "inbound": {
+        "miktar": 6338.0,
+        "tutar": 1181.02
+      },
+      "storage": {
+        "miktar": 16960.0,
+        "tutar": 24937.95
+      },
+      "outbound": {
+        "miktar": 6326.0,
+        "tutar": 1178.79
+      },
+      "depolama": {
+        "miktar": 16960.0,
+        "tutar": 27297.76
+      },
+      "transport": {
+        "miktar": 316.3,
+        "tutar": 16896.61
+      }
+    },
+    {
+      "ay": "2026-03",
+      "ciro_eur": 689040.0,
+      "lojistik": 58956.74,
+      "inbound": {
+        "miktar": 9426.0,
+        "tutar": 1830.06
+      },
+      "storage": {
+        "miktar": 16302.0,
+        "tutar": 27650.94
+      },
+      "outbound": {
+        "miktar": 11274.0,
+        "tutar": 2188.85
+      },
+      "depolama": {
+        "miktar": 16302.0,
+        "tutar": 31669.84
+      },
+      "transport": {
+        "miktar": 563.7,
+        "tutar": 27286.89
+      }
+    },
+    {
+      "ay": "2026-04",
+      "ciro_eur": 342198.0,
+      "lojistik": 50498.82,
+      "inbound": {
+        "miktar": 9841.0,
+        "tutar": 2050.17
+      },
+      "storage": {
+        "miktar": 17746.73,
+        "tutar": 31257.86
+      },
+      "outbound": {
+        "miktar": 4748.0,
+        "tutar": 989.15
+      },
+      "depolama": {
+        "miktar": 17746.73,
+        "tutar": 34297.18
+      },
+      "transport": {
+        "miktar": 459.0,
+        "tutar": 16201.64
+      }
+    },
+    {
+      "ay": "2026-05",
+      "ciro_eur": 373641.0,
+      "lojistik": 53470.6,
+      "inbound": {
+        "miktar": 2383.0,
+        "tutar": 496.45
+      },
+      "storage": {
+        "miktar": 18861.26,
+        "tutar": 34328.27
+      },
+      "outbound": {
+        "miktar": 5334.0,
+        "tutar": 1111.23
+      },
+      "depolama": {
+        "miktar": 18861.26,
+        "tutar": 35935.95
+      },
+      "transport": {
+        "miktar": 443.0,
+        "tutar": 17534.65
+      }
+    },
+    {
+      "ay": "2026-06",
+      "ciro_eur": 443321.11,
+      "lojistik": 48971.6,
+      "inbound": {
+        "miktar": 3048.0,
+        "tutar": 634.99
+      },
+      "storage": {
+        "miktar": 15643.47,
+        "tutar": 27553.31
+      },
+      "outbound": {
+        "miktar": 5745.0,
+        "tutar": 1196.85
+      },
+      "depolama": {
+        "miktar": 15643.47,
+        "tutar": 29385.15
+      },
+      "transport": {
+        "miktar": 500.0,
+        "tutar": 19586.45
+      }
+    },
+    {
+      "ay": "2026-07",
+      "ciro_eur": 0.0,
+      "lojistik": 42919.55,
+      "inbound": {
+        "miktar": 5025.0,
+        "tutar": 1046.86
+      },
+      "storage": {
+        "miktar": 13816.74,
+        "tutar": 25147.04
+      },
+      "outbound": {
+        "miktar": 4870.0,
+        "tutar": 1014.56
+      },
+      "depolama": {
+        "miktar": 13816.74,
+        "tutar": 27208.46
+      },
+      "transport": {
+        "miktar": 662.0,
+        "tutar": 15711.09
+      }
+    },
+    {
+      "ay": "2026-08",
+      "ciro_eur": 0.0,
+      "lojistik": 50384.74,
+      "inbound": {
+        "miktar": 2337.0,
+        "tutar": 486.87
+      },
+      "storage": {
+        "miktar": 12730.23,
+        "tutar": 23169.54
+      },
+      "outbound": {
+        "miktar": 6614.0,
+        "tutar": 1377.89
+      },
+      "depolama": {
+        "miktar": 12730.23,
+        "tutar": 25034.3
+      },
+      "transport": {
+        "miktar": 1988.0,
+        "tutar": 25350.44
+      }
+    }
+  ]
+}

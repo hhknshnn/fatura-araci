@@ -24,7 +24,7 @@ from .constants import (
     KZ_INV_COLS, KZ_PL_COLS,
     RU_INV_COLS, RU_PL_COLS,
 )
-from .helpers  import hdr, dat, parse_num, sku_grupla, set_print, brd
+from .helpers  import hdr, dat, parse_num, sku_grupla, set_print, brd, resolve_fatura_no
 from .weights  import calculate_weights, get_net_list, generate_master_excel
 from .templates import (
     TEMPLATE_FINDER,
@@ -160,7 +160,7 @@ def generate_rs(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
@@ -335,7 +335,7 @@ def _generate_kz_like(ulke_kodu, df, grup_kilolari, hedef_brut, exception_skus,
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
@@ -519,7 +519,7 @@ def generate_ba(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
         agg_dict['Net Tutar (D)'] = 'sum'
     df = df.groupby('SKU', sort=False).agg(agg_dict).reset_index()
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
@@ -665,7 +665,7 @@ def generate_ge(df, grup_kilolari, hedef_brut, exception_skus, logo_bytes,
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()

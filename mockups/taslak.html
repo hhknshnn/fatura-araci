@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taslak Doldur — Tasarım Önerisi</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 13L8 3l5 10H3z' fill='%232563EB'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/tabler-icons.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F8FAFC; --surface:#FFFFFF; --surface2:#F1F5F9; --surface3:#E2E8F0;
+  --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.12);
+  --accent:#2563EB; --accent-dim:#EFF6FF; --accent-mid:#BFDBFE; --accent-text:#1D4ED8;
+  --teal:#0F766E; --teal-dim:#F0FDFA;
+  --success:#22C55E; --success-dim:#F0FDF4; --success-text:#15803D;
+  --warning:#F59E0B; --warning-dim:#FFFBEB; --gold:#B45309;
+  --error:#EF4444; --error-dim:#FEF2F2;
+  --text:#0F172A; --text2:#475569; --text3:#94A3B8;
+  --font:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.5}
+
+/* ── mockup şeridi ─────────────────────────────────────────────── */
+.mk-flag{display:flex;align-items:center;gap:10px;padding:7px 18px;background:#1E293B;color:#CBD5E1;font-size:11px;letter-spacing:.04em}
+.mk-flag b{color:#fff;font-weight:600}
+.mk-flag .mk-dot{width:6px;height:6px;border-radius:50%;background:#F59E0B}
+.mk-flag span.mk-sep{color:#475569}
+
+/* ── sayfa başlığı ─────────────────────────────────────────────── */
+.mk-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:20px;
+  padding:14px 28px 16px;background:rgba(255,255,255,.72);border-bottom:1px solid rgba(15,23,42,.08)}
+.mk-kicker{width:fit-content;padding:6px 13px;border:1px solid rgba(15,118,110,.18);border-radius:999px;
+  background:var(--teal-dim);font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.08em}
+.mk-title{margin-top:9px;font-size:22px;font-weight:650;letter-spacing:-.2px}
+.mk-desc{margin-top:3px;font-size:13.5px;color:var(--text2);max-width:62ch}
+.mk-metrics{display:grid;grid-template-columns:repeat(3,minmax(112px,1fr));gap:10px}
+.mk-metric{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(15,23,42,.08);
+  border-radius:var(--r-md);background:rgba(255,255,255,.8);box-shadow:0 10px 28px rgba(15,23,42,.06)}
+.mk-metric i{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
+  background:var(--teal-dim);color:var(--teal);font-size:16px}
+.mk-metric span{display:block;font-size:15px;font-weight:700;line-height:1.05;white-space:nowrap}
+.mk-metric small{display:block;margin-top:4px;font-size:10.5px;color:var(--text3);white-space:nowrap}
+
+/* ── sekmeler ──────────────────────────────────────────────────── */
+.mk-tabs{display:flex;gap:8px;padding:10px 28px 12px;background:rgba(255,255,255,.82);border-bottom:1px solid rgba(15,23,42,.07)}
+.mk-tab{display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid transparent;border-radius:999px;
+  background:transparent;color:var(--text2);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.mk-tab i{font-size:15px}
+.mk-tab:hover{background:var(--surface2)}
+.mk-tab.on{background:var(--accent-dim);border-color:rgba(37,99,235,.2);color:var(--accent-text)}
+
+/* ── çalışma alanı: iki sütun ──────────────────────────────────── */
+.mk-work{display:grid;grid-template-columns:288px minmax(0,1fr);gap:18px;padding:18px 28px 120px;align-items:start}
+.mk-rail{position:sticky;top:14px;display:flex;flex-direction:column;gap:12px}
+.mk-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+.mk-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);padding:15px 16px}
+.mk-card.pad0{padding:0;overflow:hidden}
+.mk-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+.mk-cardhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
+.mk-link{font-size:11.5px;font-weight:600;color:var(--accent);cursor:pointer;background:none;border:0;font-family:inherit;padding:0}
+.mk-link:hover{text-decoration:underline}
+
+/* ── adım şeridi ───────────────────────────────────────────────── */
+.mk-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mk-step{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;
+  border:1px solid var(--border2);background:var(--surface);font-size:12px;font-weight:600;color:var(--text3)}
+.mk-step i{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;background:var(--surface2);color:var(--text3)}
+.mk-step.done{border-color:rgba(34,197,94,.3);background:var(--success-dim);color:var(--success-text)}
+.mk-step.done i{background:var(--success);color:#fff}
+.mk-step.now{border-color:var(--accent);background:var(--accent-dim);color:var(--accent-text);box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.mk-step.now i{background:var(--accent);color:#fff}
+.mk-steps .mk-arrow{color:var(--surface3);font-size:11px}
+
+/* ── seçili ülke (kompakt) ─────────────────────────────────────── */
+.mk-picked{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--accent);
+  background:var(--accent-dim);border-radius:var(--r-lg);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.mk-picked img{width:38px;height:27px;border-radius:5px;object-fit:cover;border:.5px solid rgba(0,0,0,.08);flex-shrink:0}
+.mk-picked .mk-pn{font-size:14px;font-weight:650;color:var(--accent-text);line-height:1.15}
+.mk-picked .mk-pm{font-family:var(--mono);font-size:10.5px;color:var(--text3);margin-top:2px}
+.mk-cur{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px}
+.cur-eur{background:#DBEAFE;color:#1E40AF} .cur-usd{background:#D1FAE5;color:#065F46} .cur-try{background:#FEF3C7;color:#92400E}
+
+/* ── ülke seçici (açılır) ──────────────────────────────────────── */
+.mk-picker{display:none;margin-top:10px}
+.mk-picker.open{display:block}
+.mk-search{position:relative;margin-bottom:9px}
+.mk-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:15px}
+.mk-search input{width:100%;padding:9px 12px 9px 33px;border:1px solid var(--border2);border-radius:var(--r-md);
+  background:var(--surface);font:inherit;font-size:13px;outline:none}
+.mk-search input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.mk-grouptabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.mk-gt{padding:5px 11px;border:1px solid var(--border2);border-radius:999px;background:var(--surface);
+  font:inherit;font-size:11.5px;font-weight:600;color:var(--text2);cursor:pointer}
+.mk-gt.on{background:var(--text);border-color:var(--text);color:#fff}
+.mk-gt b{font-weight:600;opacity:.5;margin-left:4px}
+.mk-ccgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:7px}
+.mk-cc{position:relative;display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--border2);
+  border-radius:var(--r-md);background:var(--surface);cursor:pointer;transition:.13s}
+.mk-cc:hover{border-color:var(--accent-mid);background:var(--accent-dim)}
+.mk-cc.on{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 1px var(--accent)}
+.mk-cc img{width:28px;height:20px;border-radius:4px;object-fit:cover;border:.5px solid rgba(0,0,0,.08)}
+.mk-cc .n{font-size:12.5px;font-weight:600;line-height:1.15}
+.mk-cc .c{font-family:var(--mono);font-size:9.5px;color:var(--text3)}
+.mk-cc .mk-cur{margin-left:auto;font-size:9.5px;padding:1px 6px}
+
+/* ── segmented (depo tipi) ─────────────────────────────────────── */
+.mk-seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--surface2);border-radius:10px}
+.mk-segb{display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 8px;border:0;border-radius:7px;
+  background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;transition:.12s}
+.mk-segb i{font-size:16px}
+.mk-segb:hover{color:var(--text)}
+.mk-segb.on{background:var(--surface);color:var(--accent-text);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.mk-seghint{margin-top:7px;font-size:11px;color:var(--text3);line-height:1.45}
+
+/* ── toggle satırı ─────────────────────────────────────────────── */
+.mk-toggle{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface2);cursor:pointer;margin-top:8px}
+.mk-toggle.on{border-color:var(--accent-mid);background:var(--accent-dim)}
+.mk-toggle input{margin-top:2px;accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+.mk-toggle .tt{font-size:12.5px;font-weight:600}
+.mk-toggle .ts{font-size:10.5px;color:var(--text3);margin-top:2px;line-height:1.4}
+
+/* ── form alanları ─────────────────────────────────────────────── */
+.mk-sec{margin-bottom:16px}
+.mk-sec:last-child{margin-bottom:0}
+.mk-sechead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.mk-sechead i{width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--surface2);color:var(--text2);font-size:14px}
+.mk-sectitle{font-size:12.5px;font-weight:650}
+.mk-secnote{margin-left:auto;font-size:10.5px;color:var(--text3)}
+.mk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px}
+.mk-f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mk-f > label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text2)}
+.mk-in{display:flex;align-items:center;gap:0;border:1px solid var(--border2);border-radius:var(--r-md);
+  background:var(--surface);overflow:hidden;transition:.12s}
+.mk-in:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.mk-in input{flex:1;min-width:0;padding:9px 11px;border:0;background:transparent;font-family:var(--mono);
+  font-size:13px;color:var(--text);outline:none}
+.mk-in input::placeholder{color:var(--text3)}
+.mk-in .pre,.mk-in .suf{padding:0 10px;font-family:var(--mono);font-size:12px;color:var(--text3);
+  background:var(--surface2);align-self:stretch;display:flex;align-items:center;border-right:1px solid var(--border)}
+.mk-in .suf{border-right:0;border-left:1px solid var(--border);font-weight:600}
+.mk-in select{border:0;background:var(--surface2);font-family:var(--mono);font-size:12px;color:var(--text2);
+  padding:0 6px 0 10px;align-self:stretch;outline:none;cursor:pointer;border-right:1px solid var(--border)}
+.mk-in.ro{background:var(--surface2)}
+.mk-in.ro input{color:var(--text2)}
+.mk-in.auto{border-color:var(--accent-mid);background:linear-gradient(0deg,rgba(239,246,255,.6),rgba(239,246,255,.6))}
+.mk-hint{font-size:10.5px;color:var(--text3);line-height:1.4}
+.mk-tag{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;
+  letter-spacing:.02em;text-transform:uppercase}
+.mk-tag i{font-size:11px}
+.tag-auto{background:var(--accent-dim);color:var(--accent-text)}
+.tag-lock{background:var(--surface2);color:var(--text3)}
+.tag-req{background:var(--error-dim);color:#B91C1C}
+
+/* ── özet ──────────────────────────────────────────────────────── */
+.mk-sum{border:1px solid var(--border2);border-radius:var(--r-lg);background:var(--surface);overflow:hidden}
+.mk-sumhead{display:flex;align-items:center;gap:8px;padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.mk-sumhead i{color:var(--teal);font-size:16px}
+.mk-sumhead .t{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.mk-sumbody{padding:6px 14px 12px}
+.mk-srow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--border)}
+.mk-srow:last-child{border-bottom:0}
+.mk-srow .k{font-size:11.5px;color:var(--text2)}
+.mk-srow .v{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right}
+.mk-srow .v small{font-family:var(--font);font-size:10px;color:var(--text3);font-weight:500;margin-left:3px}
+.mk-srow.big .v{font-size:15px;color:var(--accent-text)}
+.mk-formula{margin:10px 14px 14px;padding:10px 12px;border:1px dashed var(--accent-mid);border-radius:var(--r-md);
+  background:var(--accent-dim)}
+.mk-formula .ft{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:var(--accent-text);
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.mk-formula code{display:block;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.75}
+.mk-formula code b{color:var(--accent-text);font-weight:600}
+
+/* ── kayıtlı taslaklar ─────────────────────────────────────────── */
+.mk-draft{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:.12s}
+.mk-draft:last-child{border-bottom:0}
+.mk-draft:hover{background:var(--accent-dim)}
+.mk-draft img{width:24px;height:17px;border-radius:3px;object-fit:cover;border:.5px solid rgba(0,0,0,.08);flex-shrink:0}
+.mk-draft .dn{font-family:var(--mono);font-size:12.5px;font-weight:600;line-height:1.2}
+.mk-draft .dm{font-size:10px;color:var(--text3);margin-top:2px}
+.mk-pill{margin-left:auto;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.pill-warn{background:var(--warning-dim);color:var(--gold)} .pill-lock{background:var(--surface2);color:var(--text2)}
+.pill-new{background:var(--success-dim);color:var(--success-text)}
+
+/* ── uyarı şeridi ──────────────────────────────────────────────── */
+.mk-note{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:var(--r-md);font-size:11.5px;line-height:1.5}
+.mk-note i{font-size:15px;flex-shrink:0;margin-top:1px}
+.note-ok{background:var(--success-dim);color:var(--success-text)}
+.note-info{background:var(--accent-dim);color:var(--accent-text)}
+.note-warn{background:var(--warning-dim);color:var(--gold)}
+
+/* ── sabit aksiyon çubuğu ──────────────────────────────────────── */
+.mk-bar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:12px;padding:12px 28px;
+  background:rgba(255,255,255,.93);backdrop-filter:blur(10px);border-top:1px solid var(--border2);
+  box-shadow:0 -8px 24px rgba(15,23,42,.06);z-index:20}
+.mk-barinfo{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text3)}
+.mk-barinfo b{font-family:var(--mono);font-size:12.5px;color:var(--text);font-weight:600}
+.mk-btns{margin-left:auto;display:flex;gap:9px}
+.mk-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:var(--r-md);border:1px solid var(--border2);
+  background:var(--surface);color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.12s}
+.mk-btn:hover{background:var(--surface2)}
+.mk-btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.25)}
+.mk-btn.pri:hover{background:#1D4ED8}
+.mk-btn i{font-size:16px}
+
+@media(max-width:1100px){.mk-work{grid-template-columns:1fr}.mk-rail{position:static}}
+@media(max-width:640px){.mk-head{grid-template-columns:1fr}.mk-metrics{grid-template-columns:repeat(3,1fr)}
+  .mk-work{padding:14px 16px 130px}.mk-tabs,.mk-head,.mk-bar{padding-left:16px;padding-right:16px}}
+</style>
+</head>
+<body>
+
+<div class="mk-flag">
+  <span class="mk-dot"></span><b>MOCKUP</b><span class="mk-sep">·</span>
+  Taslak Doldur ekranı için tasarım önerisi — canlı uygulama değiştirilmedi
+  <span class="mk-sep">·</span> alanlar temsilidir
+</div>
+
+<header class="mk-head">
+  <div>
+    <div class="mk-kicker">Fatura Üret</div>
+    <div class="mk-title">Taslak Doldur</div>
+    <div class="mk-desc">Ülkeyi seç, depo tipini belirle; navlun ve sigorta kap oranına göre otomatik gelsin. Her alan elle değiştirilebilir.</div>
+  </div>
+  <div class="mk-metrics">
+    <div class="mk-metric"><i class="ti ti-world"></i><div><span>20</span><small>tanımlı ülke</small></div></div>
+    <div class="mk-metric"><i class="ti ti-calculator"></i><div><span>Otomatik</span><small>navlun + sigorta</small></div></div>
+    <div class="mk-metric"><i class="ti ti-device-floppy"></i><div><span>5 gün</span><small>taslak saklama</small></div></div>
+  </div>
+</header>
+
+<nav class="mk-tabs">
+  <button class="mk-tab on"><i class="ti ti-file-description"></i><span>Taslak</span></button>
+  <button class="mk-tab"><i class="ti ti-search"></i><span>GTİP &amp; Menşe</span></button>
+  <button class="mk-tab"><i class="ti ti-file-invoice"></i><span>INV + PL</span></button>
+  <button class="mk-tab"><i class="ti ti-truck-delivery"></i><span>Belçika T1 Ayrımı</span></button>
+</nav>
+
+<div class="mk-work">
+
+  <!-- ═══ SOL RAY: bağlam ═══════════════════════════════════════ -->
+  <aside class="mk-rail">
+
+    <div class="mk-card">
+      <div class="mk-cardhead">
+        <span class="mk-lbl">Ülke</span>
+        <button class="mk-link" onclick="togglePicker()" id="pickerBtn">Değiştir</button>
+      </div>
+      <div class="mk-picked" id="picked">
+        <img src="https://flagcdn.com/40x30/rs.png" alt="">
+        <div>
+          <div class="mk-pn" id="pkName">Sırbistan</div>
+          <div class="mk-pm" id="pkMeta">RS · Kurumsal · taslak_rs.xlsx</div>
+        </div>
+        <span class="mk-cur cur-eur" id="pkCur">EUR</span>
+      </div>
+      <div class="mk-note note-ok" style="margin-top:9px;">
+        <i class="ti ti-circle-check"></i><div>Şablon yüklendi — <b>taslak_rs.xlsx</b></div>
+      </div>
+    </div>
+
+    <div class="mk-card">
+      <div class="mk-cardhead"><span class="mk-lbl">Depo Tipi</span><span class="mk-lbl" id="depoKod">İHR</span></div>
+      <div class="mk-seg">
+        <button class="mk-segb on" id="segSerbest" onclick="setDepo('serbest')"><i class="ti ti-building-warehouse"></i>Serbest</button>
+        <button class="mk-segb" id="segAntrepo" onclick="setDepo('antrepo')"><i class="ti ti-building-factory-2"></i>Antrepo</button>
+      </div>
+      <div class="mk-seghint" id="depoHint">Serbest depo → <b>İHR</b>. NET otomatik: BRÜT × 0.9. Navlun çarpanı ham kap sayısı.</div>
+
+      <label class="mk-toggle on" id="tgKomple">
+        <input type="checkbox" onchange="setKomple(this.checked)">
+        <div><div class="tt">📦 Komple Depo</div><div class="ts">Navlun ve sigortanın tamamı yazılır, kap oranına bölünmez.</div></div>
+      </label>
+
+      <label class="mk-toggle" id="tgGruplu">
+        <input type="checkbox" onchange="setGruplu(this.checked)">
+        <div><div class="tt">🔗 Gruplu Sevkiyat</div><div class="ts">ANT + İHR aynı sefer. Kalan tutar partner dosyaya aktarılır.</div></div>
+      </label>
+
+      <div id="partnerWrap" style="display:none;margin-top:10px;">
+        <div class="mk-f">
+          <label>Partner Dosya No</label>
+          <div class="mk-in"><select><option>2026</option><option>2027</option><option>2028</option></select>
+            <input placeholder="örn: 101"></div>
+          <div class="mk-hint">Bu taslak kaydedilince kalan navlun/sigorta partner dosyaya otomatik aktarılır.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mk-card pad0">
+      <div class="mk-cardhead" style="padding:13px 14px 10px;margin:0;">
+        <span class="mk-lbl">Kayıtlı Taslaklar</span><span class="mk-lbl">3</span>
+      </div>
+      <div class="mk-draft"><img src="https://flagcdn.com/40x30/rs.png" alt="">
+        <div><div class="dn">2026-443</div><div class="dm">Sırbistan · 2 saat önce</div></div>
+        <span class="mk-pill pill-new">Devam et</span></div>
+      <div class="mk-draft"><img src="https://flagcdn.com/40x30/kz.png" alt="">
+        <div><div class="dn">2026-431</div><div class="dm">Kazakistan · 4 gün önce</div></div>
+        <span class="mk-pill pill-warn">1 gün</span></div>
+      <div class="mk-draft"><img src="https://flagcdn.com/40x30/be.png" alt="">
+        <div><div class="dn">2026-402</div><div class="dm">Belçika · 21 gün önce</div></div>
+        <span class="mk-pill pill-lock">Korunuyor</span></div>
+    </div>
+
+  </aside>
+
+  <!-- ═══ ANA SÜTUN ═════════════════════════════════════════════ -->
+  <section class="mk-col">
+
+    <div class="mk-steps">
+      <div class="mk-step done"><i class="ti ti-check"></i>Ülke</div><span class="mk-arrow">›</span>
+      <div class="mk-step done"><i class="ti ti-check"></i>Depo tipi</div><span class="mk-arrow">›</span>
+      <div class="mk-step now"><i>3</i>Bilgiler</div><span class="mk-arrow">›</span>
+      <div class="mk-step"><i>4</i>İndir / Kaydet</div>
+    </div>
+
+    <!-- ülke seçici (kapalı; "Değiştir" ile açılır) -->
+    <div class="mk-card mk-picker" id="picker">
+      <div class="mk-cardhead"><span class="mk-lbl">Ülke Seç</span>
+        <button class="mk-link" onclick="togglePicker()">Kapat</button></div>
+      <div class="mk-search"><i class="ti ti-search"></i><input placeholder="Ülke ara…" oninput="filterCc(this.value)"></div>
+      <div class="mk-grouptabs">
+        <button class="mk-gt on" onclick="setGrup(this,'hepsi')">Hepsi<b>20</b></button>
+        <button class="mk-gt" onclick="setGrup(this,'kurumsal')">Kurumsal<b>9</b></button>
+        <button class="mk-gt" onclick="setGrup(this,'franchise')">Franchise<b>8</b></button>
+        <button class="mk-gt" onclick="setGrup(this,'toptan')">Toptan<b>2</b></button>
+        <button class="mk-gt" onclick="setGrup(this,'devir')">Devir<b>1</b></button>
+      </div>
+      <div class="mk-ccgrid" id="ccGrid"></div>
+    </div>
+
+    <!-- FORM -->
+    <div class="mk-card">
+
+      <div class="mk-sec">
+        <div class="mk-sechead"><i class="ti ti-hash"></i><div class="mk-sectitle">Dosya</div>
+          <span class="mk-secnote">Excel A1 · referans bloğu</span></div>
+        <div class="mk-grid">
+          <div class="mk-f">
+            <label>Referans No <span class="mk-tag tag-req">zorunlu</span></label>
+            <div class="mk-in"><select><option>2026</option><option>2027</option><option>2028</option></select>
+              <input value="443" oninput="render()" id="fRef"></div>
+            <div class="mk-hint">Dosya no: <b id="dosyaNo">2026-443</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mk-sec">
+        <div class="mk-sechead"><i class="ti ti-package"></i><div class="mk-sectitle">Kap &amp; Ağırlık</div>
+          <span class="mk-secnote">navlun çarpanını bu alan belirler</span></div>
+        <div class="mk-grid">
+          <div class="mk-f">
+            <label>Kap Sayısı</label>
+            <div class="mk-in"><input value="28" id="fKap" oninput="render()"><span class="suf">kap</span></div>
+            <div class="mk-hint" id="kapHint">İHR → çarpan = 28 kap</div>
+          </div>
+          <div class="mk-f">
+            <label>Toplam BRÜT</label>
+            <div class="mk-in"><input value="8500,00" id="fBrut" oninput="render()"><span class="suf">kg</span></div>
+            <div class="mk-hint">Master Excel toplamı ile eşleşmeli.</div>
+          </div>
+          <div class="mk-f">
+            <label>Toplam NET <span class="mk-tag tag-lock" id="netTag"><i class="ti ti-lock"></i>otomatik</span></label>
+            <div class="mk-in ro" id="netBox"><input value="7650,00" id="fNet" readonly><span class="suf">kg</span></div>
+            <div class="mk-hint" id="netHint">BRÜT × 0.9 — serbest depoda kilitli.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mk-sec">
+        <div class="mk-sechead"><i class="ti ti-coins"></i><div class="mk-sectitle">Navlun &amp; Sigorta</div>
+          <span class="mk-secnote" id="curNote">EUR · ülke navlun tanımından</span></div>
+        <div class="mk-grid">
+          <div class="mk-f">
+            <label>Navlun <span class="mk-tag tag-auto"><i class="ti ti-sparkles"></i>otomatik</span></label>
+            <div class="mk-in auto"><input id="fNav" value="2700"><span class="suf">EUR</span></div>
+            <div class="mk-hint">Otomatik dolar, istediğin gibi değiştirebilirsin.</div>
+          </div>
+          <div class="mk-f">
+            <label>Sigorta <span class="mk-tag tag-auto"><i class="ti ti-sparkles"></i>otomatik</span></label>
+            <div class="mk-in auto"><input id="fSig" value="382"><span class="suf">EUR</span></div>
+            <div class="mk-hint">Sigorta bazı: 450 EUR / 33 palet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mk-note note-info" id="senaryoNot">
+        <i class="ti ti-route"></i>
+        <div><b>Senaryo: İHR</b> — <span id="senaryoAcik">serbest depo, tek dosya. Baz navlun 3.100 EUR / 33 palet.</span></div>
+      </div>
+
+    </div>
+
+    <!-- ÖZET -->
+    <div class="mk-sum">
+      <div class="mk-sumhead"><i class="ti ti-file-check"></i><div class="t">Taslak Özeti</div>
+        <span class="mk-lbl" style="margin-left:auto;">taslak_rs.xlsx</span></div>
+      <div class="mk-sumbody">
+        <div class="mk-srow"><span class="k">Dosya No</span><span class="v" id="sDosya">2026-443</span></div>
+        <div class="mk-srow"><span class="k">Ülke / Depo</span><span class="v" id="sUlke">Sırbistan · Serbest (İHR)</span></div>
+        <div class="mk-srow"><span class="k">Kap</span><span class="v" id="sKap">28 <small>kap</small></span></div>
+        <div class="mk-srow"><span class="k">BRÜT / NET</span><span class="v" id="sKg">8.500,00 / 7.650,00 <small>kg</small></span></div>
+        <div class="mk-srow big"><span class="k">Navlun</span><span class="v" id="sNav">2.700 <small>EUR</small></span></div>
+        <div class="mk-srow big"><span class="k">Sigorta</span><span class="v" id="sSig">382 <small>EUR</small></span></div>
+      </div>
+      <div class="mk-formula">
+        <div class="ft"><i class="ti ti-math-function"></i>Hesap nereden geldi?</div>
+        <code id="formula"></code>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<!-- ═══ SABİT AKSİYON ÇUBUĞU ═══════════════════════════════════ -->
+<div class="mk-bar">
+  <div class="mk-barinfo"><i class="ti ti-clock"></i>Son kayıt <b>14:32</b> · otomatik kaydedildi</div>
+  <div class="mk-btns">
+    <button class="mk-btn"><i class="ti ti-device-floppy"></i>Kaydet</button>
+    <button class="mk-btn pri"><i class="ti ti-download"></i>Taslak İndir</button>
+  </div>
+</div>
+
+<script>
+/* ── temsili ülke listesi ─────────────────────────────────────── */
+const ULKELER = [
+  ['rs','Sırbistan','EUR','kurumsal'],['ba','Bosna','EUR','kurumsal'],['ge','Gürcistan','USD','kurumsal'],
+  ['xk','Kosova','EUR','kurumsal'],['mk','Makedonya','EUR','kurumsal'],['be','Belçika','EUR','kurumsal'],
+  ['de','Almanya','EUR','kurumsal'],['nl','Hollanda','EUR','kurumsal'],['kz','Kazakistan','TRY','kurumsal'],
+  ['cy','Kıbrıs','TRY','franchise'],['iq','Irak','USD','franchise'],['ly','Libya','USD','franchise'],
+  ['lr','Liberya','USD','franchise'],['lb','Lübnan','USD','franchise'],['uz','Özbekistan','USD','franchise'],
+  ['jo','Ürdün','USD','franchise'],['mu','Mauritius','USD','franchise'],['ru','Rusya','TRY','toptan'],
+  ['az','Azerbaycan','TRY','toptan'],['ab','Abhazya','USD','devir'],
+];
+/* rs için temsili navlun tanımı */
+const TANIM = { ant:3400, ihr:3100, antihr:3600, sigorta:450, kapasite:33, palet:30, cur:'EUR' };
+
+let depo='serbest', komple=false, gruplu=false, secili='rs';
+
+function tr(n,d){return n.toLocaleString('tr-TR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
+
+function buildCc(){
+  document.getElementById('ccGrid').innerHTML = ULKELER.map(([k,ad,cur,g])=>`
+    <div class="mk-cc ${k===secili?'on':''}" data-k="${k}" data-g="${g}" data-n="${ad.toLowerCase()}" onclick="pick('${k}')">
+      <img src="https://flagcdn.com/40x30/${k==='ab'?'ge':k}.png" alt="">
+      <div><div class="n">${ad}</div><div class="c">${k.toUpperCase()}</div></div>
+      <span class="mk-cur cur-${cur.toLowerCase()}">${cur}</span>
+    </div>`).join('');
+}
+function pick(k){ secili=k; buildCc();
+  const u=ULKELER.find(x=>x[0]===k);
+  document.querySelector('#picked img').src='https://flagcdn.com/40x30/'+(k==='ab'?'ge':k)+'.png';
+  pkName.textContent=u[1];
+  pkMeta.textContent=u[0].toUpperCase()+' · '+u[3][0].toUpperCase()+u[3].slice(1)+' · taslak_'+u[0]+'.xlsx';
+  pkCur.textContent=u[2]; pkCur.className='mk-cur cur-'+u[2].toLowerCase();
+  togglePicker(); render();
+}
+function togglePicker(){ const p=document.getElementById('picker'); p.classList.toggle('open');
+  pickerBtn.textContent=p.classList.contains('open')?'Kapat':'Değiştir'; }
+function setGrup(btn,g){ document.querySelectorAll('.mk-gt').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
+  document.querySelectorAll('.mk-cc').forEach(c=>c.style.display=(g==='hepsi'||c.dataset.g===g)?'':'none'); }
+function filterCc(q){ q=q.toLowerCase().trim();
+  document.querySelectorAll('.mk-cc').forEach(c=>c.style.display=c.dataset.n.includes(q)?'':'none'); }
+
+function setDepo(t){ depo=t;
+  segSerbest.classList.toggle('on',t==='serbest'); segAntrepo.classList.toggle('on',t==='antrepo');
+  depoKod.textContent = t==='serbest'?'İHR':'ANT';
+  depoHint.innerHTML = t==='serbest'
+    ? 'Serbest depo → <b>İHR</b>. NET otomatik: BRÜT × 0.9. Navlun çarpanı ham kap sayısı.'
+    : 'Antrepo → <b>ANT</b>. NET elle girilir. Navlun çarpanı: ⌈kap / 30⌉ palet.';
+  document.querySelector('#tgKomple .tt').textContent = t==='antrepo'?'📦 Komple Antrepo':'📦 Komple Depo';
+  const ro = t==='serbest';
+  netBox.classList.toggle('ro',ro); fNet.readOnly=ro;
+  netTag.className='mk-tag '+(ro?'tag-lock':'tag-auto');
+  netTag.innerHTML = ro?'<i class="ti ti-lock"></i>otomatik':'<i class="ti ti-pencil"></i>elle';
+  netHint.textContent = ro?'BRÜT × 0.9 — serbest depoda kilitli.':'Antrepo: NET değerini elle gir.';
+  render();
+}
+function setKomple(v){ komple=v; tgKomple.classList.toggle('on',v);
+  if(v && gruplu){ gruplu=false; tgGruplu.classList.remove('on');
+    tgGruplu.querySelector('input').checked=false; partnerWrap.style.display='none'; }
+  render();
+}
+function setGruplu(v){ gruplu=v; tgGruplu.classList.toggle('on',v);
+  partnerWrap.style.display=v?'block':'none';
+  if(v && komple){ komple=false; tgKomple.classList.remove('on'); tgKomple.querySelector('input').checked=false; }
+  render();
+}
+
+function render(){
+  const u=ULKELER.find(x=>x[0]===secili);
+  const kap=parseFloat((fKap.value||'0').replace(',','.'))||0;
+  const brut=parseFloat((fBrut.value||'0').replace(/\./g,'').replace(',','.'))||0;
+  if(depo==='serbest'){ fNet.value=tr(brut*0.9,2); }
+
+  const carpan = depo==='serbest' ? kap : Math.ceil(kap/TANIM.palet);
+  const baz = gruplu ? TANIM.antihr : (depo==='antrepo'?TANIM.ant:TANIM.ihr);
+  let nav, sig, fml;
+  if(komple){
+    nav=baz; sig=TANIM.sigorta;
+    fml=`<b>Komple</b> — kap oranı uygulanmaz.\nnavlun  = ${tr(baz)} ${TANIM.cur} (tam tutar)\nsigorta = ${tr(TANIM.sigorta)} ${TANIM.cur} (tam tutar)`;
+  }else{
+    nav=Math.ceil((baz/TANIM.kapasite)*carpan/100)*100;
+    sig=Math.ceil((TANIM.sigorta/TANIM.kapasite)*carpan);
+    fml=`çarpan  = ${depo==='serbest'?`<b>${kap}</b> kap (İHR, ham kap)`:`⌈${kap} / 30⌉ = <b>${carpan}</b> palet (ANT)`}\n`+
+        `navlun  = ⌈(${tr(baz)} / 33) × ${carpan} / 100⌉ × 100 = <b>${tr(nav)} ${TANIM.cur}</b>\n`+
+        `sigorta = ⌈(${tr(TANIM.sigorta)} / 33) × ${carpan}⌉ = <b>${tr(sig)} ${TANIM.cur}</b>`;
+  }
+  fNav.value=tr(nav); fSig.value=tr(sig);
+
+  const yil=document.querySelector('#fRef').previousElementSibling.value;
+  dosyaNo.textContent=sDosya.textContent=yil+'-'+(fRef.value||'—');
+  kapHint.innerHTML = depo==='serbest' ? `İHR → çarpan = <b>${kap}</b> kap`
+    : `ANT → çarpan = ⌈${kap} / 30⌉ = <b>${carpan}</b> palet`;
+  sUlke.textContent=`${u[1]} · ${depo==='serbest'?'Serbest (İHR)':'Antrepo (ANT)'}`;
+  sKap.innerHTML=`${tr(kap)} <small>kap</small>`;
+  sKg.innerHTML=`${tr(brut,2)} / ${fNet.value} <small>kg</small>`;
+  sNav.innerHTML=`${tr(nav)} <small>${TANIM.cur}</small>`;
+  sSig.innerHTML=`${tr(sig)} <small>${TANIM.cur}</small>`;
+  document.getElementById('formula').innerHTML=fml;
+
+  const s = komple ? ['KOMPLE','navlun ve sigortanın tamamı bu dosyaya yazılır, kap oranına bölünmez.']
+    : gruplu ? ['GRUPLU (ANT + İHR)',`ortak baz ${tr(TANIM.antihr)} ${TANIM.cur}. Kalan tutar kaydedince partner dosyaya aktarılır.`]
+    : depo==='antrepo' ? ['ANT',`antrepo, tek dosya. Baz navlun ${tr(TANIM.ant)} ${TANIM.cur} / 33 palet.`]
+    : ['İHR',`serbest depo, tek dosya. Baz navlun ${tr(TANIM.ihr)} ${TANIM.cur} / 33 palet.`];
+  document.querySelector('#senaryoNot b').textContent='Senaryo: '+s[0];
+  senaryoAcik.textContent=s[1];
+}
+
+buildCc(); setDepo('serbest');
+</script>
+</body>
+</html>

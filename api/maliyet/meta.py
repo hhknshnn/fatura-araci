@@ -14,16 +14,20 @@ from api.audit import log_action
 GECERLI_TIPLER = ('hareket', 'storage', 'sabit', 'minimum')
 GECERLI_BAKIYE_YONTEMLERI = ('donem_sonu', 'donem_basi', 'gun_ortalama', 'maksimum')
 
+# Maliyet takipte 3PL/depo hesabı olmayan kurumsal ülkeler (fatura üretimi durur).
+MALIYET_HARIC_ULKELER = frozenset({'de'})
+
 
 def kurumsal_ulkeler():
-    """config/countries.json içinden grup=kurumsal ülkeleri döner."""
+    """config/countries.json içinden grup=kurumsal ülkeleri döner.
+    Almanya (de) maliyet hesaplanmadığı için listeden çıkarılır."""
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     with open(os.path.join(base_dir, 'config', 'countries.json'), encoding='utf-8') as f:
         data = json.load(f)
     return [
         {'kod': kod, 'label': u.get('label', kod), 'currency': u.get('currency', 'EUR')}
         for kod, u in data.items()
-        if u.get('grup') == 'kurumsal'
+        if u.get('grup') == 'kurumsal' and kod not in MALIYET_HARIC_ULKELER
     ]
 
 

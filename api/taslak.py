@@ -2,119 +2,26 @@ import json
 import io
 import os
 import re
-from pypdf import PdfReader
 import openpyxl
+
+from invoice.helpers import parse_pdf as _parse_pdf_common
 
 _ULKE_KODU_RE = re.compile(r'^[a-z]{2,4}$')
 
-def _normalize_pdf_text(text):
-    return re.sub(r'\s+', ' ', (text or '').replace('\u00a0', ' ')).strip()
-
-def _extract_pdf_amount(text, patterns):
-    def _parse_pdf_amount(value):
-        s = str(value).strip().replace(' ', '').replace('\u00a0', '')
-        if '.' in s and ',' in s:
-            if s.rfind(',') > s.rfind('.'):
-                s = s.replace('.', '').replace(',', '.')
-            else:
-                s = s.replace(',', '')
-        elif ',' in s:
-            s = s.replace(',', '.')
-        try:
-            return float(s)
-        except Exception:
-            return 0.0
-    for pattern in patterns:
-        m = re.search(pattern, text, re.IGNORECASE)
-        if m:
-            return _parse_pdf_amount(m.group(1))
-    return 0.0
-
-def _extract_amount_near_keywords(text, keywords, window=140):
-    money_re = re.compile(
-        r'(?:TRY|TL|₺)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2,4})|[0-9]+[.,][0-9]{2,4})\s*(?:TRY|TL|₺)?',
-        re.IGNORECASE,
-    )
-    for keyword in keywords:
-        for match in re.finditer(keyword, text, re.IGNORECASE):
-            snippet = text[match.start():match.end() + window]
-            amounts = [
-                _extract_pdf_amount(m.group(1), [r'([\d.,]+)'])
-                for m in money_re.finditer(snippet)
-            ]
-            amounts = [n for n in amounts if n > 0]
-            if amounts:
-                return amounts[0]
-    return 0.0
 
 def parse_pdf_fields(pdf_bytes):
-    result = {'navlun': 0.0, 'sigorta': 0.0, 'kap': '', 'brutKg': 0.0, 'netKg': 0.0, 'kur': 0.0}
-    try:
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        page_count = len(reader.pages)
+    """Taslak / menşe / PL hedef kilo için PDF alanları. B.KG: 5600,00 dahil."""
+    parsed = _parse_pdf_common(pdf_bytes or b'')
+    return {
+        'navlun':  float(parsed.get('navlun') or 0),
+        'sigorta': float(parsed.get('sigorta') or 0),
+        'kap':     parsed.get('kap') or '',
+        'brutKg':  float(parsed.get('brutKg') or 0),
+        'netKg':   float(parsed.get('netKg') or 0),
+        'kur':     float(parsed.get('kur') or 0),
+    }
 
-        def _page_text(i):
-            return _normalize_pdf_text(reader.pages[i].extract_text() or '')
 
-        last_two_text = ' '.join(
-            t for t in (_page_text(i) for i in range(max(0, page_count - 2), page_count)) if t
-        ).strip()
-
-        # NAVLUN/SİGORTA özet bloğu faturalarda hep son sayfa altbilgisinde
-        # yer alır — tüm sayfaları taramak (pdfplumber/pypdf fark etmez) çok
-        # pahalıdır ve pratikte hiçbir zaman ek veri bulmaz.
-        text = last_two_text
-        if not text:
-            return result
-        result['navlun'] = _extract_pdf_amount(text, [
-            r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-            r'\bFREIGHT(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-        ]) or _extract_amount_near_keywords(text, [
-            r'\bNAVLUN\b',
-            r'\bFREIGHT\b',
-            r'\bTA[SŞ]IMA\b',
-        ])
-        result['sigorta'] = _extract_pdf_amount(text, [
-            r'\bS[İI]G(?:ORTA)?(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?\.?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-            r'\bINSURANCE(?:\s+(?:AMOUNT|COST|CHARGE|VALUE))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
-        ]) or _extract_amount_near_keywords(text, [
-            r'\bS[İI]GORTA\b',
-            r'\bSIGORTA\b',
-            r'\bINSURANCE\b',
-        ])
-        # Kap sayısı
-        kap_patterns = [
-            r'[*\-]?\s*KAP\s+ADET[İI]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
-            r'[*\-]?\s*KAP\s+SAYISI\s*:\s*(\d+(?:\s*\([^)]*\))?)',
-            r'[*\-]?\s*KAP\s*:\s*(\d+(?:\s*\([^)]*\))?)',
-            r'\bPACKAGES?\s*:\s*(\d+(?:\s*\([^)]*\))?)',
-        ]
-        for p in kap_patterns:
-            m = re.search(p, text, re.IGNORECASE)
-            if m:
-                result['kap'] = m.group(1).strip()
-                break
-        # Kur bilgisi
-        result['kur'] = _extract_pdf_amount(text, [
-            r'[*\-]?\s*KUR\s+B[İI]LG[İI]S[İI]\s*[:.]?\s*(?:TRY|EUR|USD)?\s*([\d.,]+)',
-        ])
-        # BRÜT kilo
-        result['brutKg'] = _extract_pdf_amount(text, [
-            r'\bB\.KG\s*[:.]?\s*([\d.,]+)',
-            r'\bBRUT\s*KG\s*[:.]?\s*([\d.,]+)',
-            r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-            r'\bBRÜT\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.,]+)',
-        ])
-        # NET kilo
-        result['netKg'] = _extract_pdf_amount(text, [
-            r'\bN\.KG\s*[:.]?\s*([\d.,]+)',
-            r'\bNET\s*KG\s*[:.]?\s*([\d.,]+)',
-            r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.,]+)',
-            r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.,]+)',
-        ])
-    except Exception:
-        pass
-    return result
 # ── CONFIG YÜKLE ──────────────────────────────────────────────────────────────
 def load_config(ulke_kodu):
     """Ülkeye göre taslak config dosyasını yükle."""

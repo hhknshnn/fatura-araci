@@ -155,6 +155,28 @@ def _extract_amount_near_keywords(text, keywords, window=140):
     return 0.0
 
 
+# B.KG: 5600,00 — PDF extract bazen "B. KG" / "B.\nKG" / "5 600,00" üretir.
+_BRUT_KG_PATTERNS = [
+    r'\bB\s*\.\s*KG\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bBRUT\s*\.?\s*KG\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bGROSS\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bBR[ÜU]T\s*(?:KG|A[ĞG]IRLIK)\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+]
+_NET_KG_PATTERNS = [
+    r'\bN\s*\.\s*KG\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bNET\s*\.?\s*KG\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bNET\s*WEIGHT\s*[:.]?\s*(?:KG)?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+    r'\bNET\s*A[ĞG]IRLIK\s*[:.]?\s*([\d.\s]+,\d{2}|[\d.,]+)',
+]
+
+
+def extract_pdf_brut_net_kg(text):
+    """PDF metninden (B.KG / N.KG) brüt ve net kiloyu okur."""
+    brut = _extract_pdf_amount(text, _BRUT_KG_PATTERNS)
+    net = _extract_pdf_amount(text, _NET_KG_PATTERNS)
+    return brut, net
+
+
 def _extract_pdf_packages(text):
     patterns = [
         r'[*\-]?\s*KAP\s+ADET[İI]\s*:\s*(\d+(?:\s*\([^)]*\))?)',
@@ -171,25 +193,126 @@ def _extract_pdf_packages(text):
     return ''
 
 
-def parse_pdf(pdf_bytes):
-    """
-    PDF'ten navlun, sigorta, kur, kap ve toplam TL bilgisini çıkarır.
-    Dönen dict: {'navlun': float, 'sigorta': float, 'kur': float, 'kap': str, 'fatura_tl': float}
-    Navlun ve sigorta PDF'te yazdığı tutar olarak döner; para birimi ülke akışında yorumlanır.
-    """
-    result = {'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0, 'kap': '', 'fatura_tl': 0.0}
+_FATURA_NO_LABEL_RE = re.compile(
+    r'(?:e-?\s*)?Fatura\s*No\s*:?\s*([A-Z]{2,6}\d{10,})',
+    re.IGNORECASE,
+)
+_INVOICE_NO_LABEL_RE = re.compile(
+    r'(?:Invoice|INV)\s*(?:No\.?|Number|#)\s*:?\s*([A-Z]{2,6}\d{10,})',
+    re.IGNORECASE,
+)
+_IHR_ANT_FATURA_RE = re.compile(r'\b((?:IHR|ANT)\d{10,})\b', re.IGNORECASE)
+_BLANK_FATURA_NO = frozenset(('none', 'nan', 'null', 'nat', '<na>'))
+
+
+def _extract_pdf_fatura_no(text):
+    """E-fatura PDF metninden fatura seri no çıkarır (örn. IHR2026000000317)."""
+    if not text:
+        return ''
+    for pattern in (_FATURA_NO_LABEL_RE, _INVOICE_NO_LABEL_RE):
+        m = pattern.search(text)
+        if m:
+            return m.group(1).strip().upper()
+    m = _IHR_ANT_FATURA_RE.search(text)
+    if m:
+        return m.group(1).strip().upper()
+    return ''
+
+
+def extract_fatura_no_from_pdf(pdf_bytes):
+    """PDF'in ilk sayfalarından fatura no okur. Yoksa boş string."""
+    if not pdf_bytes:
+        return ''
     try:
         reader = PdfReader(io.BytesIO(pdf_bytes))
+        for i in range(min(2, len(reader.pages))):
+            no = _extract_pdf_fatura_no(
+                _normalize_pdf_text(reader.pages[i].extract_text() or ''))
+            if no:
+                return no
+    except Exception:
+        pass
+    return ''
+
+
+def is_blank_fatura_no(value):
+    """Excel'deki boş / None / nan fatura no değerlerini ayırır."""
+    if value is None:
+        return True
+    try:
+        if isinstance(value, float) and value != value:  # NaN
+            return True
+    except Exception:
+        pass
+    s = str(value).strip()
+    return (not s) or s.lower() in _BLANK_FATURA_NO
+
+
+def resolve_fatura_no(df, pdf_fields=None):
+    """Excel'den fatura no okur; boş/None ise PDF'den gelen değere düşer."""
+    col = 'E-Fatura Seri Numarası'
+    excel_no = ''
+    if df is not None and col in getattr(df, 'columns', []) and len(df) > 0:
+        raw = df[col].iloc[0]
+        if not is_blank_fatura_no(raw):
+            excel_no = str(raw).strip()
+    if excel_no:
+        return excel_no
+    return str((pdf_fields or {}).get('fatura_no') or '').strip()
+
+
+def apply_pdf_fatura_fallback(df, pdf_fields=None):
+    """Excel fatura no boş/None ise PDF'dekini tüm satırlara yazar (master dahil)."""
+    pdf_no = str((pdf_fields or {}).get('fatura_no') or '').strip()
+    if not pdf_no or df is None:
+        return False
+    col = 'E-Fatura Seri Numarası'
+    if col not in getattr(df, 'columns', []) or df.empty or is_blank_fatura_no(df[col].iloc[0]):
+        df[col] = pdf_no
+        return True
+    return False
+
+
+def parse_pdf(pdf_bytes):
+    """
+    PDF'ten navlun, sigorta, kur, kap, kg, toplam TL ve fatura no bilgisini çıkarır.
+    Dönen dict: {'navlun': float, 'sigorta': float, 'kur': float, 'kap': str,
+                 'fatura_tl': float, 'fatura_no': str, 'brutKg': float, 'netKg': float}
+    Navlun ve sigorta PDF'te yazdığı tutar olarak döner; para birimi ülke akışında yorumlanır.
+    """
+    result = {
+        'navlun': 0.0, 'sigorta': 0.0, 'kur': 0.0,
+        'kap': '', 'fatura_tl': 0.0, 'fatura_no': '',
+        'brutKg': 0.0, 'netKg': 0.0,
+    }
+    try:
+        result['fatura_no'] = extract_fatura_no_from_pdf(pdf_bytes)
+        reader = PdfReader(io.BytesIO(pdf_bytes))
         page_count = len(reader.pages)
-        preferred_indexes = list(range(max(0, page_count - 2), page_count))
+        # B.KG çoğu faturada son sayfa dipnotunda; bazen bir önceki sayfada
+        # veya ilk sayfada kalır. Önce son 4, gerekirse geriye doğru tara.
+        preferred_indexes = list(range(max(0, page_count - 4), page_count))
+
+        def _page_text(i):
+            return _normalize_pdf_text(reader.pages[i].extract_text() or '')
+
+        def _apply_kg(text):
+            if not text:
+                return
+            brut, net = extract_pdf_brut_net_kg(text)
+            if result['brutKg'] <= 0 and brut > 0:
+                result['brutKg'] = brut
+            if result['netKg'] <= 0 and net > 0:
+                result['netKg'] = net
 
         for indexes in (preferred_indexes,):
             texts = []
             for i in indexes:
-                texts.append(_normalize_pdf_text(reader.pages[i].extract_text() or ''))
+                texts.append(_page_text(i))
             text = ' '.join(t for t in texts if t).strip()
             if not text:
                 continue
+            _apply_kg(text)
             if result['navlun'] <= 0:
                 result['navlun'] = _extract_pdf_amount(text, [
                     r'\bNAVLUN(?:\s+(?:BEDEL[İI]|BEDELI|TUTAR[İI]|TUTARI|ÜCRET[İI]|UCRETI))?(?:\s*\([^)]*\))?\s*[:.]?\s*(?:TRY|TL|₺)?\s*([\d.,]+)',
@@ -219,6 +342,18 @@ def parse_pdf(pdf_bytes):
                 result['kap'] = _extract_pdf_packages(text)
             if result['navlun'] > 0 and result['sigorta'] > 0:
                 break
+
+        if result['brutKg'] <= 0 or result['netKg'] <= 0:
+            extra = list(range(max(0, page_count - 8), max(0, page_count - 4)))
+            if 0 not in preferred_indexes:
+                extra.append(0)
+            seen = set(preferred_indexes)
+            for i in extra:
+                if i in seen:
+                    continue
+                _apply_kg(_page_text(i))
+                if result['brutKg'] > 0 and result['netKg'] > 0:
+                    break
     except Exception:
         pass
     return result

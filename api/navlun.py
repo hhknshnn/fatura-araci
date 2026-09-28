@@ -391,27 +391,31 @@ def navlun_tahsis_olustur():
     partner = str(body.get('partnerDosyaNo') or '').strip()
     kaynak = str(body.get('kaynakDosyaNo') or '').strip()
 
-    if ulke not in KURUMSAL_ULKELER:
-        return jsonify({'success': False, 'error': f'Geçersiz ülke: {ulke}'}), 400
     if not partner:
         return jsonify({'success': False, 'error': 'Partner dosya no zorunlu'}), 400
-
-    try:
-        navlun_final = float(body.get('navlunFinal'))
-        sigorta_final = float(body.get('sigortaFinal'))
-    except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'İlk taslak navlun/sigorta değeri geçersiz'}), 400
+    if not kaynak:
+        return jsonify({'success': False, 'error': 'Kaynak dosya no zorunlu'}), 400
 
     conn = get_conn()
     cur = conn.cursor()
     try:
-        row = _tanim_getir(cur, ulke)
-        if not row:
-            return jsonify({'success': False, 'error': 'Ülke navlun tanımı bulunamadı'}), 404
+        row = _tanim_getir(cur, ulke) if ulke in KURUMSAL_ULKELER else None
+        if row:
+            try:
+                navlun_final = float(body.get('navlunFinal'))
+                sigorta_final = float(body.get('sigortaFinal'))
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'İlk taslak navlun/sigorta değeri geçersiz'}), 400
+            # Kalan = toplam − ilk taslağın nihai değeri (negatife düşmez)
+            kalan_navlun = max(0.0, float(row['navlun_ant_ihr']) - navlun_final)
+            kalan_sigorta = max(0.0, float(row['sigorta_baz']) - sigorta_final)
+            para = row['para_birimi']
+        else:
+            # Navlun tanımı olmayan ülkelerde yalnız ANT+İHR grup eşlemesi yazılır.
+            kalan_navlun = 0.0
+            kalan_sigorta = 0.0
+            para = 'EUR'
 
-        # Kalan = toplam − ilk taslağın nihai değeri (negatife düşmez)
-        kalan_navlun = max(0.0, float(row['navlun_ant_ihr']) - navlun_final)
-        kalan_sigorta = max(0.0, float(row['sigorta_baz']) - sigorta_final)
         yil = _yil_ayikla(partner)
 
         cur.execute('''
@@ -425,17 +429,17 @@ def navlun_tahsis_olustur():
                 kaynak_dosya_no = EXCLUDED.kaynak_dosya_no,
                 kullanildi = FALSE,
                 created_at = now()
-        ''', (partner, yil, kalan_navlun, kalan_sigorta,
-              row['para_birimi'], kaynak))
+        ''', (partner, yil, kalan_navlun, kalan_sigorta, para, kaynak))
+        _otomatik_grupla(cur, kaynak)
         conn.commit()
         log_action(getattr(g, 'user', None), 'navlun_tahsis',
                    f'Gruplu kalan tahsis: {kaynak} → {partner} '
-                   f'navlun={kalan_navlun} sigorta={kalan_sigorta} {row["para_birimi"]}')
+                   f'navlun={kalan_navlun} sigorta={kalan_sigorta} {para}')
         return jsonify({
             'success': True,
             'navlun': kalan_navlun,
             'sigorta': kalan_sigorta,
-            'paraBirimi': row['para_birimi'],
+            'paraBirimi': para,
         })
     finally:
         cur.close()
@@ -531,6 +535,27 @@ def _partner_dosyalari(cur, dosya_no):
     return [r[0] for r in cur.fetchall() if r[0] and r[0] != dosya_no]
 
 
+def grup_ant_durum_esitle(cur, sefer_id):
+    """Grupta ANT faturası varsa (ve grup henüz toptan teslim edilmemişse)
+    tüm üyelerin durumunu Yüklenecek yap. Aynı cursor üzerinde çalışır."""
+    if not sefer_id:
+        return
+    cur.execute('SELECT fatura_no, durum FROM shipments WHERE sefer_id = %s', (sefer_id,))
+    rows = cur.fetchall()
+    if not rows:
+        return
+    has_ant = any(str(r[0] or '').upper().startswith('ANT') for r in rows)
+    if not has_ant:
+        return
+    teslim = {'TESLİM EDİLDİ', 'TESLIM EDILDI'}
+    if all(str(r[1] or '').strip().upper() in teslim for r in rows):
+        return
+    cur.execute('''
+        UPDATE shipments SET durum = %s
+        WHERE sefer_id = %s AND (durum IS DISTINCT FROM %s)
+    ''', ('Yüklenecek', sefer_id, 'Yüklenecek'))
+
+
 def _otomatik_grupla(cur, dosya_no):
     """Gruplu sevkin iki dosyasına ortak sefer_id atar (mevcut gruplama anahtarı).
     Partner shipment henüz yoksa no-op — partner oluşunca geriye dönük eşleşir.
@@ -563,6 +588,10 @@ def _otomatik_grupla(cur, dosya_no):
         UPDATE shipments SET sefer_id = %s
         WHERE id = ANY(%s) AND (sefer_id IS DISTINCT FROM %s)
     ''', (sefer_id, ids, sefer_id))
+    grup_ant_durum_esitle(cur, sefer_id)
+    # Plakası boş olan üyeyi gruptaki dolu plakayla tamamla.
+    from api.shipments import grup_plaka_esitle
+    grup_plaka_esitle(cur, sefer_id)
     return sefer_id
 
 

@@ -58,6 +58,11 @@ let mtState = {
     secili: null,      // Set(ulke kodları); null → hepsi seçili başlar
     indiriliyor: false,
   },
+  excel: {             // Lojistik maliyet Excel aktarımı
+    onizleme: null,    // API önizleme yanıtı
+    yukleniyor: false,
+    hata: '',
+  },
 };
 
 // Dataviz palet rolleri (doğrulanmış referans palet; seri sırası sabittir)
@@ -77,11 +82,13 @@ const MT_YONTEM_LABELS = {
 };
 
 const MT_TABS = [
-  { id: 'karsilastirma', label: 'Maliyet', icon: 'ti-wallet' },
-  { id: 'tarifeler',     label: 'Tarifeler',     icon: 'ti-list-details' },
-  { id: 'depolama',      label: 'Depolama',      icon: 'ti-building-warehouse' },
-  { id: 'faturalar',     label: 'Faturalar',     icon: 'ti-receipt' },
-  { id: 'analiz',        label: 'Analiz',        icon: 'ti-chart-dots-3' },
+  { id: 'karsilastirma', label: 'Maliyet',    icon: 'ti-wallet' },
+  { id: 'tarifeler',     label: 'Tarifeler',  icon: 'ti-list-details' },
+  { id: 'hareketler',    label: 'Hareketler', icon: 'ti-arrows-exchange' },
+  { id: 'depolama',      label: 'Depolama',   icon: 'ti-building-warehouse' },
+  { id: 'faturalar',     label: 'Faturalar',  icon: 'ti-receipt' },
+  { id: 'analiz',        label: 'Analiz',     icon: 'ti-chart-dots-3' },
+  { id: 'rapor',         label: 'Rapor',      icon: 'ti-file-spreadsheet' },
 ];
 
 const MT_ULKE_COLORS = {
@@ -127,8 +134,8 @@ function mtFmtTarih(iso) {
 function initMaliyetPanel() {
   const panel = document.getElementById('stepMaliyetTakip');
   if (!panel) return;
-  if (!panel.dataset.ready) {
-    panel.dataset.ready = '1';
+  if (panel.dataset.ready !== 'excel-aktar-1') {
+    panel.dataset.ready = 'excel-aktar-1';
     panel.innerHTML = `
       <style>
         .mt-shell {
@@ -139,15 +146,39 @@ function initMaliyetPanel() {
             radial-gradient(circle at 96% 4%, rgba(20,184,166,0.10), transparent 24%),
             linear-gradient(180deg, rgba(248,250,252,0.96) 0%, rgba(241,245,249,0.98) 100%);
         }
-        .mt-header { display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; }
-        .mt-kicker {
-          width:fit-content; padding:9px 15px; border:1px solid rgba(37,99,235,0.18);
-          border-radius:999px;
-          background:linear-gradient(135deg, rgba(239,246,255,0.96), rgba(240,253,250,0.96));
-          font-size:13px; font-weight:800; color:var(--accent-text);
-          letter-spacing:.08em; text-transform:uppercase;
-          box-shadow:0 12px 30px rgba(37,99,235,0.10);
+        .mt-header { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+        .mt-hero {
+          display:flex; justify-content:space-between; gap:18px; align-items:flex-end; flex-wrap:wrap;
+          padding:18px 20px; border:1px solid rgba(37,99,235,.12); border-radius:22px;
+          background:
+            linear-gradient(135deg, rgba(15,23,42,.96) 0%, rgba(23,37,84,.94) 52%, rgba(15,118,110,.88) 100%);
+          color:#fff; box-shadow:0 22px 48px rgba(15,23,42,.18);
+          position:relative; overflow:hidden;
         }
+        .mt-hero:after {
+          content:""; position:absolute; width:280px; height:280px; border-radius:50%;
+          right:-90px; top:-150px; background:rgba(56,189,248,.18);
+        }
+        .mt-kicker {
+          width:fit-content; padding:7px 12px; border:1px solid rgba(255,255,255,.16);
+          border-radius:999px; background:rgba(255,255,255,.1);
+          font-size:11px; font-weight:800; color:#dbeafe;
+          letter-spacing:.08em; text-transform:uppercase;
+        }
+        .mt-hero-title { font-size:22px; font-weight:820; letter-spacing:-.03em; margin:8px 0 4px; }
+        .mt-hero-sub { font-size:12.5px; color:rgba(255,255,255,.72); max-width:640px; line-height:1.55; }
+        .mt-hero-actions { display:flex; gap:8px; flex-wrap:wrap; position:relative; z-index:1; }
+        .mt-hero.dragover { outline:2px dashed #93C5FD; outline-offset:4px; }
+        .mt-drop {
+          border:1.5px dashed rgba(37,99,235,.28); border-radius:16px; background:rgba(239,246,255,.55);
+          padding:16px 18px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s, transform .15s;
+        }
+        .mt-drop:hover, .mt-drop.dragover { border-color:#2563EB; background:#EFF6FF; transform:translateY(-1px); }
+        .mt-drop i { font-size:22px; color:#2563EB; display:block; margin-bottom:6px; }
+        .mt-drop b { display:block; font-size:13px; color:var(--text); }
+        .mt-drop span { display:block; font-size:11px; color:var(--text3); margin-top:3px; }
+        .mt-preview { margin-bottom:12px; }
+        .mt-preview-table td, .mt-preview-table th { font-size:11px; }
         .mt-tabs { display:flex; gap:6px; flex-wrap:wrap; }
         .mt-tab {
           display:inline-flex; align-items:center; gap:7px;
@@ -398,16 +429,34 @@ function initMaliyetPanel() {
         }
       </style>
       <div class="mt-shell">
+        <div class="mt-hero"
+             ondragover="event.preventDefault(); this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="event.preventDefault(); this.classList.remove('dragover'); mtExcelDosyaSec(event.dataTransfer.files[0])">
+          <div style="position:relative;z-index:1;">
+            <div class="mt-kicker">Yurtdışı depo · 3PL</div>
+            <div class="mt-hero-title">Maliyet Takip</div>
+            <div class="mt-hero-sub">Lojistik maliyet Excel’ini buraya bırakın; tarife veya palet hareketleri otomatik çözülür. Faturalar, depolama ve analiz aynı ekranda kalır.</div>
+          </div>
+          <div class="mt-hero-actions">
+            <input id="mt-excel-input" type="file" accept=".xlsx,.xls" hidden onchange="mtExcelDosyaSec(this.files[0]); this.value='';">
+            <button class="mt-btn" style="background:#fff;color:#1D4ED8;box-shadow:0 10px 24px rgba(15,23,42,.18);"
+                    onclick="document.getElementById('mt-excel-input').click()">
+              <i class="ti ti-file-spreadsheet"></i> Excel’den Aktar
+            </button>
+          </div>
+        </div>
         <div class="mt-header">
-          <div class="mt-kicker">Maliyet Takip</div>
           <div class="mt-tabs" id="mt-tabs"></div>
         </div>
         <div class="mt-ulke-pills" id="mt-ulke-pills"></div>
+        <div id="mt-excel-preview"></div>
         <div id="mt-content"></div>
       </div>
     `;
   }
   mtRenderTabs();
+  mtRenderExcelPreview();
   if (!mtState.meta) {
     mtLoadMeta();
   } else {
@@ -430,6 +479,127 @@ async function mtLoadMeta() {
   }
   mtRenderUlkePills();
   mtRenderContent();
+}
+
+// ── EXCEL AKTARIM ────────────────────────────────────────────────────────────
+
+function mtExcelUlkeLabel(kod) {
+  return (mtState.meta?.ulkeler || []).find(u => u.kod === kod)?.label || kod || '—';
+}
+
+function mtRenderExcelPreview() {
+  const box = document.getElementById('mt-excel-preview');
+  if (!box) return;
+  if (mtState.excel.yukleniyor) {
+    box.innerHTML = '<div class="mt-card mt-preview"><div class="mt-empty">Excel okunuyor…</div></div>';
+    return;
+  }
+  if (mtState.excel.hata) {
+    box.innerHTML = `<div class="mt-card mt-preview"><div class="mt-uyari">${mtEsc(mtState.excel.hata)}</div>
+      <button class="mt-btn secondary" style="height:34px;margin-top:8px" onclick="mtExcelVazgec()">Kapat</button></div>`;
+    return;
+  }
+  const d = mtState.excel.onizleme;
+  if (!d) { box.innerHTML = ''; return; }
+  const tipLabel = d.tip === 'tarife' ? 'Tarife' : 'Hareket';
+  const o = d.ozet || {};
+  const rows = (d.satirlar || []).slice(0, 12);
+  const headers = d.tip === 'tarife'
+    ? ['Ülke', 'Kalem', 'Fiyat', 'Birim', 'Geçerlilik']
+    : ['Tarih', 'Ülke', 'Kalem', 'Miktar'];
+  const body = d.tip === 'tarife'
+    ? rows.map(r => `<tr><td>${mtEsc(mtExcelUlkeLabel(r.ulke))}</td><td>${mtEsc(r.kalem_ad)}</td>
+        <td style="text-align:right;font-weight:750">${mtFmtFiyat(r.birim_fiyat, r.para_birimi)}</td>
+        <td>${mtEsc(mtBirimLabel(r.birim))}</td><td>${mtFmtTarih(r.gecerli_baslangic)}</td></tr>`).join('')
+    : rows.map(r => `<tr><td>${mtFmtTarih(r.tarih)}</td><td>${mtEsc(mtExcelUlkeLabel(r.ulke) || 'seçili ülke')}</td>
+        <td>${mtEsc(r.kalem_ad)}</td><td style="text-align:right;font-weight:750">${mtFmtMiktar(r.miktar)}</td></tr>`).join('');
+  const eksikUlke = d.tip === 'hareket' && o.ulke_eksik
+    ? `<div class="mt-uyari">Ülke sütunu olmayan ${o.ulke_eksik} satır, şu an seçili depoya (${mtEsc(mtExcelUlkeLabel(mtState.ulke))}) yazılacak.</div>`
+    : '';
+  const hatalar = (d.hatalar || []).length
+    ? `<div class="mt-hint">${d.hatalar.length} satır atlandı: ${mtEsc(d.hatalar.slice(0, 4).join(' · '))}</div>` : '';
+  box.innerHTML = `
+    <div class="mt-card mt-preview">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div class="mt-card-title">${mtEsc(d.dosya_adi || 'Excel')} · ${tipLabel} bulundu</div>
+          <div class="mt-card-sub" style="margin-bottom:0">${o.satir || d.satir_sayisi || 0} satır · ${o.ulke || 0} ülke · ${o.kalem || 0} kalem${d.sheetler?.length ? ' · ' + mtEsc(d.sheetler.join(', ')) : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="mt-btn" style="height:36px" onclick="mtExcelAktarOnay()">Aktar</button>
+          <button class="mt-btn secondary" style="height:36px" onclick="mtExcelVazgec()">Vazgeç</button>
+        </div>
+      </div>
+      ${eksikUlke}
+      <div class="mt-table-wrap" style="margin-top:12px">
+        <table class="mt-table mt-preview-table">
+          <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+          <tbody>${body || '<tr><td colspan="5" class="mt-empty">Önizlenecek satır yok</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${d.satir_sayisi > rows.length ? `<div class="mt-hint">İlk ${rows.length} satır gösteriliyor, toplam ${d.satir_sayisi} satır aktarılacak.</div>` : ''}
+      ${hatalar}
+    </div>`;
+}
+
+async function mtExcelDosyaSec(file) {
+  if (!file) return;
+  const ad = String(file.name || '').toLowerCase();
+  if (!/\.xlsx$|\.xls$/.test(ad)) {
+    mtState.excel = { onizleme: null, yukleniyor: false, hata: 'Yalnızca .xlsx / .xls dosyası yükleyin.' };
+    mtRenderExcelPreview();
+    return;
+  }
+  mtState.excel = { onizleme: null, yukleniyor: true, hata: '' };
+  mtRenderExcelPreview();
+  try {
+    const fd = new FormData();
+    fd.append('dosya', file);
+    const res = await fetch('/api/maliyet/excel-onizle', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Excel okunamadı');
+    mtState.excel = { onizleme: data, yukleniyor: false, hata: '' };
+  } catch (e) {
+    mtState.excel = { onizleme: null, yukleniyor: false, hata: e.message || 'Excel okunamadı' };
+  }
+  mtRenderExcelPreview();
+  document.getElementById('mt-excel-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function mtExcelVazgec() {
+  mtState.excel = { onizleme: null, yukleniyor: false, hata: '' };
+  mtRenderExcelPreview();
+}
+
+async function mtExcelAktarOnay() {
+  const d = mtState.excel.onizleme;
+  if (!d?.excel) { alert('Önizleme kayboldu, dosyayı yeniden yükleyin.'); return; }
+  if (d.tip === 'hareket' && d.ozet?.ulke_eksik && !mtState.ulke) {
+    alert('Hareket satırlarında ülke yok. Önce bir ülke seçin.');
+    return;
+  }
+  mtState.excel.yukleniyor = true;
+  mtRenderExcelPreview();
+  try {
+    const res = await fetch('/api/maliyet/excel-aktar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excel: d.excel, dosya_adi: d.dosya_adi, ulke: mtState.ulke }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error((data.error || 'Aktarım başarısız') + (data.hatalar?.length ? '\n' + data.hatalar.slice(0, 5).join('\n') : ''));
+    mtState.excel = { onizleme: null, yukleniyor: false, hata: '' };
+    mtRenderExcelPreview();
+    const hedef = data.tip === 'hareket' ? 'hareketler' : 'tarifeler';
+    if (mtState.tab !== hedef) mtSelectTab(hedef);
+    else if (hedef === 'tarifeler') mtLoadTarife();
+    else mtLoadHareket();
+    alert(`${data.yazilan} satır aktarıldı (${data.tip === 'hareket' ? 'hareket' : 'tarife'}).`);
+  } catch (e) {
+    mtState.excel.yukleniyor = false;
+    mtState.excel.hata = e.message;
+    mtRenderExcelPreview();
+  }
 }
 
 // ── SEKMELER VE ÜLKE SEÇİMİ ──────────────────────────────────────────────────
@@ -880,7 +1050,7 @@ function mtRenderTarifeMatrix() {
           <span class="mt-tarife-overview-icon"><i class="ti ti-table"></i></span>
           <div>
             <div class="mt-card-title">Ülke Bazlı Maliyet Tablosu</div>
-            <div class="mt-card-sub" style="margin-bottom:0">Güncel birim maliyetleri tek tabloda karşılaştırın; bir hücreye tıklayarak tarifeyi düzenleyin.</div>
+            <div class="mt-card-sub" style="margin-bottom:0">Güncel birim maliyetleri tek tabloda karşılaştırın; Excel’den aktarın veya bir hücreye tıklayarak düzenleyin.</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
@@ -923,7 +1093,14 @@ function mtRenderTarifeMatrix() {
           </table>
         </div>
         <div class="mt-tarife-legend"><span><i></i>Seçili dönemde geçerli</span><span class="future"><i></i>İleri başlangıçlı</span><span>▲/▼ Önceki çeyreğe göre değişim</span><span>— Tarife tanımlanmamış</span></div>
-      ` : '<div class="mt-empty" style="padding:20px">Henüz hiçbir ülke için tarife girilmedi.</div>'}
+      ` : `<div class="mt-drop" style="margin:16px" onclick="document.getElementById('mt-excel-input').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault();this.classList.remove('dragover');mtExcelDosyaSec(event.dataTransfer.files[0])">
+            <i class="ti ti-file-spreadsheet"></i>
+            <b>Lojistik maliyet Excel’ini sürükleyin</b>
+            <span>Ülke sütunlu tarife matrisi veya Ülke / Kalem / Fiyat listesi. Aktarım öncesi önizleme gösterilir.</span>
+          </div>`}
     </div>
   `;
 }
@@ -1328,8 +1505,16 @@ function mtRenderHareket() {
           </div>
         </div>
         <div class="mt-card" style="margin-top:12px;">
-          <div class="mt-card-title">Excel'den Yapıştır</div>
-          <div class="mt-card-sub">Sütunlar: tarih, kalem, miktar (Excel'den kopyalanan hücreler sekmeli gelir). Kalem adı veya kodu kullanılabilir.</div>
+          <div class="mt-card-title">Excel’den Aktar</div>
+          <div class="mt-card-sub">Dosya yükleyin veya sütunları yapıştırın: tarih, kalem, miktar. Ülke sütunu yoksa seçili depoya yazılır.</div>
+          <div class="mt-drop" style="margin-bottom:12px" onclick="document.getElementById('mt-excel-input').click()"
+               ondragover="event.preventDefault();this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="event.preventDefault();this.classList.remove('dragover');mtExcelDosyaSec(event.dataTransfer.files[0])">
+            <i class="ti ti-cloud-upload"></i>
+            <b>Hareket Excel’i bırakın</b>
+            <span>.xlsx · tarih / kalem / miktar</span>
+          </div>
           <div class="mt-form">
             <textarea class="mt-textarea" id="mt-import-text"
               placeholder="2026-07-10&#9;Pallet In&#9;24&#10;2026-07-10&#9;Box Out&#9;310&#10;10.07.2026&#9;Store Transfer per Pallet&#9;6"></textarea>

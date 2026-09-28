@@ -28,6 +28,62 @@ def _musteri_tipi_from_ulke(ulke):
     return ULKE_MUSTERI_TIPI.get(str(ulke).strip().upper(), 'kurumsal')
 
 
+def _is_ant_fatura(fatura_no):
+    return str(fatura_no or '').upper().startswith('ANT')
+
+
+def normalize_plaka(raw):
+    """Plaka alanını tek biçime getirir: "AAA-BBB".
+
+    Kullanıcılar çekici/dorse plakalarını "/", "-", "|" gibi farklı ayraçlarla
+    ve plaka içinde boşluklu ("14 ABV 965") girebiliyor. Burada:
+    - ayraçlar (/ - | \ , ; + &) tek tipe indirgenir → "-"
+    - her plakanın içindeki boşluklar kaldırılır ("14 ABV 965" → "14ABV965")
+    - harfler büyütülür
+    Boş/None değer boş string döner.
+    """
+    txt = str(raw or '').strip()
+    if not txt:
+        return ''
+    # Ayraç: / - – — | \ , ; + &  (ya da 2+ boşluk)
+    parcalar = re.split(r'[\/\-\u2013\u2014|\\,;+&]+|\s{2,}', txt)
+    parcalar = [re.sub(r'\s+', '', p).upper() for p in parcalar]
+    parcalar = [p for p in parcalar if p]
+    if len(parcalar) == 1:
+        # "26FC046 26AJL546": ayraçsız, tek boşlukla yazılmış iki plaka.
+        # Tam iki parça ve her biri hem harf hem rakam içeren ≥5 karakterse iki plaka say.
+        tok = txt.upper().split()
+        if len(tok) == 2 and all(
+            len(t) >= 5 and re.search(r'[A-Z]', t) and re.search(r'\d', t) for t in tok
+        ):
+            parcalar = tok
+    return '-'.join(parcalar)
+
+
+def grup_plaka_esitle(cur, sefer_id):
+    """Gruplu sevkte (aynı sefer_id) plakası boş kayıtları, gruptaki dolu plaka
+    ile doldurur. Dolu plakalar ASLA ezilmez; grupta birden fazla farklı plaka
+    varsa en küçük id'li kaydın plakası baz alınır. Aynı cursor üzerinde
+    çalışır, commit etmez — çağıran commit eder. Etkilenen satır sayısını döner.
+    """
+    if not sefer_id:
+        return 0
+    cur.execute("""
+        SELECT plaka FROM shipments
+        WHERE sefer_id = %s AND COALESCE(TRIM(plaka), '') <> ''
+        ORDER BY id
+        LIMIT 1
+    """, (sefer_id,))
+    row = cur.fetchone()
+    if not row:
+        return 0
+    cur.execute("""
+        UPDATE shipments SET plaka = %s
+        WHERE sefer_id = %s AND COALESCE(TRIM(plaka), '') = ''
+    """, (row[0], sefer_id))
+    return cur.rowcount or 0
+
+
 def _gecerli_tarih(v):
     """Tarih alanı için makul aralık koruması (YYYY-MM-DD, 1900–2100).
 
@@ -63,7 +119,7 @@ def get_all_shipments(ulke=None, durum=None, musteri_tipi=None):
                mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
                toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet,
-               navlun_usd, sigorta_usd, usd_kuru
+               navlun_usd, sigorta_usd, usd_kuru, ihracat_beyanname_usd
         FROM shipments
         WHERE 1=1
     '''
@@ -119,10 +175,17 @@ def create_shipment(data):
 
     ulke         = data.get('ulke', '')
     musteri_tipi = data.get('musteri_tipi') or _musteri_tipi_from_ulke(ulke)
+    is_ant       = _is_ant_fatura(fatura_no)
 
     # Franchise/toptan/devir ise: varış ve gümrükleme bitiş = gümrük tarihi, durum = TESLİM EDİLDİ
+    # ANT (antrepo) faturaları henüz yüklenmemiş kabul edilir: kurumsal/franchise/toptan
+    # fark etmez, durum Yüklenecek. Teslim tarihleri otomatik doldurulmaz.
     gumruk_tarihi = _gecerli_tarih(data.get('gumruk_tarihi'))
-    if musteri_tipi in ('franchise', 'toptan', 'devir'):
+    if is_ant:
+        varis_tarihi      = _gecerli_tarih(data.get('varis_tarihi'))
+        gumrukleme_bitis  = _gecerli_tarih(data.get('gumrukleme_bitis'))
+        durum_default     = 'Yüklenecek'
+    elif musteri_tipi in ('franchise', 'toptan', 'devir'):
         varis_tarihi      = gumruk_tarihi or _gecerli_tarih(data.get('varis_tarihi'))
         gumrukleme_bitis  = gumruk_tarihi or _gecerli_tarih(data.get('gumrukleme_bitis'))
         durum_default     = 'TESLİM EDİLDİ'
@@ -156,7 +219,7 @@ def create_shipment(data):
                 fatura_no,
                 ulke,
                 data.get('nakliye_firmasi', ''),
-                data.get('plaka', ''),
+                normalize_plaka(data.get('plaka', '')),
                 data.get('fatura_bedeli_tl', 0),
                 data.get('mal_bedeli_eur', 0),
                 data.get('navlun_eur', 0),
@@ -205,10 +268,11 @@ def update_shipment(shipment_id, data):
     # USD alanları formdan gelmiyorsa mevcut DB değerini koru (veri kaybını önler)
     cur.execute('''
         SELECT navlun_usd, sigorta_usd, usd_kuru, yukleme_tarihi,
-               gumruk_tarihi, varis_tarihi, gumrukleme_bitis, durum, sefer_id
+               gumruk_tarihi, varis_tarihi, gumrukleme_bitis, durum, sefer_id,
+               ihracat_beyanname_usd
         FROM shipments WHERE id = %s
     ''', (shipment_id,))
-    existing = cur.fetchone() or (0, 0, 0, None, None, None, None, None, None)
+    existing = cur.fetchone() or (0, 0, 0, None, None, None, None, None, None, 0)
     eski_durum            = existing[7]
     eski_varis_tarihi     = str(existing[5]) if existing[5] else None
     eski_gumruk_tarihi    = str(existing[4]) if existing[4] else None
@@ -218,6 +282,7 @@ def update_shipment(shipment_id, data):
     navlun_usd  = data.get('navlun_usd',  existing[0]) or 0
     sigorta_usd = data.get('sigorta_usd', existing[1]) or 0
     usd_kuru    = data.get('usd_kuru',    existing[2]) or 0
+    beyanname_usd = data.get('ihracat_beyanname_usd', existing[9] if len(existing) > 9 else 0) or 0
     yukleme_tarihi = _gecerli_tarih(data.get('yukleme_tarihi', existing[3]))
     gumruk_tarihi = _gecerli_tarih(data.get('gumruk_tarihi', existing[4]))
 
@@ -264,6 +329,7 @@ def update_shipment(shipment_id, data):
             usd_kuru              = %s,
             ihracat_beyanname_tl  = %s,
             ihracat_beyanname_eur = %s,
+            ihracat_beyanname_usd = %s,
             arac_bekleme          = %s,
             brokerage_eur         = %s,
             gumruk_vergisi_eur    = %s,
@@ -280,7 +346,7 @@ def update_shipment(shipment_id, data):
     ''', (
         data.get('ihracat_dosya_no', ''),
         data.get('nakliye_firmasi', ''),
-        data.get('plaka', ''),
+        normalize_plaka(data.get('plaka', '')),
         data.get('fatura_bedeli_tl', 0),
         data.get('fatura_bedeli_eur', 0),
         data.get('mal_bedeli_eur', 0),
@@ -292,6 +358,7 @@ def update_shipment(shipment_id, data):
         usd_kuru,
         data.get('ihracat_beyanname_tl', 0),
         data.get('ihracat_beyanname_eur', 0),
+        beyanname_usd,
         data.get('arac_bekleme', 0),
         data.get('brokerage_eur', 0),
         data.get('gumruk_vergisi_eur', 0),
@@ -329,6 +396,10 @@ def update_shipment(shipment_id, data):
                 f'UPDATE shipments SET {set_clause} WHERE sefer_id = %s AND id != %s',
                 values,
             )
+            conn.commit()
+
+        # Plaka gruptaki tüm dosyalarda aynıdır: boş olanları dolu olandan tamamla.
+        if grup_plaka_esitle(cur, sefer_id):
             conn.commit()
 
     cur.close()
@@ -471,7 +542,7 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         'Navlun EUR', 'Sigorta EUR', 'EUR Kuru',
         'Navlun USD', 'Sigorta USD', 'USD Kuru',
         'Yükleme Tarihi', 'Gümrük Tarihi', 'Varış Tarihi', 'Gümrükleme Bitiş',
-        'İhracat Beyanname TL', 'İhracat Beyanname EUR',
+        'İhracat Beyanname TL', 'İhracat Beyanname EUR', 'İhracat Beyanname USD',
         'Araç Bekleme', 'Brokerage Fee & Other Costs EUR', 'Other Costs EUR', 'Gümrük Vergisi EUR', 'KDV EUR',
         'Durum', 'Fatura Ref No',
     ]
@@ -522,13 +593,14 @@ def export_shipments(ulke=None, durum=None, depo=None, musteri_tipi=None, ids=No
         c(22, s.get('gumrukleme_bitis', ''))
         c(23, float(s.get('ihracat_beyanname_tl', 0) or 0),  TL_FMT)
         c(24, float(s.get('ihracat_beyanname_eur', 0) or 0), EUR_FMT)
-        c(25, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
-        c(26, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
-        c(27, float(s.get('other_costs_eur', 0) or 0),       EUR_FMT)
-        c(28, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
-        c(29, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
-        c(30, s.get('durum', ''))
-        c(31, fatura_ref_no_map.get(s.get('id'), ''))
+        c(25, float(s.get('ihracat_beyanname_usd', 0) or 0), USD_FMT)
+        c(26, float(s.get('arac_bekleme', 0) or 0),          EUR_FMT)
+        c(27, float(s.get('brokerage_eur', 0) or 0),         EUR_FMT)
+        c(28, float(s.get('other_costs_eur', 0) or 0),       EUR_FMT)
+        c(29, float(s.get('gumruk_vergisi_eur', 0) or 0),    EUR_FMT)
+        c(30, float(s.get('kdv_eur', 0) or 0),               EUR_FMT)
+        c(31, s.get('durum', ''))
+        c(32, fatura_ref_no_map.get(s.get('id'), ''))
 
     for col_idx in range(1, len(headers) + 1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
@@ -613,6 +685,7 @@ def _row_to_dict(row):
         'navlun_usd':            float(row[30] or 0) if len(row) > 30 else 0.0,
         'sigorta_usd':           float(row[31] or 0) if len(row) > 31 else 0.0,
         'usd_kuru':              float(row[32] or 0) if len(row) > 32 else 0.0,
+        'ihracat_beyanname_usd': float(row[33] or 0) if len(row) > 33 else 0.0,
     }
 
 
@@ -645,7 +718,7 @@ def shipments_get():
                    mal_bedeli_tl, ihracat_beyanname_tl, ihracat_beyanname_eur,
                    arac_bekleme, brokerage_eur, gumruk_vergisi_eur, kdv_eur,
                    toplam_maliyet_eur, other_costs_eur, musteri_tipi, sefer_id, palet,
-                   navlun_usd, sigorta_usd, usd_kuru
+                   navlun_usd, sigorta_usd, usd_kuru, ihracat_beyanname_usd
             FROM shipments WHERE sefer_id = %s ORDER BY id
         ''', (int(sefer_id),))
         rows = cur.fetchall()
@@ -1043,7 +1116,8 @@ def bulk_update_shipments(rows):
 
             # Kayıt var mı kontrol et, musteri_tipi, kur ve mevcut navlun/sigortayı da al
             cur.execute('''
-                SELECT id, musteri_tipi, eur_kuru, ulke, navlun_eur, sigorta_eur
+                SELECT id, musteri_tipi, eur_kuru, ulke, navlun_eur, sigorta_eur,
+                       sefer_id
                 FROM shipments
                 WHERE fatura_no = %s
             ''', (fatura_no,))
@@ -1057,17 +1131,19 @@ def bulk_update_shipments(rows):
             db_ulke = str(existing[3] or '').strip().upper()
             db_navlun_eur = float(existing[4] or 0)
             db_sigorta_eur = float(existing[5] or 0)
+            db_sefer_id = existing[6]
 
             # Sadece gönderilen alanları güncelle (None olanları atla)
             fields = {}
             mapping = {
                 'ulke': to_str, 'ihracat_dosya_no': to_str,
-                'nakliye_firmasi': to_str, 'plaka': to_str,
+                'nakliye_firmasi': to_str, 'plaka': lambda v: (normalize_plaka(to_str(v)) if to_str(v) is not None else None),
                 'fatura_bedeli_tl': to_float, 'mal_bedeli_tl': to_float,
                 'mal_bedeli_eur': to_float, 'navlun_eur': to_float,
                 'sigorta_eur': to_float, 'eur_kuru': to_float,
                 'fatura_bedeli_eur': to_float, 'arac_bekleme': to_float,
                 'ihracat_beyanname_tl': to_float, 'ihracat_beyanname_eur': to_float,
+                'ihracat_beyanname_usd': to_float,
                 'brokerage_eur': to_float, 'gumruk_vergisi_eur': to_float,
                 'kdv_eur': to_float, 'toplam_maliyet_eur': to_float,
                 'navlun_usd': to_float, 'sigorta_usd': to_float, 'usd_kuru': to_float,
@@ -1123,6 +1199,9 @@ def bulk_update_shipments(rows):
             set_clause = ', '.join(f'{k} = %s' for k in fields)
             values = list(fields.values()) + [fatura_no]
             cur.execute(f'UPDATE shipments SET {set_clause} WHERE fatura_no = %s', values)
+            # Plaka toplu güncellendiyse gruptaki boş plakaları da tamamla.
+            if fields.get('plaka') and db_sefer_id is not None:
+                grup_plaka_esitle(cur, db_sefer_id)
             conn.commit()
             guncellenen += 1
 
@@ -1233,7 +1312,7 @@ def bulk_import_shipments(rows):
                 ulke,
                 to_str(row.get('ihracat_dosya_no')),
                 to_str(row.get('nakliye_firmasi')),
-                to_str(row.get('plaka')),
+                normalize_plaka(to_str(row.get('plaka'))),
                 fatura_no,
                 to_str(row.get('palet')),
                 to_str(row.get('aciklama')),
@@ -1482,6 +1561,9 @@ def group_shipments(shipment_ids):
         'UPDATE shipments SET sefer_id = %s WHERE id = ANY(%s)',
         (new_sefer_id, shipment_ids)
     )
+    from api.navlun import grup_ant_durum_esitle
+    grup_ant_durum_esitle(cur, new_sefer_id)
+    grup_plaka_esitle(cur, new_sefer_id)
     conn.commit()
     cur.close()
     conn.close()
@@ -1547,6 +1629,49 @@ def bulk_delete_shipments(ids):
     cur.close()
     conn.close()
     return deleted
+
+
+# Toplu durum guncellemede tarihin yazilacagi kolon (durum -> kolon).
+# Kolon adlari sabit sozlukten gelir; SQL'e asla kullanici girdisi konmaz.
+# Yüklenecek/YOLDA için tarih sorulmaz (yükleme tarihi sevkiyat kaydında zaten var).
+DURUM_TARIH_KOLONU = {
+    'Varış Gümrük':  'varis_tarihi',
+    'Gümrükleme':    'gumruk_tarihi',
+    'TESLİM EDİLDİ': 'gumrukleme_bitis',
+}
+
+
+def durum_tarih_kolonu(durum):
+    """Verilen durum icin tarihin yazilacagi kolon adi (yoksa None)."""
+    return DURUM_TARIH_KOLONU.get(_normalize_durum(durum))
+
+
+def bulk_update_durum(ids, durum, tarih=None):
+    """Birden fazla sevkiyatın durumunu id listesine göre günceller.
+
+    `tarih` verilirse duruma karşılık gelen tarih kolonu da aynı UPDATE ile
+    yazılır (Varış Gümrük→varis_tarihi, Gümrükleme→gumruk_tarihi,
+    TESLİM EDİLDİ→gumrukleme_bitis). Yüklenecek/YOLDA için tarih yazılmaz.
+    """
+    if not ids or not durum:
+        return 0
+    durum  = _normalize_durum(durum)
+    tarih  = _gecerli_tarih(tarih)
+    kolon  = DURUM_TARIH_KOLONU.get(durum)
+    conn = get_conn()
+    cur  = conn.cursor()
+    if tarih and kolon:
+        cur.execute(
+            f'UPDATE shipments SET durum = %s, {kolon} = %s WHERE id = ANY(%s)',
+            (durum, tarih, ids),
+        )
+    else:
+        cur.execute('UPDATE shipments SET durum = %s WHERE id = ANY(%s)', (durum, ids))
+    updated = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+    return updated
 
 # ── SIRBİSTAN VERGİ PDF PARSE ────────────────────────────────────────────────
 def parse_rs_vergi_pdf(pdf_bytes):
@@ -1683,6 +1808,7 @@ def parse_kz_avr_image(image_bytes):
         'other_costs_eur': 0.0,
         'kzt_per_eur':     0.0,
         'kalemler':        [],
+        'fatura_nolar':    [],
     }
 
     BROKERAGE_KALEMLER = {1, 2, 4}
@@ -1798,10 +1924,47 @@ def parse_kz_avr_image(image_bytes):
     return result
 
 
+def _extract_kz_fatura_nolar(text):
+    """AVR/broker PDF metninden ANT/IHR fatura numaralarını çıkarır.
+
+    Tablonun 1. satır / 2. sütun (Наименование) hücresinde tek kalemde
+    iki fatura yazabilir: ANT2026... ve IHR2026... OCR AMT/Kiril A karışıklığını
+    da toparlar.
+    """
+    if not text:
+        return []
+    t = str(text).upper()
+    t = (t
+         .replace('\u0410', 'A')  # Cyrillic А
+         .replace('\u041c', 'M')  # Cyrillic М
+         .replace('\u041d', 'H')  # Cyrillic Н
+         .replace('\u0422', 'T')  # Cyrillic Т
+         .replace('\u0406', 'I')  # Cyrillic І
+         .replace('\u0418', 'N'))  # Cyrillic И → ANT içindeki N
+    found = re.findall(r'(?:ANT|AMT|IHR|1HR|LHR)\s*20\d{2}\s*\d{6,12}', t)
+    nolar = []
+    seen = set()
+    for raw in found:
+        compact = re.sub(r'\s+', '', raw)
+        if compact.startswith('AMT'):
+            compact = 'ANT' + compact[3:]
+        elif compact.startswith('1HR') or compact.startswith('LHR'):
+            compact = 'IHR' + compact[3:]
+        m = re.match(r'(ANT|IHR)(\d{10,14})', compact)
+        if not m:
+            continue
+        no = m.group(1) + m.group(2)
+        if no not in seen:
+            seen.add(no)
+            nolar.append(no)
+    return nolar
+
+
 def parse_kz_avr_pdf(pdf_bytes):
     """
-    Kazakistan AVR PDF'inden Итого satırını okur.
-    Tüm tutarı brokerage_eur olarak döner.
+    Kazakistan AVR PDF'inden Итого satırını ve varsa ANT/IHR fatura
+    numaralarını okur. Tüm tutarı brokerage_eur olarak döner; iki fatura
+    varsa fatura_nolar listesi dolu gelir (bölme frontend'de yapılır).
     """
     import urllib.request, json as _json
 
@@ -1812,6 +1975,7 @@ def parse_kz_avr_pdf(pdf_bytes):
         'other_costs_eur': 0.0,
         'kzt_per_eur':     0.0,
         'kalemler':        [],
+        'fatura_nolar':    [],
     }
 
     def parse_kzt(s):
@@ -1829,28 +1993,53 @@ def parse_kz_avr_pdf(pdf_bytes):
     try:
         # Önce pdfplumber dene, boşsa OCR yap
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            n_pages = len(pdf.pages)
             text = ' '.join((p.extract_text() or '') for p in pdf.pages)
         text = re.sub(r'\s+', ' ', text).strip()
+        ocr_chunks = [text]
 
         if len(text) < 50:  # Taranmış PDF — OCR gerekli
             try:
                 from pdf2image import convert_from_bytes
                 import pytesseract
-                # Sadece son sayfa — Итого orada, dpi düşük
-                images = convert_from_bytes(pdf_bytes, dpi=100, last_page=2, first_page=2)
+                last_page = max(1, n_pages)
+                # Fatura no çoğu zaman 1. sayfa AVR tablosu sütun 2'de;
+                # Итого son sayfada. İkisini de oku.
+                images = convert_from_bytes(
+                    pdf_bytes, dpi=140, first_page=1, last_page=min(2, last_page)
+                )
                 if not images:
-                    images = convert_from_bytes(pdf_bytes, dpi=100, last_page=1)
-                # Sadece sayfa alt yarısı — Итого hep altta
-                img = images[0]
-                w, h = img.size
-                img = img.crop((0, int(h * 0.6), w, h))
-                text = pytesseract.image_to_string(img, lang='rus')
-                text = re.sub(r'\s+', ' ', text)
-                print(f'[KZ PDF] OCR text preview: {text[:300]}')
+                    images = convert_from_bytes(pdf_bytes, dpi=140, last_page=1)
+                tess_cfg = '--psm 6'
+                name_parts = []
+                total_text = ''
+                for pi, img in enumerate(images):
+                    w, h = img.size
+                    # AVR sayfa 1, sütun 2 (Наименование) — ANT/IHR alt alta
+                    col2 = img.crop((int(w * 0.05), int(h * 0.16), int(w * 0.50), int(h * 0.58)))
+                    # Счет sayfası kalem açıklaması
+                    name_mid = img.crop((int(w * 0.08), int(h * 0.28), int(w * 0.62), int(h * 0.62)))
+                    for crop in (col2, name_mid):
+                        name_parts.append(
+                            pytesseract.image_to_string(crop, lang='eng', config=tess_cfg)
+                        )
+                    if pi == len(images) - 1:
+                        total_crop = img.crop((0, int(h * 0.50), w, h))
+                        total_text = pytesseract.image_to_string(
+                            total_crop, lang='rus+eng'
+                        )
+                name_text = '\n'.join(name_parts)
+                ocr_chunks.extend([name_text, total_text])
+                text = re.sub(r'\s+', ' ', (name_text or '') + ' ' + (total_text or ''))
+                print(f'[KZ PDF] OCR name preview: {(name_text or "")[:400]}')
+                print(f'[KZ PDF] OCR total preview: {(total_text or "")[:250]}')
             except Exception as ocr_err:
                 print(f'[KZ PDF] OCR hatası: {ocr_err}')
         else:
             print(f'[KZ PDF] pdfplumber text preview: {text[:300]}')
+
+        result['fatura_nolar'] = _extract_kz_fatura_nolar('\n'.join(ocr_chunks))
+        print(f'[KZ PDF] fatura_nolar: {result["fatura_nolar"]}')
 
         # Итого satırını yakala — Kiril veya bozuk encoding dahil
         m = re.search(r'(?:Итого|Итого|ИТОГО|\u0418\u0442\u043e\u0433\u043e)[:\s]+([\d\s]+[,.][\d]{2})', text)
@@ -2215,43 +2404,96 @@ def parse_be_broker_pdf(pdf_bytes):
 
 
 def _parse_kzt_sayi(s):
-    """KZT sayı formatı: '702 062,00' veya '3167375,35' — boşluk/nokta binlik, virgül ondalık."""
-    s = s.strip().replace('\xa0', '').replace(' ', '').replace('.', '').replace(',', '.')
+    """KZT sayı formatı: '702 062,00', '3.821.199,42' veya '3167375.35'."""
+    s = str(s or '').strip().replace('\xa0', '').replace('\u202f', '')
+    s = re.sub(r'\s+', '', s)
+    if not s:
+        return 0.0
+    if ',' in s and '.' in s:
+        if s.rfind(',') > s.rfind('.'):
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '')
+    elif ',' in s:
+        s = s.replace('.', '').replace(',', '.')
     try:
         return float(s)
     except (TypeError, ValueError):
         return 0.0
 
 
+def _parse_kz_beyanname_text(text):
+    """
+    Kazakistan DT özet kutusundan vergi/KDV okur.
+    Kod 1010 (beyan ücreti) + 2010 (ithalat gümrük vergisi) → vergi
+    Kod 5060 (KDV) → kdv
+    Kod-tutar eşlemesi sıraya göre değil koda göre yapılır; 5060 satırında
+    matrah+KDV varsa son KZT tutarı KDV kabul edilir.
+    """
+    result = {'vergi': 0.0, 'kdv': 0.0, 'fatura_nolar': []}
+    text = re.sub(r'\s+', ' ', text or '')
+    result['fatura_nolar'] = _extract_kz_fatura_nolar(text)
+
+    m_section = re.search(
+        r'В\s+ПОДРОБНОСТИ\s+ПОДСЧЕТА(.*?)(?:Общая\s+сумма|$)',
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    section = m_section.group(1) if m_section else text
+
+    codes = re.findall(r'\b(1010|2010|5060)\b', section)
+    amount_src = re.sub(r'\b(1010|2010|5060)\b', ' ', section)
+    amounts = re.findall(
+        r'(\d{1,3}(?:[.\s]\d{3})+,\d{2}|\d+,\d{2})\s*KZT',
+        amount_src,
+    )
+    parsed = [_parse_kzt_sayi(a) for a in amounts]
+    parsed = [v for v in parsed if v > 0]
+
+    by_code = {'1010': 0.0, '2010': 0.0, '5060': 0.0}
+
+    if codes and parsed and len(codes) == len(parsed):
+        for code, val in zip(codes, parsed):
+            by_code[code] = round(by_code.get(code, 0.0) + val, 2)
+    elif codes and parsed:
+        # Kodlar önde, tutarlar sonra (1010 2010 5060  tutar tutar tutar).
+        # 5060 için baz+KDV gibi fazla tutar varsa son tutar KDV'dir.
+        unique = []
+        for c in codes:
+            if c not in unique:
+                unique.append(c)
+        if unique == ['1010', '2010', '5060'] and len(parsed) >= 3:
+            by_code['1010'] = parsed[0]
+            by_code['2010'] = parsed[1]
+            by_code['5060'] = parsed[-1]
+        elif len(parsed) >= 3:
+            by_code['1010'] = parsed[0]
+            by_code['2010'] = parsed[1]
+            by_code['5060'] = parsed[2]
+    elif len(parsed) >= 3:
+        by_code['1010'] = parsed[0]
+        by_code['2010'] = parsed[1]
+        by_code['5060'] = parsed[2]
+
+    result['vergi'] = round(by_code['1010'] + by_code['2010'], 2)
+    result['kdv'] = round(by_code['5060'], 2)
+    return result
+
+
 def parse_kz_beyanname_pdf(pdf_bytes):
     """
     Kazakistan gümrük beyannamesinin (ДЕКЛАРАЦИЯ НА ТОВАРЫ) ilk sayfasındaki
     "В ПОДРОБНОСТИ ПОДСЧЕТА" özet kutusundan çeker.
-    Kod 1010 (beyan ücreti) + 2010 (ithalat gümrük vergisi) → vergi
-    Kod 5060 (KDV) → kdv
-    Kodlar ve tutarlar ayrı bloklar halinde (1010 2010 5060 ... tutar tutar tutar) çıkarıldığından
-    önce kod token'ları temizlenip sadece tutarlar sırayla eşleştirilir.
     """
-    result = {'vergi': 0.0, 'kdv': 0.0}
-
+    result = {'vergi': 0.0, 'kdv': 0.0, 'fatura_nolar': []}
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             text = pdf.pages[0].extract_text() or ''
-        text = re.sub(r'\s+', ' ', text)
-
-        m_section = re.search(r'В\s+ПОДРОБНОСТИ\s+ПОДСЧЕТА(.*?)Общая\s+сумма', text, re.DOTALL)
-        if m_section:
-            section = re.sub(r'\b(1010|2010|5060)\b', ' ', m_section.group(1))
-            amounts = re.findall(r'(\d[\d\s.]*,\d{2})\s*KZT', section)
-            if len(amounts) >= 3:
-                beyan_ucreti = _parse_kzt_sayi(amounts[0])
-                gumruk_v     = _parse_kzt_sayi(amounts[1])
-                result['kdv']   = _parse_kzt_sayi(amounts[2])
-                result['vergi'] = round(beyan_ucreti + gumruk_v, 2)
-
+            if len(pdf.pages) > 1:
+                text += ' ' + (pdf.pages[1].extract_text() or '')
+        result = _parse_kz_beyanname_text(text)
     except Exception as e:
         print(f'KZ beyanname PDF parse hatası: {e}')
-
     return result
 
 
@@ -2334,6 +2576,290 @@ def parse_aksu_beyanname_pdf(pdf_bytes):
         print(f'Aksu beyanname PDF parse hatası: {e}')
 
     return faturalar
+
+
+def _aksu_norm_header(value):
+    s = str(value or '').strip()
+    s = s.replace('İ', 'i').replace('I', 'i').replace('ı', 'i')
+    s = s.lower().replace('i̇', 'i')
+    for src, dst in (('ş', 's'), ('ğ', 'g'), ('ü', 'u'), ('ö', 'o'), ('ç', 'c')):
+        s = s.replace(src, dst)
+    s = re.sub(r'[^a-z0-9]+', ' ', s)
+    return ' '.join(s.split())
+
+
+def _aksu_parse_tutar(value):
+    if value is None or value == '':
+        return 0.0
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip().replace('₺', '').replace('TL', '').replace('tl', '').replace(' ', '')
+    if not s:
+        return 0.0
+    if ',' in s and '.' in s:
+        if s.rfind(',') > s.rfind('.'):
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '')
+    elif ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _aksu_cell_text(value):
+    if value is None:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def parse_aksu_beyanname_excel(excel_bytes):
+    """Maliyet raporu / Aksu Excel'inden beyanname TL satırlarını okur.
+
+    Eşleşme anahtarları: İhracat Dosya No (ref) ve Fatura No.
+    Tutar kolonu: İhracat Beyanname TL (Excel'deki EUR/USD kolonları yok sayılır;
+    kur çevirisi sevkiyat kaydındaki sistem kuru ile yapılır).
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        raise ValueError('openpyxl kurulu değil')
+
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(excel_bytes), data_only=True)
+    except Exception:
+        return _parse_aksu_beyanname_pandas(excel_bytes)
+    faturalar = []
+
+    dosya_aliases = {
+        'ihracat dosya no', 'dosya no', 'referans', 'ref no', 'ref',
+        'musteri ref no', 'pozisyon no',
+    }
+    fatura_aliases = {
+        'fatura no', 'musteri fatura no', 'invoice no', 'invoice',
+    }
+    tutar_aliases = {
+        'ihracat beyanname tl', 'beyanname tl', 'aksu tl', 'masraf tl', 'tutar tl',
+    }
+
+    try:
+        for ws in wb.worksheets:
+            header_row = None
+            col_map = {}
+            max_scan = min(ws.max_row or 1, 12)
+            for r in range(1, max_scan + 1):
+                found = {}
+                for c in range(1, (ws.max_column or 1) + 1):
+                    key = _aksu_norm_header(ws.cell(r, c).value)
+                    if not key:
+                        continue
+                    if key in dosya_aliases and 'dosya' not in found:
+                        found['dosya'] = c
+                    elif key in fatura_aliases and 'fatura' not in found:
+                        found['fatura'] = c
+                    elif key in tutar_aliases and 'tutar' not in found:
+                        found['tutar'] = c
+                    elif key == 'tutar' and 'tutar' not in found:
+                        found['tutar'] = c
+                if 'tutar' in found and ('dosya' in found or 'fatura' in found):
+                    header_row = r
+                    col_map = found
+                    break
+            if not header_row:
+                continue
+
+            for r in range(header_row + 1, (ws.max_row or header_row) + 1):
+                tutar = _aksu_parse_tutar(ws.cell(r, col_map['tutar']).value)
+                if tutar <= 0:
+                    continue
+                ref_no = _aksu_cell_text(ws.cell(r, col_map['dosya']).value) if 'dosya' in col_map else ''
+                fatura_no = _aksu_cell_text(ws.cell(r, col_map['fatura']).value) if 'fatura' in col_map else ''
+                if not ref_no and not fatura_no:
+                    continue
+                faturalar.append({
+                    'ref_no':    ref_no or None,
+                    'fatura_no': fatura_no or None,
+                    'tutar_tl':  round(tutar, 2),
+                })
+            if faturalar:
+                break
+    finally:
+        wb.close()
+
+    return faturalar
+
+
+def _parse_aksu_beyanname_pandas(excel_bytes):
+    """Eski .xls veya openpyxl'in okuyamadığı Excel'ler için yedek okuyucu."""
+    import pandas as pd
+
+    xl = pd.ExcelFile(io.BytesIO(excel_bytes))
+    dosya_aliases = {
+        'ihracat dosya no', 'dosya no', 'referans', 'ref no', 'ref',
+        'musteri ref no', 'pozisyon no',
+    }
+    fatura_aliases = {
+        'fatura no', 'musteri fatura no', 'invoice no', 'invoice',
+    }
+    tutar_aliases = {
+        'ihracat beyanname tl', 'beyanname tl', 'aksu tl', 'masraf tl', 'tutar tl',
+    }
+
+    for sheet in xl.sheet_names:
+        df = xl.parse(sheet, header=None)
+        if df.empty:
+            continue
+        header_idx = None
+        col_map = {}
+        scan = min(len(df), 12)
+        for r in range(scan):
+            found = {}
+            for c, val in enumerate(df.iloc[r].tolist()):
+                key = _aksu_norm_header(val)
+                if not key:
+                    continue
+                if key in dosya_aliases and 'dosya' not in found:
+                    found['dosya'] = c
+                elif key in fatura_aliases and 'fatura' not in found:
+                    found['fatura'] = c
+                elif key in tutar_aliases and 'tutar' not in found:
+                    found['tutar'] = c
+                elif key == 'tutar' and 'tutar' not in found:
+                    found['tutar'] = c
+            if 'tutar' in found and ('dosya' in found or 'fatura' in found):
+                header_idx = r
+                col_map = found
+                break
+        if header_idx is None:
+            continue
+
+        faturalar = []
+        for r in range(header_idx + 1, len(df)):
+            row = df.iloc[r]
+            tutar = _aksu_parse_tutar(row.iloc[col_map['tutar']] if col_map['tutar'] < len(row) else None)
+            if tutar <= 0:
+                continue
+            ref_no = _aksu_cell_text(row.iloc[col_map['dosya']]) if 'dosya' in col_map else ''
+            fatura_no = _aksu_cell_text(row.iloc[col_map['fatura']]) if 'fatura' in col_map else ''
+            if not str(ref_no).strip() or str(ref_no).lower() == 'nan':
+                ref_no = ''
+            if not str(fatura_no).strip() or str(fatura_no).lower() == 'nan':
+                fatura_no = ''
+            if not ref_no and not fatura_no:
+                continue
+            faturalar.append({
+                'ref_no':    ref_no or None,
+                'fatura_no': fatura_no or None,
+                'tutar_tl':  round(tutar, 2),
+            })
+        if faturalar:
+            return faturalar
+    return []
+
+
+def _aksu_norm_key(value):
+    return re.sub(r'\s+', '', str(value or '').strip().upper())
+
+
+def apply_aksu_beyanname(faturalar):
+    """Aksu satırlarını fatura no / dosya no ile eşleştirip TL + kur çevrimini yazar."""
+    eslesen, atlanan, hatalar = 0, 0, []
+    if not faturalar:
+        return eslesen, atlanan, hatalar
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT id, fatura_no, ihracat_dosya_no, eur_kuru, usd_kuru
+        FROM shipments
+    ''')
+    by_fatura = {}
+    by_dosya = {}
+    for row in cur.fetchall():
+        sid, fatura_no, dosya_no, eur_kuru, usd_kuru = row
+        rec = {
+            'id': sid,
+            'eur_kuru': float(eur_kuru or 0),
+            'usd_kuru': float(usd_kuru or 0),
+        }
+        fkey = _aksu_norm_key(fatura_no)
+        dkey = _aksu_norm_key(dosya_no)
+        if fkey:
+            by_fatura[fkey] = rec
+        if dkey and dkey not in by_dosya:
+            by_dosya[dkey] = rec
+
+    for f in faturalar:
+        ref_no = f.get('ref_no')
+        fatura_no = f.get('fatura_no')
+        tutar_tl = float(f.get('tutar_tl') or 0)
+
+        etiket = fatura_no or ref_no or '?'
+        if tutar_tl <= 0:
+            atlanan += 1
+            hatalar.append(f'{etiket}: tutar çıkarılamadı')
+            continue
+
+        rec = None
+        fkey = _aksu_norm_key(fatura_no)
+        dkey = _aksu_norm_key(ref_no)
+        if fkey and fkey in by_fatura:
+            rec = by_fatura[fkey]
+        elif dkey and dkey in by_dosya:
+            rec = by_dosya[dkey]
+
+        if not rec:
+            atlanan += 1
+            hatalar.append(f'{etiket}: eşleşen kayıt bulunamadı')
+            continue
+
+        eur_kuru = rec['eur_kuru']
+        usd_kuru = rec['usd_kuru']
+        tutar_eur = round(tutar_tl / eur_kuru, 2) if eur_kuru else None
+        tutar_usd = round(tutar_tl / usd_kuru, 2) if usd_kuru else None
+
+        sets = ['ihracat_beyanname_tl = %s']
+        params = [tutar_tl]
+        if tutar_eur is not None:
+            sets.append('ihracat_beyanname_eur = %s')
+            params.append(tutar_eur)
+            sets.append(
+                'toplam_maliyet_eur = %s + COALESCE(arac_bekleme,0) + COALESCE(brokerage_eur,0)'
+                ' + COALESCE(gumruk_vergisi_eur,0) + COALESCE(kdv_eur,0) + COALESCE(other_costs_eur,0)'
+            )
+            params.append(tutar_eur)
+        if tutar_usd is not None:
+            sets.append('ihracat_beyanname_usd = %s')
+            params.append(tutar_usd)
+        params.append(rec['id'])
+
+        cur.execute(
+            f"UPDATE shipments SET {', '.join(sets)} WHERE id = %s",
+            params,
+        )
+        eslesen += 1
+
+        parcalar = [f'{tutar_tl:,.2f} TL']
+        if tutar_eur is not None:
+            parcalar.append(f'{tutar_eur:,.2f} EUR (kur {eur_kuru:g})')
+        else:
+            parcalar.append('EUR kuru yok')
+        if tutar_usd is not None:
+            parcalar.append(f'{tutar_usd:,.2f} USD (kur {usd_kuru:g})')
+        hatalar.append(
+            f'✓ REF:{ref_no or "-"} / FATURA:{fatura_no or "-"} → ' + ' / '.join(parcalar)
+        )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return eslesen, atlanan, hatalar
 
 
 # ── FR FATURA PDF PARSE ───────────────────────────────────────────────────────

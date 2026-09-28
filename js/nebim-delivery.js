@@ -300,8 +300,7 @@ function ensureNebimDeliveryPanel() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // İlk açılış rotası shell.js tarafından her zaman dashboard'a normalize edilir.
-  // Nebim paneli sadece kullanıcı menüden seçtiğinde sidebarSelect() üzerinden başlar.
+  // Nebim paneli menüden veya /nebim-delivery rotasından sidebarSelect() ile açılır.
 });
 
 function nebimSetCountryFilter(value) {

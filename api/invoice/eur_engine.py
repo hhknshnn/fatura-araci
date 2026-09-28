@@ -18,7 +18,7 @@ from .constants import (
     DARK_BLUE, GOLD, EUR_FMT,
     EUR_INV_COLS, EUR_PL_COLS,
 )
-from .helpers   import hdr, dat, parse_num, sku_grupla, set_print, brd
+from .helpers   import hdr, dat, parse_num, sku_grupla, set_print, brd, resolve_fatura_no
 from .weights   import calculate_weights, get_net_list, generate_master_excel
 from .templates import TEMPLATE_FINDER, HEADER_APPLIER
 
@@ -110,7 +110,7 @@ def _generate_eur(ulke_kodu, df, grup_kilolari, hedef_brut, exception_skus,
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()

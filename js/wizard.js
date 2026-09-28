@@ -20,6 +20,24 @@ let cyMasterRows = [];
 let groupWeights = {};
 let exceptionSkus = {};
 
+// Plaka normalizasyonu — backend api/shipments.py::normalize_plaka ile aynı kural.
+// Ayraçlar (/ - – — | \ , ; + & veya 2+ boşluk) → "-", plaka içi boşluklar kalkar, büyük harf.
+// "BG28130K / BU147BG" → "BG28130K-BU147BG", "14 ABV 965" → "14ABV965"
+function normalizePlaka(raw) {
+  const txt = String(raw || '').trim();
+  if (!txt) return '';
+  let parcalar = txt.split(/[\/\-\u2013\u2014|\\,;+&]+|\s{2,}/)
+    .map(p => p.replace(/\s+/g, '').toUpperCase())
+    .filter(Boolean);
+  if (parcalar.length === 1) {
+    // "26FC046 26AJL546": ayraçsız, tek boşlukla yazılmış iki plaka
+    const tok = txt.toUpperCase().split(/\s+/);
+    if (tok.length === 2 && tok.every(t => t.length >= 5 && /[A-Z]/.test(t) && /\d/.test(t))) parcalar = tok;
+  }
+  return parcalar.join('-');
+}
+function _plakaVal() { return normalizePlaka(document.getElementById('plakaInput')?.value); }
+
 function calcShipmentGoodsTotal(rows, country) {
   if (!Array.isArray(rows)) return 0;
 
@@ -349,6 +367,8 @@ function resetSonrasiWizard() {
   cyPdfFiles    = [];
   cyMasterRows  = [];
   window._pdfKur = null;
+  window._pdfBrutKg = 0;
+  window._pdfNetKg = 0;
 
   // Ülke + dropzone sıfırla (zaten var olan fonksiyon)
   resetUlkeSecimi();
@@ -399,24 +419,29 @@ function updateEurSectionStep4() {
   if (!eurSection) return;
 
   const cfg = window.COUNTRIES_CACHE?.[currentCountry];
+  const eurInvUlkeler = ['be', 'de', 'nl', 'xk', 'mk'];
+  const needsEurInput = cfg
+    ? cfg.invKurKaynagi === 'pdf_eur'
+    : eurInvUlkeler.includes(currentCountry);
 
-  if (!cfg || cfg.invKurKaynagi !== 'pdf_eur') {
+  if (!needsEurInput) {
     eurSection.classList.remove('visible');
     eurSection.style.display = 'none';
     return;
   }
 
-  // Her zaman göster
+  const el = document.getElementById('eurRateInput');
+  const pdfKurOk = window._pdfKur && window._pdfKur > 0;
+
+  if (pdfKurOk) {
+    if (el) el.value = String(window._pdfKur).replace('.', ',');
+    eurSection.classList.remove('visible');
+    eurSection.style.display = 'none';
+    return;
+  }
+
   eurSection.classList.add('visible');
   eurSection.style.display = '';
-
-  // PDF'ten kur geldiyse doldur
-  const el = document.getElementById('eurRateInput');
-  if (el && window._pdfKur && window._pdfKur > 0) {
-    if (!el.value || parseNum(el.value) <= 0) {
-      el.value = String(window._pdfKur).replace('.', ',');
-    }
-  }
 }
 
 function goStep4Next() {
@@ -468,7 +493,14 @@ async function initStep5CY() {
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
+// Grup kiloları başka sekme/ekrandan (menşe, GTİP) güncellenmiş olabilir —
+// tabloyu kurmadan önce sunucudan tazele, sonra çiz.
 function buildKgTable(rows) {
+  renderKgTable(rows);
+  syncGrupKilolariFromServer().then(() => renderKgTable(rows));
+}
+
+function renderKgTable(rows) {
   const groups = [...new Set(
     rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== '')
   )].sort();
@@ -675,8 +707,8 @@ function applyNetAdjust() {
 // ── MENŞE AYRIM ───────────────────────────────────────────────────────────────
 function showMenseAyrim() {
   if (!workingRows) return;
-  const trRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
-  const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
+  const trRows = workingRows.filter(r => isTurkiyeMensei(getMenseiAciklama(r)));
+  const otherRows = workingRows.filter(r => !isTurkiyeMensei(getMenseiAciklama(r)));
   const trBrut = round2(trRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const trNet = round2(trRows.reduce((s, r) => s + parseNum(r['NET']), 0));
   const otherBrut = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
@@ -688,9 +720,12 @@ function showMenseAyrim() {
   document.getElementById('menseOtherNet').textContent = 'NET: ' + fmt(otherNet) + ' kg';
   document.getElementById('menseBox').classList.add('visible');
   document.getElementById('menseTaslakSection').style.display = 'block';
+  const uyari = (trRows.length === 0 || otherRows.length === 0)
+    ? `<div class="stat" style="color:var(--gold);">⚠ Tüm satırlar tek grupta — MENŞEİ Açıklama değerleri: ${escapeHtml(menseiDegerOzeti(workingRows))}</div>`
+    : '';
   showStatus('success',
     `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
-     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
+     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>${uyari}`);
 }
 
 // ── BUILD OUTPUT ──────────────────────────────────────────────────────────────
@@ -776,7 +811,7 @@ async function downloadRS() {
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
 
     // INV+PL
-    const plakaVal = document.getElementById('plakaInput')?.value?.trim() || '';
+    const plakaVal = _plakaVal();
     const dosyaAdi = plakaVal
       ? `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'} - ${plakaVal}.xlsx`
       : `INV-PL- ${data.faturaNo} - ${selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse'}.xlsx`;
@@ -984,7 +1019,7 @@ async function downloadRS() {
           ihracat_dosya_no: ihracatDosyaNo,
           fatura_no: data.faturaNo,
           ulke: ULKE_MAP[currentCountry] || currentCountry.toUpperCase(),
-          durum: 'YOLDA',
+          durum: String(data.faturaNo || '').toUpperCase().startsWith('ANT') ? 'Yüklenecek' : 'YOLDA',
           fatura_bedeli_eur: Math.round(fatura_bedeli_eur * 100) / 100,
           fatura_bedeli_tl:  Math.round(fatura_bedeli_tl * 100) / 100,
           mal_bedeli_eur:    Math.round(mal_bedeli_eur * 100) / 100,
@@ -994,7 +1029,7 @@ async function downloadRS() {
           navlun_usd: Math.round(navlun_usd * 100) / 100,
           sigorta_usd: Math.round(sigorta_usd * 100) / 100,
           usd_kuru: Math.round(usd_kuru * 10000) / 10000,
-          plaka: document.getElementById('plakaInput')?.value?.trim() || '',
+          plaka: _plakaVal(),
           nakliye_firmasi: document.getElementById('nakliyeInput')?.value?.trim() || '',
           yukleme_tarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
           gumruk_tarihi:  document.getElementById('gumrukTarihiInput')?.value || '',
@@ -1151,7 +1186,7 @@ async function downloadCY() {
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-    const plakaVal2    = document.getElementById('plakaInput')?.value?.trim() || '';
+    const plakaVal2    = _plakaVal();
     const depoLabel2   = selectedDepo === 'antrepo' ? 'Bonded Warehouse' : 'Warehouse';
     const faturaNolar  = faturalar.map(f => f.faturaNo).join(' - ');
     const plDosyaAdi   = plakaVal2
@@ -1218,12 +1253,12 @@ async function downloadCY() {
             fatura_no:         f.faturaNo,
             ihracat_dosya_no:  document.getElementById('ihracatDosyaNo')?.value?.trim() ? '2026-' + document.getElementById('ihracatDosyaNo').value.trim() : '',
             ulke:              'KIBRIS',
-            durum:             'TESLİM EDİLDİ',
+            durum:             String(f.faturaNo || '').toUpperCase().startsWith('ANT') ? 'Yüklenecek' : 'TESLİM EDİLDİ',
             eur_kuru:          Math.round(eur_kuru * 10000) / 10000,
             fatura_bedeli_tl,
             fatura_bedeli_eur,
             mal_bedeli_eur:    fatura_bedeli_eur,
-            plaka:             document.getElementById('plakaInput')?.value?.trim() || '',
+            plaka:             _plakaVal(),
             nakliye_firmasi:   document.getElementById('nakliyeInput')?.value?.trim() || '',
             yukleme_tarihi:    document.getElementById('yuklemeTarihiInput')?.value || '',
             gumruk_tarihi:     document.getElementById('gumrukTarihiInput')?.value || '',
@@ -1283,8 +1318,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── MENŞE → TASLAK TRİGGER ───────────────────────────────────────────────────
 function triggerMenseTaslak() {
   if (!workingRows) { showStatus('error', '⚠ Önce menşe hesaplayın.'); return; }
-  const trRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
-  const otherRows = workingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
+  const trRows = workingRows.filter(r => isTurkiyeMensei(getMenseiAciklama(r)));
+  const otherRows = workingRows.filter(r => !isTurkiyeMensei(getMenseiAciklama(r)));
   const trKg = round2(trRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const yabanciKg = round2(otherRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const brutKg = round2(workingRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));

@@ -19,7 +19,7 @@ from .constants import (
     USD_INV_COLS, USD_PL_COLS,
     KZ_INV_COLS, KZ_PL_COLS,   # Özbekistan KZ yapısını kullanır
 )
-from .helpers   import hdr, dat, parse_num, sku_grupla, set_print, brd
+from .helpers   import hdr, dat, parse_num, sku_grupla, set_print, brd, resolve_fatura_no
 from .weights   import calculate_weights, get_net_list, generate_master_excel
 from .templates import TEMPLATE_FINDER, apply_genel_header, apply_uz_header
 
@@ -103,7 +103,7 @@ def _generate_usd_genel(ulke_kodu, df, grup_kilolari, hedef_brut, exception_skus
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()
@@ -217,7 +217,7 @@ def _generate_uz(df, grup_kilolari, hedef_brut, exception_skus,
 
     df = sku_grupla(df)
 
-    fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+    fatura_no   = resolve_fatura_no(df, pdf_fields)
     fatura_date = df['Fatura Tarihi'].iloc[0]
     if hasattr(fatura_date, 'date'):
         fatura_date = fatura_date.date()

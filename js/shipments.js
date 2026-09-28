@@ -3,13 +3,28 @@
 
 // ── SÜTUN GENİŞLİKLERİ ───────────────────────────────────────────────────────
 // ── SAYFALAMA STATE ───────────────────────────────────────────────────────────
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+let PAGE_SIZE = parseInt(localStorage.getItem('shipmentsPageSize'), 10) || 25;
+if (!PAGE_SIZE_OPTIONS.includes(PAGE_SIZE)) PAGE_SIZE = 25;
 let currentPage = 1;
 let filteredList = [];
 
-const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','yukleme_tarihi','durum'];
-const COL_DEFAULTS = { ihracat_dosya_no:75, fatura_no:140, palet:50, _depo:56, ulke:85, nakliye_firmasi:75, plaka:142, sefer_id:72, fatura_bedeli_eur:98, yukleme_tarihi:84, durum:96 };
-const COL_MAX = { ihracat_dosya_no:120, fatura_no:160, palet:72, _depo:72, ulke:110, nakliye_firmasi:140, plaka:160, sefer_id:96, fatura_bedeli_eur:118, yukleme_tarihi:104, durum:118 };
+function changePageSize(val) {
+  const size = parseInt(val, 10);
+  PAGE_SIZE = PAGE_SIZE_OPTIONS.includes(size) ? size : 25;
+  localStorage.setItem('shipmentsPageSize', PAGE_SIZE);
+  currentPage = 1;
+  renderPage();
+}
+
+const COL_KEYS = ['ihracat_dosya_no','fatura_no','palet','_depo','ulke','nakliye_firmasi','plaka','sefer_id','fatura_bedeli_eur','durum'];
+// Başlangıç genişlikleri (px). Tablo `width:100%; table-layout:fixed` olduğu için
+// tarayıcı bu değerleri ORANTI olarak kullanır ve tüm sütunlar görünür alana
+// sığar — yatay kaydırma çıkmaz. Kullanıcı tutamaçla sürükleyince o sütunun
+// değeri localStorage'a yazılır; çift tık içeriğe göre otomatik sığdırır.
+const COL_DEFAULTS = { ihracat_dosya_no:75, fatura_no:140, palet:50, _depo:56, ulke:85, nakliye_firmasi:75, plaka:142, sefer_id:72, fatura_bedeli_eur:98, durum:96 };
+const COL_MAX = { ihracat_dosya_no:120, fatura_no:160, palet:72, _depo:72, ulke:110, nakliye_firmasi:140, plaka:160, sefer_id:96, fatura_bedeli_eur:118, durum:118 };
+const SECIM_KOLON_GENISLIK = 36;
 
 function normalizeColWidths(widths) {
   return COL_KEYS.reduce((acc, key) => {
@@ -34,6 +49,16 @@ function saveColWidths(widths) {
 
 let colWidths = loadColWidths();
 
+/** Sol sabit sütunun offset'ini seçim kolonunun gerçek genişliğiyle hizalar. */
+function hizalaSabitKolonOffset(wrapper) {
+  const ilkTh = wrapper?.querySelector('thead th');
+  const genislik = ilkTh?.getBoundingClientRect().width;
+  if (!genislik) return;
+  wrapper.querySelectorAll('.shipments-sticky-l1').forEach(el => {
+    el.style.left = genislik + 'px';
+  });
+}
+
 function initColResize() {
   const table = document.querySelector('#shipments-table-wrapper table');
   if (!table) return;
@@ -54,23 +79,27 @@ function initColResize() {
       cursor:col-resize;z-index:10;user-select:none;
       background:transparent;
     `;
-    th.style.position = 'relative';
-    th.style.width = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
-    th.style.minWidth = '40px';
+    // NOT: position YAZILMAZ. Başlıklar zaten sticky (konumlandırılmış) olduğu
+    // için absolute tutamaç onların içinde kalır; inline 'relative' yazmak
+    // sticky-l1 (Dosya No) başlığının left offset'ini gerçek kaydırmaya
+    // çevirip onu Fatura No'nun üstüne bindiriyordu.
+    if (getComputedStyle(th).position === 'static') th.style.position = 'relative';
     th.style.overflow = 'hidden';
     th.appendChild(handle);
 
-    // Tüm td'leri de baştan genişliğe göre ayarla
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const td = row.cells[i];
-      if (td) {
-        td.style.width = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
-        td.style.maxWidth = (colWidths[colKey] || COL_DEFAULTS[colKey]) + 'px';
-        td.style.overflow = 'hidden';
-        td.style.textOverflow = 'ellipsis';
-      }
-    });
+    const uygula = w => {
+      th.style.width = w + 'px';
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const td = row.cells[i];
+        if (td) {
+          td.style.width = w + 'px';
+          td.style.maxWidth = w + 'px';
+          td.style.overflow = 'hidden';
+          td.style.textOverflow = 'ellipsis';
+        }
+      });
+      hizalaSabitKolonOffset(table.parentElement);
+    };
 
     let startX, startW, isDragging = false;
 
@@ -84,22 +113,11 @@ function initColResize() {
 
       const onMove = e => {
         isDragging = true;
-        const newW = Math.min(260, Math.max(40, startW + e.clientX - startX));
-        th.style.width = newW + 'px';
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-          const td = row.cells[i];
-          if (td) {
-            td.style.width = newW + 'px';
-            td.style.maxWidth = newW + 'px';
-            td.style.overflow = 'hidden';
-            td.style.textOverflow = 'ellipsis';
-          }
-        });
+        uygula(Math.min(400, Math.max(40, startW + e.clientX - startX)));
       };
 
       const onUp = e => {
-        const newW = Math.min(260, Math.max(40, startW + e.clientX - startX));
+        const newW = Math.min(400, Math.max(40, startW + e.clientX - startX));
         if (isDragging) {
           colWidths[colKey] = newW;
           saveColWidths(colWidths);
@@ -118,11 +136,10 @@ function initColResize() {
       e.stopPropagation();
     });
 
+    // Çift tık: sütunu içeriğine göre sığdır
     handle.addEventListener('dblclick', e => {
       e.preventDefault();
       e.stopPropagation();
-
-      // O sütundaki tüm hücrelerin içerik genişliğini ölç
       let maxW = 60;
       const allCells = table.querySelectorAll(`tr td:nth-child(${i + 1}), tr th:nth-child(${i + 1})`);
       const measurer = document.createElement('span');
@@ -133,17 +150,8 @@ function initColResize() {
         maxW = Math.max(maxW, measurer.offsetWidth + 16);
       });
       document.body.removeChild(measurer);
-      maxW = Math.min(maxW, 400); // max 400px
-
-      th.style.width = maxW + 'px';
-      const rows = table.querySelectorAll('tbody tr');
-      rows.forEach(row => {
-        const td = row.cells[i];
-        if (td) {
-          td.style.width = maxW + 'px';
-          td.style.maxWidth = maxW + 'px';
-        }
-      });
+      maxW = Math.min(maxW, 400);
+      uygula(maxW);
       colWidths[colKey] = maxW;
       saveColWidths(colWidths);
     });
@@ -220,59 +228,118 @@ function getHiddenFilterValues(id) {
   }
 }
 
+let shipmentsSearchQuery = '';
+
+// Arama için: küçük harf + Türkçe karakterleri sadeleştir ("sirbistan" = "SIRBİSTAN")
+function aramaNormalize(val) {
+  return String(val || '').trim().toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c');
+}
+let shipmentsSearchDebounce = null;
+
+function onShipmentsSearch(val) {
+  clearTimeout(shipmentsSearchDebounce);
+  shipmentsSearchDebounce = setTimeout(() => {
+    shipmentsSearchQuery = aramaNormalize(val);
+    document.getElementById('shipments-search-btn')?.classList.toggle('active', !!shipmentsSearchQuery);
+    applyFiltersAndRender();
+  }, 200);
+}
+
+function toggleShipmentsSearch(event) {
+  event.stopPropagation();
+  const panel = document.getElementById('shipments-search-panel');
+  const btn   = document.getElementById('shipments-search-btn');
+  if (!panel || !btn) return;
+  const isOpen = panel.style.display === 'block';
+  if (isOpen) {
+    panel.style.display = 'none';
+  } else {
+    const rect = btn.getBoundingClientRect();
+    panel.style.top  = (rect.bottom + 6) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.display = 'block';
+    setTimeout(() => document.getElementById('shipments-search')?.focus(), 0);
+  }
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#shipments-search-wrap')) {
+    const panel = document.getElementById('shipments-search-panel');
+    if (panel) panel.style.display = 'none';
+  }
+});
+
 function applyFiltersAndRender() {
   const depo        = document.getElementById('filter-depo')?.value         || '';
   const durumlar    = getHiddenFilterValues('filter-durum');
   const musteriTipleri = getHiddenFilterValues('filter-musteri-tipi');
   const aylar       = getHiddenFilterValues('filter-ay');
+  const yillar      = getHiddenFilterValues('filter-yil');
 
   // Filtrelenmiş listeyi her zaman allShipments'tan sıfırdan hesapla
   let filtered = allShipments;
   if (selectedUlkeler && selectedUlkeler.size > 0)
     filtered = filtered.filter(s => selectedUlkeler.has(s.ulke?.toUpperCase()));
-  if (durumlar.length > 0) filtered = filtered.filter(s => durumlar.includes(normalizeDurum(s.durum)));
+  if (durumlar.length > 0) filtered = filtered.filter(s => durumlar.includes(durumGoster(s, allShipments)));
   if (depo)        filtered = filtered.filter(s => s.fatura_no?.startsWith(depo));
   if (musteriTipleri.length > 0) filtered = filtered.filter(s => musteriTipleri.includes(s.musteri_tipi));
   if (aylar.length > 0) filtered = filtered.filter(s => aylar.includes((s.yukleme_tarihi || '').slice(5, 7)));
+  if (yillar.length > 0) filtered = filtered.filter(s => yillar.includes((s.yukleme_tarihi || '').slice(0, 4)));
   if (dashboardSeferFilter === 'tek') filtered = filtered.filter(s => !s.sefer_id);
   if (dashboardSeferFilter === 'gruplu') filtered = filtered.filter(s => !!s.sefer_id);
+  if (shipmentsSearchQuery) {
+    const q = shipmentsSearchQuery;
+    filtered = filtered.filter(s =>
+      [s.ihracat_dosya_no, s.fatura_no, s.plaka, s.nakliye_firmasi, s.ulke]
+        .some(alan => aramaNormalize(alan).includes(q))
+    );
+  }
 
   filteredList = sortShipments(filtered);
   currentPage  = 1;
   renderPage();
+
+  const aktifFiltre = [
+    selectedUlkeler && selectedUlkeler.size > 0, durumlar.length > 0, !!depo,
+    musteriTipleri.length > 0, aylar.length > 0 || yillar.length > 0,
+    !!dashboardSeferFilter, !!shipmentsSearchQuery
+  ].filter(Boolean).length;
+  updateTemizleButonu(aktifFiltre);
 }
 
-// Özet şeridi HTML'i — ayrı standalone pilller (Sevkiyat/Navlun/Sigorta) ve
-// aralarında ince ayraç bulunan tek bir grup kutusu (Fatura/TL/USD) üretir.
-function ozetHtml({ toplam, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd }) {
-  const pill = (icon, label, val, iconColor) => `
-    <div style="display:flex;align-items:center;gap:5px;padding:5px 11px;
-                background:var(--surface);border:0.5px solid var(--border2);
-                border-radius:20px;white-space:nowrap;">
-      <i class="ti ti-${icon}" style="font-size:12.5px;color:${iconColor};" aria-hidden="true"></i>
-      <span style="font-size:11.5px;color:var(--text3);">${label}</span>
-      <span style="font-size:11.5px;font-weight:600;color:var(--text);">${val}</span>
+// Temizle butonu: filtre yokken soluk, varsa kırmızı + aktif filtre sayısı
+function updateTemizleButonu(sayi) {
+  const btn = document.getElementById('filter-clear-btn');
+  if (!btn) return;
+  btn.classList.toggle('has-filter', sayi > 0);
+  document.getElementById('filter-clear-count').textContent = sayi || '';
+  btn.title = sayi ? `${sayi} aktif filtreyi temizle` : 'Aktif filtre yok';
+}
+
+// Özet şeridi HTML'i — kart görünümü; stiller css/style.css "ÖZET KARTLARI" bloğunda.
+// Renk sadece ikon rozetinde (--c); değerler koyu ve büyük.
+function ozetHtml({ toplam, kayit, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd }) {
+  const kalem = (icon, label, val, renk, title = '') => `
+    <div class="oz-item" ${title ? `title="${title}"` : ''} style="--c:${renk};">
+      <span class="oz-ic"><i class="ti ti-${icon}" aria-hidden="true"></i></span>
+      <span class="oz-txt"><span class="oz-lbl">${label}</span><span class="oz-val">${val}</span></span>
     </div>`;
-  const segment = (icon, label, val, iconColor, divider) => `
-    <div style="display:flex;align-items:center;gap:5px;padding:5px 11px;white-space:nowrap;
-                ${divider ? 'border-left:1px solid var(--border2);' : ''}">
-      <i class="ti ti-${icon}" style="font-size:12.5px;color:${iconColor};" aria-hidden="true"></i>
-      <span style="font-size:11.5px;color:var(--text3);">${label}</span>
-      <span style="font-size:11.5px;font-weight:600;color:var(--text);">${val}</span>
-    </div>`;
-  const faturaGroup = `
-    <div style="display:flex;align-items:center;
-                background:var(--surface);border:0.5px solid var(--border2);
-                border-radius:20px;overflow:hidden;">
-      ${segment('currency-euro',   'Fatura', fmt(faturaEur),    '#185FA5', false)}
-      ${segment('currency-lira',   'TL',     fmtTl(faturaTl),   '#3B6D11', true)}
-      ${segment('currency-dollar', 'USD',    fmtUsd(faturaUsd), '#1B7A6B', true)}
-    </div>`;
+  // Gruplu sevkiyatlar tek sefer sayılır; alt bilgideki ham kayıt sayısıyla
+  // çelişki izlenimi doğmasın diye ikisi birlikte gösterilir.
+  const seferVal = (kayit != null && kayit !== toplam)
+    ? `${toplam} <small>· ${kayit} kayıt</small>`
+    : `${toplam}`;
   return `
-    ${pill('package', 'Sevkiyat', toplam, 'var(--text2)')}
-    ${faturaGroup}
-    ${pill('ship',    'Navlun',   fmt(navlunEur),  '#854F0B')}
-    ${pill('shield',  'Sigorta',  fmt(sigortaEur), '#533AB7')}
+    <div class="oz-card">${kalem('truck', 'Sefer', seferVal, '#475569', 'Gruplu sevkiyatlar tek sefer sayılır')}</div>
+    <div class="oz-card oz-group">
+      ${kalem('currency-euro',   'Fatura (EUR)', fmt(faturaEur),    '#2563EB')}
+      ${kalem('currency-lira',   'Fatura (TL)',  fmtTl(faturaTl),   '#16A34A')}
+      ${kalem('currency-dollar', 'Fatura (USD)', fmtUsd(faturaUsd), '#0D9488')}
+    </div>
+    <div class="oz-card">${kalem('ship',   'Navlun',  fmt(navlunEur),  '#D97706')}</div>
+    <div class="oz-card">${kalem('shield', 'Sigorta', fmt(sigortaEur), '#7C3AED')}</div>
   `;
 }
 
@@ -285,8 +352,8 @@ function sortIcon(col) {
 }
 
 // Tıklanabilir başlık hücresi
-function thCell(label, col, extraStyle = '') {
-  return `<th class="shipments-th" onclick="onSort('${col}')" style="${extraStyle}">
+function thCell(label, col, extraStyle = '', cls = '') {
+  return `<th class="shipments-th ${cls}" onclick="onSort('${col}')" style="${extraStyle}">
     <span class="shipments-th-inner">${label}${sortIcon(col)}</span>
   </th>`;
 }
@@ -311,7 +378,31 @@ function normalizeDurum(raw) {
   return raw.toString().trim();
 }
 
-async function loadShipments(ulke = '', durum = '') {
+function durumGoster(s, kaynak) {
+  const own = normalizeDurum(s.durum);
+  if (!s.sefer_id) return own;
+  const liste = kaynak || (typeof allShipments !== 'undefined' ? allShipments : null) || [s];
+  const grup = liste.filter(x => x.sefer_id === s.sefer_id);
+  const antYuklenecek = grup.some(x =>
+    String(x.fatura_no || '').toUpperCase().startsWith('ANT') &&
+    normalizeDurum(x.durum) === 'Yüklenecek'
+  );
+  return antYuklenecek ? 'Yüklenecek' : own;
+}
+
+/**
+ * Sevkiyat listesini yeniden yükler.
+ * `opts.gorunumuKoru` true ise sayfa no, sıralama ve scroll konumu korunur —
+ * toplu işlem/kayıt güncelleme sonrası kullanıcı bulunduğu yerde kalır.
+ */
+async function loadShipments(ulke = '', durum = '', opts = {}) {
+  const gorunumuKoru = opts.gorunumuKoru === true;
+  const oncekiSayfa  = currentPage;
+  const oncekiSortCol = sortColumn;
+  const oncekiSortDir = sortDir;
+  const oncekiScrollTop  = document.getElementById('shipments-table-wrapper')?.scrollTop  || 0;
+  const oncekiScrollLeft = document.getElementById('shipments-table-wrapper')?.scrollLeft || 0;
+
   // Wrapper scroll ayarları
   const wrapper = document.getElementById('shipments-table-wrapper');
   if (wrapper) {
@@ -339,7 +430,7 @@ async function loadShipments(ulke = '', durum = '') {
     }
     wrapper._resizeHandler = setWrapperHeight;
     setTimeout(setWrapperHeight, 100);
-    window.addEventListener('resize', setWrapperHeight);
+    window.addEventListener('resize', wrapper._resizeHandler);
   }
 
   if (!document.getElementById('shipments-ozet')) {
@@ -362,16 +453,39 @@ async function loadShipments(ulke = '', durum = '') {
 
     allShipments = data.shipments;
     filteredList = [];
-    currentPage  = 1;
-    sortColumn   = 'ihracat_dosya_no';
-    sortDir      = 'desc';
+    // Görünüm korunuyorsa sayfa/sıralama sıfırlanmaz. Silinen kayıt yüzünden
+    // sayfa sayısı azalırsa renderPage() zaten son sayfaya kırpıyor.
+    currentPage  = gorunumuKoru ? oncekiSayfa : 1;
+    sortColumn   = gorunumuKoru && oncekiSortCol ? oncekiSortCol : 'ihracat_dosya_no';
+    sortDir      = gorunumuKoru && oncekiSortCol ? oncekiSortDir : 'desc';
 
+    populateYilFilterOptions();
+    decorateFilterMenuleri();
+    if (typeof bildirimGuncelle === 'function') bildirimGuncelle(allShipments);
     applyPendingDashboardShipmentFilter();
     applyFiltersAndRender();
     if (!document.getElementById('fake-scrollbar')) initStickyScroll();
+
+    if (gorunumuKoru && (oncekiScrollTop || oncekiScrollLeft)) {
+      // Yükseklik hesabı setTimeout(...,0) ile yapılıyor; scroll'u ondan sonra geri al
+      setTimeout(() => {
+        const w = document.getElementById('shipments-table-wrapper');
+        if (!w) return;
+        w.scrollTop  = oncekiScrollTop;
+        w.scrollLeft = oncekiScrollLeft;
+      }, 0);
+    }
   } catch (e) {
     console.error('Sevkiyatlar yüklenemedi:', e);
   }
+}
+
+/** Toplu/tekil işlem sonrası: listeyi tazele ama kullanıcının yerini koru. */
+async function yenileGorunumuKoruyarak() {
+  allShipments = [];
+  const tbody = document.getElementById('shipments-tbody');
+  if (tbody) tbody.innerHTML = '';
+  await loadShipments('', '', { gorunumuKoru: true });
 }
 
 // ── SAYFA RENDER ─────────────────────────────────────────────────────────────
@@ -452,8 +566,16 @@ function renderPagination(totalPages) {
     return navBtn(slot, `goPageNum(${slot})`, slot === currentPage);
   }).join('');
 
+  const pageSizeSelect = `
+    <select onchange="changePageSize(this.value)" title="Sayfa başına kayıt"
+      style="height:26px;padding:0 6px;border-radius:8px;border:0.5px solid var(--border2);
+             background:var(--surface);color:var(--text2);font-family:var(--font);
+             font-size:11.5px;cursor:pointer;">
+      ${PAGE_SIZE_OPTIONS.map(n => `<option value="${n}" ${n === PAGE_SIZE ? 'selected' : ''}>${n} / sayfa</option>`).join('')}
+    </select>`;
+
   pg.innerHTML = `
-    <div style="display:grid;grid-template-columns:minmax(110px,1fr) auto minmax(110px,1fr);align-items:center;gap:14px;width:100%;padding:0 4px;">
+    <div style="display:grid;grid-template-columns:minmax(150px,1fr) auto minmax(150px,1fr);align-items:center;gap:14px;width:100%;padding:0 4px;">
       <span style="font-size:12px;color:var(--text3);white-space:nowrap;min-width:110px;text-align:right;">
         ${total} kayıt · ${start}–${end}
       </span>
@@ -466,9 +588,10 @@ function renderPagination(totalPages) {
         </div>
         ${navBtn('›', 'goPageDelta(1)', false, currentPage === totalPages)}
       </div>
-      <span style="font-size:12px;color:var(--text3);white-space:nowrap;min-width:110px;">
-        Sayfa ${currentPage}/${totalPages}
-      </span>
+      <div style="display:flex;align-items:center;gap:10px;justify-content:flex-end;white-space:nowrap;">
+        <span style="font-size:12px;color:var(--text3);">Sayfa ${currentPage}/${totalPages}</span>
+        ${pageSizeSelect}
+      </div>
     </div>
   `;
 }
@@ -519,36 +642,38 @@ function renderShipments(list, fullList) {
 
   const ozet = document.getElementById('shipments-ozet');
   if (ozet) {
-    ozet.innerHTML = ozetHtml({ toplam, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd });
+    ozet.innerHTML = ozetHtml({ toplam, kayit: summaryList.length, faturaEur, faturaTl, faturaUsd, navlunEur, sigortaEur, fmt, fmtTl, fmtUsd });
   }
 
-  // Tablo — Varış sütunu yok
+  // Sütun genişlikleri kullanıcı ayarından (localStorage) gelir; tablo %100
+  // genişlikte olduğu için px değerleri orantı olarak kullanılır ve hepsi sığar.
+  const g = k => `width:${colWidths[k]}px;`;
+
   wrapper.innerHTML = `
     <table class="shipments-modern-table" style="width:100%;min-width:0;table-layout:fixed;">
       <thead>
         <tr>
-          <th class="shipments-th shipments-check-th" style="width:36px;">
+          <th class="shipments-th shipments-check-th shipments-sticky-l0" style="width:${SECIM_KOLON_GENISLIK}px;">
             <input type="checkbox" id="chk-all" onclick="toggleTumSatirlar(this)" class="role-write-only"
               style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
           </th>
-          ${thCell('Dosya No',        'ihracat_dosya_no', `width:${colWidths.ihracat_dosya_no}px;`)}
-          ${thCell('Fatura No',       'fatura_no',        `width:${colWidths.fatura_no}px;overflow:hidden;text-overflow:ellipsis;`)}
-          ${thCell('Palet',           'palet',            `width:${colWidths.palet}px;text-align:center;`)}
-          ${thCell('Depo',            '_depo',            `width:${colWidths._depo}px;`)}
-          ${thCell('Ülke',            'ulke',             `width:${colWidths.ulke}px;`)}
-          ${thCell('Nakliyeci',       'nakliye_firmasi',  `width:${colWidths.nakliye_firmasi}px;`)}
-          ${thCell('Plaka',           'plaka',            `width:${colWidths.plaka}px;`)}
-          ${thCell('Grup',            'sefer_id',         `width:${colWidths.sefer_id}px;`)}
-          ${thCell('Fatura EUR',      'fatura_bedeli_eur',`width:${colWidths.fatura_bedeli_eur}px;`)}
-          ${thCell('Yükleme',         'yukleme_tarihi',   `width:${colWidths.yukleme_tarihi}px;`)}
-          ${thCell('Durum',           'durum',            `width:${colWidths.durum}px;`)}
+          ${thCell('Dosya No',        'ihracat_dosya_no', `${g('ihracat_dosya_no')}left:${SECIM_KOLON_GENISLIK}px;`, 'shipments-sticky-l1')}
+          ${thCell('Fatura No',       'fatura_no',        `${g('fatura_no')}overflow:hidden;text-overflow:ellipsis;`)}
+          ${thCell('Palet',           'palet',            `${g('palet')}`, 'th-ortala')}
+          ${thCell('Depo',            '_depo',            `${g('_depo')}`, 'th-ortala')}
+          ${thCell('Ülke',            'ulke',             `${g('ulke')}`)}
+          ${thCell('Nakliyeci',       'nakliye_firmasi',  `${g('nakliye_firmasi')}`)}
+          ${thCell('Plaka',           'plaka',            `${g('plaka')}`)}
+          ${thCell('Grup',            'sefer_id',         `${g('sefer_id')}`, 'th-ortala')}
+          ${thCell('Fatura EUR',      'fatura_bedeli_eur',`${g('fatura_bedeli_eur')}`, 'th-saga')}
+          ${thCell('Durum',           'durum',            `${g('durum')}right:0;`, 'th-ortala shipments-sticky-r')}
         </tr>
       </thead>
       <tbody id="shipments-tbody">
         ${list.length === 0
-          ? `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">Sevkiyat bulunamadı</td></tr>`
+          ? `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">Sevkiyat bulunamadı</td></tr>`
           : list.map((s, idx) => {
-              const durumNorm = normalizeDurum(s.durum);
+              const durumNorm = durumGoster(s, allShipments);
               const isAnt    = s.fatura_no?.startsWith('ANT');
               // Gruplu (sefer_id var) = mevcut renk; Komple (grupsuz) = ANT kırmızı / IHR yeşil
               const isGrouped = !!s.sefer_id;
@@ -557,27 +682,27 @@ function renderShipments(list, fullList) {
                 : (isGrouped ? 'shipment-pill-ihr' : 'shipment-pill-ihr-komple');
               const depoTag  = `<span class="shipment-pill ${depoCls}">${isAnt ? 'ANT' : 'IHR'}</span>`;
               return `
-                <tr class="shipments-row" data-id="${s.id}" onclick="openShipmentDetail(${s.id})">
-                  <td class="shipments-td shipments-check-td" onclick="event.stopPropagation()">
+                <tr class="shipments-row" data-id="${s.id}" onclick="openShipmentDetail(${s.id})"
+                    style="--durum-renk:${durumRenk(durumNorm)};">
+                  <td class="shipments-td shipments-check-td shipments-sticky-l0" onclick="event.stopPropagation()">
                     <input type="checkbox" data-id="${s.id}" class="role-write-only"
                       ${seciliSatirlar.has(s.id) ? 'checked' : ''}
                       onclick="toggleSatirSec(event, ${s.id})"
                       style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
                   </td>
-                  <td class="shipments-td shipments-cell-strong">${escapeHtml(s.ihracat_dosya_no) || '-'}</td>
+                  <td class="shipments-td shipments-cell-strong shipments-sticky-l1" style="left:${SECIM_KOLON_GENISLIK}px;">${escapeHtml(s.ihracat_dosya_no) || '-'}</td>
                   <td class="shipments-td shipments-cell-mono shipments-cell-clip">${escapeHtml(s.fatura_no) || '-'}</td>
                   <td class="shipments-td shipments-cell-center">${escapeHtml(s.palet) || '-'}</td>
-                  <td class="shipments-td">${depoTag}</td>
+                  <td class="shipments-td shipments-cell-depo">${depoTag}</td>
                   <td class="shipments-td shipments-cell-clip">${escapeHtml(s.ulke) || '-'}</td>
                   <td class="shipments-td shipments-cell-clip">${escapeHtml(s.nakliye_firmasi) || '-'}</td>
                   <td class="shipments-td shipments-cell-clip shipments-cell-plate">${escapeHtml(s.plaka) || '-'}</td>
                   <td class="shipments-td shipments-cell-group">
-                    ${s.sefer_id ? `<span class="shipment-pill shipment-pill-group"><i class="ti ti-link" aria-hidden="true"></i>Grup ${escapeHtml(s.sefer_id)}</span>` : '<span class="shipments-empty">-</span>'}
+                    ${s.sefer_id ? `<span class="shipment-pill shipment-pill-group"><i class="ti ti-link" aria-hidden="true"></i>G${escapeHtml(s.sefer_id)}</span>` : '<span class="shipments-empty">-</span>'}
                   </td>
                   <td class="shipments-td shipments-cell-money">${formatEUR(s.fatura_bedeli_eur)}</td>
-                  <td class="shipments-td shipments-cell-date">${escapeHtml(s.yukleme_tarihi) || '-'}</td>
-                  <td class="shipments-td">
-                    <span class="shipment-pill" style="${durumStyle(durumNorm)}">${durumNorm}</span>
+                  <td class="shipments-td shipments-cell-durum shipments-sticky-r" style="right:0;">
+                    <span class="shipment-pill" style="${durumStyle(durumNorm)}">${durumNorm}</span>${gecikmeBadge(durumNorm, s.yukleme_tarihi)}
                   </td>
                 </tr>`;
             }).join('')}
@@ -586,6 +711,51 @@ function renderShipments(list, fullList) {
   if (!document.querySelector('#shipments-table-wrapper .col-resize-handle')) {
     setTimeout(initColResize, 0);
   }
+
+  // Sabitlenen sütunların kenar gölgesi yalnızca yatay kaydırma varken görünsün
+  if (!wrapper._xScrollBound) {
+    wrapper._xScrollBound = true;
+    const isaretle = () => {
+      wrapper.classList.toggle('x-sol-kaydi', wrapper.scrollLeft > 0);
+      wrapper.classList.toggle('x-sag-var', wrapper.scrollLeft + wrapper.clientWidth < wrapper.scrollWidth - 1);
+    };
+    wrapper.addEventListener('scroll', isaretle, { passive: true });
+    wrapper._markXScroll = isaretle;
+  }
+  // Sabit kolon offset'i seçim kolonunun gerçek genişliğine göre hizalanır
+  requestAnimationFrame(() => {
+    hizalaSabitKolonOffset(wrapper);
+    wrapper._markXScroll?.();
+  });
+}
+
+// ── GECİKME GÖSTERGESİ (yükleme tarihinden bu yana geçen süre) ───────────────
+const GECIKME_UYARI_GUN  = 15;
+const GECIKME_KRITIK_GUN = 30;
+
+function gecikmeGunSayisi(yuklemeTarihi) {
+  if (!yuklemeTarihi) return null;
+  const t = Date.parse(yuklemeTarihi);
+  if (isNaN(t)) return null;
+  const gun = Math.floor((Date.now() - t) / 86400000);
+  return gun >= 0 ? gun : null;
+}
+
+function gecikmeBadge(durumNorm, yuklemeTarihi) {
+  if (durumNorm === 'TESLİM EDİLDİ') return '';
+  const gun = gecikmeGunSayisi(yuklemeTarihi);
+  if (gun === null || gun < GECIKME_UYARI_GUN) return '';
+  const renk = gun >= GECIKME_KRITIK_GUN ? 'var(--error)' : 'var(--warning)';
+  return `<span title="Yüklemeden bu yana ${gun} gün geçti" style="margin-left:6px;font-size:10.5px;font-weight:700;color:${renk};white-space:nowrap;">${gun}g</span>`;
+}
+
+// Satır sol kenarındaki durum şeridi için tam doygunlukta renk
+function durumRenk(durum) {
+  if (durum === 'Yüklenecek')    return '#7C3AED';
+  if (durum === 'YOLDA')         return '#C2751A';
+  if (durum === 'TESLİM EDİLDİ') return '#3F7A14';
+  if (durum === 'Varış Gümrük')  return '#1668B8';
+  return '#9CA3AF';
 }
 
 function durumStyle(durum) {
@@ -685,6 +855,8 @@ function renderShipmentDetail(s) {
   document.getElementById('edit-gumruk-bitis').value  = s.gumrukleme_bitis || '';
   document.getElementById('edit-beyanname-tl').value  = s.ihracat_beyanname_tl || '';
   document.getElementById('edit-beyanname-eur').value = s.ihracat_beyanname_eur || '';
+  const beyannameUsd = document.getElementById('edit-beyanname-usd');
+  if (beyannameUsd) beyannameUsd.value = s.ihracat_beyanname_usd || '';
   document.getElementById('edit-bekleme').value       = s.arac_bekleme || '';
   document.getElementById('edit-brokerage').value     = s.brokerage_eur || '';
   document.getElementById('edit-other-costs').value   = s.other_costs_eur || '';
@@ -819,6 +991,7 @@ async function saveShipmentDetail() {
       usd_kuru:              parseFloat(document.getElementById('edit-usd-kur').value)     || 0,
       ihracat_beyanname_tl:  parseFloat(document.getElementById('edit-beyanname-tl').value)  || 0,
       ihracat_beyanname_eur: parseFloat(document.getElementById('edit-beyanname-eur').value) || 0,
+      ihracat_beyanname_usd: parseFloat(document.getElementById('edit-beyanname-usd')?.value) || 0,
       arac_bekleme:          parseFloat(document.getElementById('edit-bekleme').value)        || 0,
       brokerage_eur:         parseFloat(document.getElementById('edit-brokerage').value)      || 0,
       other_costs_eur:       parseFloat(document.getElementById('edit-other-costs').value)    || 0,
@@ -831,7 +1004,7 @@ async function saveShipmentDetail() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; const tbody = document.getElementById('shipments-tbody'); if (tbody) tbody.innerHTML = ''; loadShipments(); }
+    if (data.success) { closeShipmentDetail(); filteredList = []; yenileGorunumuKoruyarak(); }
     else alert('Kayıt hatası: ' + (data.error || 'Bilinmeyen hata'));
   }
 }
@@ -898,7 +1071,7 @@ function openNewShipmentForm() {
   document.getElementById('detail-id').value              = '';
 
   ['edit-nakliye','edit-plaka','edit-varis','edit-gumruk-bitis',
-   'edit-beyanname-tl','edit-beyanname-eur','edit-bekleme',
+   'edit-beyanname-tl','edit-beyanname-eur','edit-beyanname-usd','edit-bekleme',
    'edit-brokerage','edit-gumruk-v','edit-kdv'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -941,7 +1114,7 @@ function deleteShipment() {
           body: JSON.stringify({ id: parseInt(id) }),
         });
         const data = await res.json();
-        if (data.success) { closeShipmentDetail(); allShipments = []; filteredList = []; currentPage = 1; loadShipments(); }
+        if (data.success) { closeShipmentDetail(); filteredList = []; yenileGorunumuKoruyarak(); }
         else showMiniModal('⚠️ Hata', 'Silme hatası: ' + (data.error || 'Bilinmeyen hata'), [{ label: 'Tamam', style: 'primary', action: null }]);
       }}
     ]
@@ -963,6 +1136,8 @@ function toggleDD(id) {
     const rect = btn.getBoundingClientRect();
     menu.style.top  = (rect.bottom + 6) + 'px';
     menu.style.left = rect.left + 'px';
+    // Menü ekranın altına taşmasın; sığmazsa kendi içinde kaydırılır
+    menu.style.maxHeight = Math.max(200, window.innerHeight - rect.bottom - 18) + 'px';
   }
 }
 
@@ -974,7 +1149,7 @@ document.addEventListener('click', e => {
 });
 
 function onDDChange(type, input) {
-  if (['tip', 'durum', 'ay'].includes(type)) {
+  if (['tip', 'durum', 'ay', 'yil'].includes(type)) {
     updateMultiDropdownFilter(type, input);
     return;
   }
@@ -992,9 +1167,37 @@ function onDDChange(type, input) {
 }
 
 function onMultiDDApply(type) {
-  commitMultiDropdownFilter(type);
+  if (type === 'donem') {
+    commitMultiDropdownFilter('ay');
+    commitMultiDropdownFilter('yil');
+  } else {
+    commitMultiDropdownFilter(type);
+  }
   applyFiltersAndRender();
   document.getElementById(`dd-${type}`)?.classList.remove('open');
+}
+
+// Dönem (Ay + Yıl) butonunun etiketini seçili chip'lere göre günceller.
+function updateDonemLabel() {
+  const secili = name => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
+  const aylar  = secili('dd-ay-r');
+  const yillar = secili('dd-yil-r');
+  const ayText  = aylar.length === 1 ? ayAdlari[aylar[0]] : aylar.length ? `${aylar.length} Ay` : '';
+  const yilText = yillar.length === 1 ? yillar[0] : yillar.length ? `${yillar.length} Yıl` : '';
+
+  let text = 'Dönem';
+  if (ayText && yilText) text = (aylar.length === 1 && yillar.length === 1) ? `${ayText} ${yilText}` : `${ayText} · ${yilText}`;
+  else if (ayText || yilText) text = ayText || yilText;
+
+  document.getElementById('dd-donem-label').textContent = text;
+  decorateDonemSayilari();
+  document.querySelector('#dd-donem .custom-dd-btn')?.classList.toggle('active', text !== 'Dönem');
+}
+
+function clearDonemFilter() {
+  document.querySelectorAll('input[name="dd-ay-r"], input[name="dd-yil-r"]').forEach(i => i.checked = false);
+  updateDonemLabel();
+  onMultiDDApply('donem');
 }
 
 const ayAdlari = {'01':'Ocak','02':'Şubat','03':'Mart','04':'Nisan','05':'Mayıs','06':'Haziran','07':'Temmuz','08':'Ağustos','09':'Eylül','10':'Ekim','11':'Kasım','12':'Aralık'};
@@ -1015,19 +1218,42 @@ const multiDropdownFilters = {
     labelId: 'dd-durum-label',
     buttonSelector: '#dd-durum .custom-dd-btn',
     emptyLabel: 'Durumlar',
-    countLabel: 'Durum',
-    format: val => val
+    countLabel: 'seçili',
+    // Menüdeki okunur adı göster (YOLDA → Yolda)
+    format: val => document.querySelector(`input[name="dd-durum-r"][value="${val}"] + span`)?.textContent || val
   },
   ay: {
     inputName: 'dd-ay-r',
     hiddenId: 'filter-ay',
-    labelId: 'dd-ay-label',
-    buttonSelector: '#dd-ay .custom-dd-btn',
-    emptyLabel: 'Ay',
-    countLabel: 'Ay',
-    format: val => ayAdlari[val] || val
+    donem: true
+  },
+  yil: {
+    inputName: 'dd-yil-r',
+    hiddenId: 'filter-yil',
+    donem: true
   }
 };
+
+// Sevkiyat verisindeki mevcut yıllara göre Yıl filtresi seçeneklerini üretir.
+function populateYilFilterOptions() {
+  const menu = document.getElementById('dd-yil-menu');
+  if (!menu) return;
+  const yillar = [...new Set(allShipments
+    .map(s => (s.yukleme_tarihi || '').slice(0, 4))
+    .filter(y => /^\d{4}$/.test(y)))]
+    .sort((a, b) => b.localeCompare(a));
+
+  // Mevcut seçimleri koru (liste yeniden üretilince kaybolmasın)
+  const secili = new Set([...menu.querySelectorAll('input:checked')].map(i => i.value));
+  menu.innerHTML = '';
+  yillar.forEach(y => {
+    const label = document.createElement('label');
+    label.className = 'dd-chip';
+    label.innerHTML = `<input type="checkbox" name="dd-yil-r" value="${y}" onchange="onDDChange('yil',this)"><span>${y}</span>`;
+    label.querySelector('input').checked = secili.has(y);
+    menu.appendChild(label);
+  });
+}
 
 function updateMultiDropdownFilter(type, changedInput) {
   const config = multiDropdownFilters[type];
@@ -1049,6 +1275,11 @@ function updateMultiDropdownFilter(type, changedInput) {
     .map(input => input.value);
 
   if (selected.length === 0 && allInput) allInput.checked = true;
+
+  if (config.donem) {
+    updateDonemLabel();
+    return;
+  }
 
   const btn = document.querySelector(config.buttonSelector);
   const label = document.getElementById(config.labelId);
@@ -1075,21 +1306,137 @@ function commitMultiDropdownFilter(type) {
   document.getElementById(config.hiddenId).value = selected.length ? JSON.stringify(selected) : '';
 }
 
+// Filtre menüleri görsel zenginleştirme: renk (--grp) + kayıt sayısı.
+// Sadece görünüm; filtre mantığına dokunmaz.
+const DEPO_RENK = { '': '#64748b', IHR: '#047857', ANT: '#B45309' };
+
+// Sayı gösterilmez (kompakt); kaydı olmayan seçenek soluklaşır, sayı tooltip'te
+function setFiltreSayac(item, sayi) {
+  item.classList.toggle('dd-bos', sayi === 0);
+  item.title = `${sayi} kayıt`;
+}
+
+function decorateFilterMenuleri() {
+  decorateUlkeMenu();
+
+  const durumSay = {};
+  allShipments.forEach(s => {
+    const d = durumGoster(s, allShipments);
+    durumSay[d] = (durumSay[d] || 0) + 1;
+  });
+  document.querySelectorAll('input[name="dd-durum-r"]').forEach(input => {
+    const item = input.closest('.dd-item');
+    item.style.setProperty('--grp', input.value ? durumRenk(input.value) : '#64748b');
+    setFiltreSayac(item, input.value ? (durumSay[input.value] || 0) : allShipments.length);
+  });
+
+  document.querySelectorAll('input[name="dd-depo-r"]').forEach(input => {
+    const item = input.closest('.dd-item');
+    item.style.setProperty('--grp', DEPO_RENK[input.value] || '#64748b');
+    const sayi = input.value
+      ? allShipments.filter(s => (s.fatura_no || '').startsWith(input.value)).length
+      : allShipments.length;
+    setFiltreSayac(item, sayi);
+  });
+
+  decorateDonemSayilari();
+}
+
+// Yıl sayıları toplam; ay sayıları seçili yıllara göre (yıl seçili değilse tümü)
+function decorateDonemSayilari() {
+  const seciliYillar = [...document.querySelectorAll('input[name="dd-yil-r"]:checked')].map(i => i.value);
+  const yilSay = {}, aySay = {};
+  allShipments.forEach(s => {
+    const t = s.yukleme_tarihi || '';
+    const y = t.slice(0, 4), m = t.slice(5, 7);
+    yilSay[y] = (yilSay[y] || 0) + 1;
+    if (!seciliYillar.length || seciliYillar.includes(y)) aySay[m] = (aySay[m] || 0) + 1;
+  });
+  document.querySelectorAll('input[name="dd-yil-r"]').forEach(input => {
+    const chip = input.closest('.dd-chip');
+    setFiltreSayac(chip, yilSay[input.value] || 0);
+  });
+  document.querySelectorAll('input[name="dd-ay-r"]').forEach(input => {
+    const chip = input.closest('.dd-chip');
+    setFiltreSayac(chip, aySay[input.value] || 0);
+  });
+}
+
+function decorateUlkeMenu() {
+  const menu = document.getElementById('dd-ulke-menu');
+  if (!menu) return;
+  const sayilar = {};
+  allShipments.forEach(s => {
+    const u = (s.ulke || '').toUpperCase();
+    sayilar[u] = (sayilar[u] || 0) + 1;
+  });
+
+  menu.querySelectorAll('.dd-group-toggle').forEach(header => {
+    ulkeGrubuInputlari(header).forEach(input => {
+      const item = input.closest('.dd-item');
+      item.dataset.grup = header.dataset.grup;
+      setFiltreSayac(item, sayilar[input.value] || 0);
+    });
+  });
+}
+
+// Ülke menüsündeki grup başlığının altındaki (bir sonraki başlığa kadar) checkbox'lar
+function ulkeGrubuInputlari(header) {
+  const inputs = [];
+  let el = header.nextElementSibling;
+  while (el && !el.classList.contains('dd-group-toggle') && !el.classList.contains('dd-apply-row')) {
+    const input = el.querySelector('input[type=checkbox]');
+    if (input) inputs.push(input);
+    el = el.nextElementSibling;
+  }
+  return inputs;
+}
+
+// Grup başlığına tıklama: hepsi seçiliyse kaldırır, değilse tümünü seçer
+function toggleUlkeGrubu(header) {
+  const inputs = ulkeGrubuInputlari(header);
+  const hepsiSecili = inputs.length > 0 && inputs.every(i => i.checked);
+  inputs.forEach(i => i.checked = !hepsiSecili);
+  onUlkeChange();
+}
+
+// Başlık ikonlarını günceller; tam seçili grupların adlarını döner
+function updateUlkeGrupDurumu() {
+  const tamGruplar = [];
+  document.querySelectorAll('#dd-ulke-menu .dd-group-toggle').forEach(header => {
+    const inputs = ulkeGrubuInputlari(header);
+    const secili = inputs.filter(i => i.checked).length;
+    const tam = secili > 0 && secili === inputs.length;
+    header.classList.toggle('active', tam);
+    header.classList.toggle('partial', secili > 0 && !tam);
+    const icon = header.querySelector('.ti');
+    if (icon) icon.className = 'ti ' + (tam ? 'ti-square-check' : secili ? 'ti-square-minus' : 'ti-square');
+    if (tam) tamGruplar.push({ ad: header.textContent.trim(), sayi: inputs.length });
+  });
+  return tamGruplar;
+}
+
 function onUlkeChange() {
   const checkboxes = document.querySelectorAll('#dd-ulke-menu input[type=checkbox]');
   selectedUlkeler = new Set();
   checkboxes.forEach(cb => { if (cb.checked) selectedUlkeler.add(cb.value); });
 
+  const tamGruplar = updateUlkeGrupDurumu();
   const btn = document.querySelector('#dd-ulke .custom-dd-btn');
   const label = document.getElementById('dd-ulke-label');
-  if (selectedUlkeler.size === 0) {
+  const grupSayisi = tamGruplar.reduce((t, g) => t + g.sayi, 0);
+  if (tamGruplar.length > 0 && grupSayisi === selectedUlkeler.size) {
+    // Seçim tam olarak bir/birkaç grubun kendisiyse grup adıyla göster
+    label.textContent = tamGruplar.map(g => g.ad).join(' + ');
+    btn.classList.add('active');
+  } else if (selectedUlkeler.size === 0) {
     label.textContent = 'Ülkeler';
     btn.classList.remove('active');
   } else if (selectedUlkeler.size === 1) {
     label.textContent = [...selectedUlkeler][0].charAt(0) + [...selectedUlkeler][0].slice(1).toLowerCase();
     btn.classList.add('active');
   } else {
-    label.textContent = `${selectedUlkeler.size} Ülke`;
+    label.textContent = `${selectedUlkeler.size} seçili`;
     btn.classList.add('active');
   }
   applyFiltersAndRender();
@@ -1101,20 +1448,30 @@ function resetShipmentFilterControls() {
   document.getElementById('filter-depo').value  = '';
   document.getElementById('filter-musteri-tipi').value = '';
   document.getElementById('filter-ay').value = '';
+  document.getElementById('filter-yil').value = '';
   dashboardSeferFilter = '';
+
+  shipmentsSearchQuery = '';
+  const searchInput = document.getElementById('shipments-search');
+  if (searchInput) searchInput.value = '';
+  document.getElementById('shipments-search-btn')?.classList.remove('active');
+  const searchPanel = document.getElementById('shipments-search-panel');
+  if (searchPanel) searchPanel.style.display = 'none';
 
   selectedUlkeler = new Set();
   document.querySelectorAll('#dd-ulke-menu input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateUlkeGrupDurumu();
   document.querySelectorAll('input[name="dd-tip-r"]').forEach((input, index) => input.checked = index === 0);
   document.querySelectorAll('input[name="dd-durum-r"]').forEach((input, index) => input.checked = index === 0);
   document.querySelectorAll('input[name="dd-depo-r"]').forEach((input, index) => input.checked = index === 0);
-  document.querySelectorAll('input[name="dd-ay-r"]').forEach((input, index) => input.checked = index === 0);
+  document.querySelectorAll('input[name="dd-ay-r"], input[name="dd-yil-r"]').forEach(input => input.checked = false);
 
   document.getElementById('dd-tip-label').textContent   = 'Tipler';
   document.getElementById('dd-ulke-label').textContent  = 'Ülkeler';
   document.getElementById('dd-durum-label').textContent = 'Durumlar';
   document.getElementById('dd-depo-label').textContent  = 'Depolar';
-  document.getElementById('dd-ay-label').textContent    = 'Ay';
+  document.getElementById('dd-donem-label').textContent = 'Dönem';
+  decorateDonemSayilari();
   document.querySelectorAll('.custom-dd-btn').forEach(b => b.classList.remove('active'));
 }
 
@@ -1134,7 +1491,7 @@ function applyPendingDashboardShipmentFilter() {
 
   if (filter.durum) {
     document.getElementById('filter-durum').value = filter.durum;
-    document.getElementById('dd-durum-label').textContent = filter.durum;
+    document.getElementById('dd-durum-label').textContent = multiDropdownFilters.durum.format(filter.durum);
     document.querySelector('#dd-durum .custom-dd-btn')?.classList.add('active');
     setRadioFilter('dd-durum-r', filter.durum);
     if (title) title.textContent = `Sevkiyatlar · ${filter.durum}`;
@@ -1337,6 +1694,12 @@ function updateSecimToolbar() {
     `;
     toolbar.innerHTML = `
       <span id="secim-count"></span>
+      <button onclick="topluDurumGuncelle()" class="role-write-only"
+        style="padding:7px 16px;border-radius:8px;border:none;
+               background:#185FA5;color:#fff;font-family:var(--font);
+               font-size:12px;font-weight:600;cursor:pointer;">
+        ⟳ Durum Güncelle
+      </button>
       <button onclick="topluGrupla()" class="role-write-only"
         style="padding:7px 16px;border-radius:8px;border:none;
                background:#7C3AED;color:#fff;font-family:var(--font);
@@ -1414,16 +1777,137 @@ async function topluSil() {
           if (!data.success) throw new Error(data.error);
           seciliSatirlar.clear();
           updateSecimToolbar();
-          allShipments = [];
-          const tbody = document.getElementById('shipments-tbody');
-          if (tbody) tbody.innerHTML = '';
-          await loadShipments();
+          await yenileGorunumuKoruyarak();
         } catch (e) {
           showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
         }
       }}
     ]
   );
+}
+
+// ── TOPLU DURUM GÜNCELLE ─────────────────────────────────────────────────────
+const TOPLU_DURUM_SECENEKLERI = ['Yüklenecek', 'YOLDA', 'Varış Gümrük', 'Gümrükleme', 'TESLİM EDİLDİ'];
+
+// Durum → yazılacak tarih kolonu ve ekranda görünen etiket.
+// Backend'deki DURUM_TARIH_KOLONU ile birebir aynı olmalı (api/shipments.py).
+// Yüklenecek/YOLDA burada yok: o durumlarda tarih sorulmaz, alan gizlenir.
+const DURUM_TARIH_ALANI = {
+  'Varış Gümrük':  { kolon: 'varis_tarihi',     etiket: 'Varış Tarihi'      },
+  'Gümrükleme':    { kolon: 'gumruk_tarihi',    etiket: 'Gümrük Tarihi'     },
+  'TESLİM EDİLDİ': { kolon: 'gumrukleme_bitis', etiket: 'Gümrükleme Bitiş'  },
+};
+
+function bugunISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function topluDurumGuncelle() {
+  const count = seciliSatirlar.size;
+  if (!count) return;
+
+  const seciliKayitlar = [...seciliSatirlar]
+    .map(id => allShipments.find(x => x.id === id))
+    .filter(Boolean);
+
+  const seciliListesi = seciliKayitlar
+    .map(s => `<span style="font-family:var(--mono);font-size:12px;color:var(--accent);">${escapeHtml(s.ihracat_dosya_no || s.fatura_no)}</span>`)
+    .join(', ');
+
+  // Kurumsal olmayan (franchise/toptan/devir) ülkelerde tarih bugünle dolu gelir.
+  // Seçimde tek bir kurumsal kayıt bile varsa tarih boş bırakılır, elle girilir.
+  const hepsiKurumsalDisi = seciliKayitlar.length > 0 &&
+    seciliKayitlar.every(s => (s.musteri_tipi || 'kurumsal') !== 'kurumsal');
+  const varsayilanTarih = hepsiKurumsalDisi ? bugunISO() : '';
+
+  showMiniModal('⟳ Toplu Durum Güncelle', `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text2);">
+      <b>${count} sevkiyat</b> için yeni durum seçin:
+    </div>
+    <select id="toplu-durum-select" style="width:100%;height:36px;padding:0 10px;margin-bottom:12px;
+           border-radius:var(--radius-md);border:0.5px solid var(--border2);
+           background:var(--surface2);color:var(--text);font-family:var(--font);font-size:13px;">
+      ${TOPLU_DURUM_SECENEKLERI.map(d => `<option value="${d}">${d}</option>`).join('')}
+    </select>
+    <div id="toplu-tarih-wrap" style="margin-bottom:12px;">
+      <label id="toplu-tarih-label" for="toplu-durum-tarih"
+             style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;"></label>
+      <input id="toplu-durum-tarih" type="date" value="${varsayilanTarih}"
+             style="width:100%;height:36px;padding:0 10px;
+                    border-radius:var(--radius-md);border:0.5px solid var(--border2);
+                    background:var(--surface2);color:var(--text);font-family:var(--font);font-size:13px;">
+      <div id="toplu-tarih-uyari" style="display:none;font-size:12px;color:#EF4444;margin-top:5px;">
+        Tarih zorunludur.
+      </div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-md);
+                border:0.5px solid var(--border2);line-height:1.8;">
+      ${seciliListesi}
+    </div>`,
+    [
+      { label: 'İptal', style: 'ghost', action: null },
+      { label: '⟳ Güncelle', style: 'primary',
+        // Tarih boşsa modal kapanmaz, kayıt güncellenmez
+        validate: (formValues) => {
+          const durum = formValues?.['toplu-durum-select'] || '';
+          const tarih = (formValues?.['toplu-durum-tarih'] || '').trim();
+          if (DURUM_TARIH_ALANI[durum] && !tarih) {
+            const uyari = document.getElementById('toplu-tarih-uyari');
+            const input = document.getElementById('toplu-durum-tarih');
+            if (uyari) uyari.style.display = 'block';
+            if (input) { input.style.borderColor = '#EF4444'; input.focus(); }
+            return false;
+          }
+          return true;
+        },
+        action: async (formValues) => {
+        const durum = formValues?.['toplu-durum-select'] || TOPLU_DURUM_SECENEKLERI[0];
+        const tarih = (formValues?.['toplu-durum-tarih'] || '').trim();
+        if (!durum) return;
+        const token = localStorage.getItem('fa_auth_token');
+        try {
+          const resp = await fetch('/api/shipments/bulk-status', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body:    JSON.stringify({ ids: [...seciliSatirlar], durum, tarih }),
+          });
+          const data = await resp.json();
+          if (!data.success) throw new Error(data.error);
+          seciliSatirlar.clear();
+          updateSecimToolbar();
+          await yenileGorunumuKoruyarak();
+        } catch (e) {
+          showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
+        }
+      }}
+    ]
+  );
+
+  // Seçilen duruma göre tarih alanının etiketi değişir (hangi kolona yazılacağı)
+  const durumSelect = document.getElementById('toplu-durum-select');
+  const tarihLabel  = document.getElementById('toplu-tarih-label');
+  const tarihWrap   = document.getElementById('toplu-tarih-wrap');
+  const tarihInput  = document.getElementById('toplu-durum-tarih');
+
+  function tarihAlaniniGuncelle() {
+    const alan = DURUM_TARIH_ALANI[durumSelect?.value || ''];
+    if (!tarihWrap) return;
+    if (!alan) { tarihWrap.style.display = 'none'; return; }
+    tarihWrap.style.display = '';
+    if (tarihLabel) tarihLabel.textContent = alan.etiket + ' *';
+    const uyari = document.getElementById('toplu-tarih-uyari');
+    if (uyari) uyari.style.display = 'none';
+    if (tarihInput) tarihInput.style.borderColor = 'var(--border2)';
+  }
+
+  durumSelect?.addEventListener('change', tarihAlaniniGuncelle);
+  tarihInput?.addEventListener('input', () => {
+    const uyari = document.getElementById('toplu-tarih-uyari');
+    if (uyari) uyari.style.display = 'none';
+    tarihInput.style.borderColor = 'var(--border2)';
+  });
+  tarihAlaniniGuncelle();
 }
 
 // ── TOPLU GRUPLA ─────────────────────────────────────────────────────────────
@@ -1464,10 +1948,7 @@ function topluGrupla() {
           if (!data.success) throw new Error(data.error);
           seciliSatirlar.clear();
           updateSecimToolbar();
-          allShipments = [];
-          const tbody = document.getElementById('shipments-tbody');
-          if (tbody) tbody.innerHTML = '';
-          await loadShipments();
+          await yenileGorunumuKoruyarak();
         } catch (e) {
           showMiniModal('⚠️ Hata', e.message, [{ label: 'Tamam', style: 'primary', action: null }]);
         }
@@ -1525,8 +2006,17 @@ function showMiniModal(title, bodyHtml, buttons) {
     const label = btn.dataset.action;
     const found = buttons.find(b => b.label === label);
     btn.addEventListener('click', async () => {
+      // Overlay kapanmadan once form degerlerini al — aksi halde action icinde
+      // document.getElementById(...) null doner (modal DOM'dan silinmis olur).
+      const formValues = {};
+      overlay.querySelectorAll('input, select, textarea').forEach(el => {
+        if (!el.id) return;
+        formValues[el.id] = (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value;
+      });
+      // validate false donerse modal acik kalir, action calismaz
+      if (found?.validate && found.validate(formValues) === false) return;
       overlay.remove();
-      if (found?.action) await found.action();
+      if (found?.action) await found.action(formValues);
     });
   });
 
@@ -1536,6 +2026,7 @@ function showMiniModal(title, bodyHtml, buttons) {
   });
 
   document.body.appendChild(overlay);
+  return overlay;
 }
 
 // ── SIRBİSTAN VERGİ PDF PARSE ─────────────────────────────────────────────────
@@ -2165,7 +2656,7 @@ async function meLoadKzShipments() {
     const prev = sel.value;
     sel.innerHTML = '<option value="">— Sevkiyat seçin —</option>' +
       list.map(s => {
-        const label = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ');
+        const label = [s.ihracat_dosya_no, s.fatura_no, s.sefer_id ? `[Grup ${s.sefer_id}]` : ''].filter(Boolean).join(' · ');
         return `<option value="${s.id}">${escapeHtml(label)}</option>`;
       }).join('');
     if (prev && list.find(s => String(s.id) === prev)) sel.value = prev;
@@ -2173,6 +2664,30 @@ async function meLoadKzShipments() {
   } catch (err) {
     if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
   }
+}
+
+function meKzNormFatura(no) {
+  return String(no || '').toUpperCase().replace(/^AMT/, 'ANT').replace(/[^A-Z0-9]/g, '');
+}
+
+function meKzPaylar(targets) {
+  const n = targets.length || 1;
+  return targets.map(x => ({ ...x, oran: 1 / n }));
+}
+
+function meKzSplitAmount(total, paylar) {
+  const amounts = [];
+  let allocated = 0;
+  paylar.forEach((p, i) => {
+    if (i === paylar.length - 1) {
+      amounts.push(Math.round((total - allocated) * 100) / 100);
+    } else {
+      const v = Math.round(total * p.oran * 100) / 100;
+      amounts.push(v);
+      allocated += v;
+    }
+  });
+  return amounts;
 }
 
 async function meHandleKzPdf(file) {
@@ -2210,76 +2725,212 @@ async function meHandleKzPdf(file) {
   const selectedId = selEl?.value;
 
   // Beyanname yanıtı: {tip:'beyanname', kzt:{vergi,kdv}, eur:{vergi,kdv}, kur:{kzt_per_eur}}
-  // AVR/broker yanıtı (mevcut endpoint, tip alanı yok): {brokerage_kzt, other_costs_kzt, brokerage_eur, other_costs_eur, kzt_per_eur, kalemler}
+  // AVR/broker: {tip:'broker', brokerage_*, fatura_nolar:[ANT..., IHR...]}
   const isBeyanname = data.tip === 'beyanname';
+  const faturaNolar = (data.fatura_nolar || []).map(meKzNormFatura).filter(Boolean);
 
-  if (!selectedId) {
-    let info = '';
-    if (isBeyanname) {
-      info = `<div style="color:var(--success);">✓ Gümrük Beyannamesi</div>
+  if (isBeyanname && !selectedId && !faturaNolar.length) {
+    resultEl.innerHTML = `<div style="color:var(--success);">✓ Gümrük Beyannamesi</div>
         <div style="margin-top:6px;">Vergi (1010+2010): <b>${fmt(data.kzt.vergi)} KZT → ${fmtEur(data.eur.vergi)}</b><br>
         KDV (5060): <b>${fmt(data.kzt.kdv)} KZT → ${fmtEur(data.eur.kdv)}</b><br>
-        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.kzt_per_eur)} KZT</span></div>`;
-    } else {
-      info = `<div style="color:var(--success);">✓ Broker faturası — Итого</div>
-        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.brokerage_kzt)} KZT → ${fmtEur(data.brokerage_eur)}</b><br>
-        Diğer masraflar: <b>${fmt(data.other_costs_kzt)} KZT → ${fmtEur(data.other_costs_eur)}</b><br>
-        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kzt_per_eur)} KZT</span></div>`;
-    }
-    resultEl.innerHTML = info + `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+        <span style="color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.kzt_per_eur)} KZT</span></div>` +
+      `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
     return;
   }
 
-  // Seçili sevkiyata uygula — her fatura/beyanname 1 sevke eşittir, gruplu araçlarda orantılı dağıtım yapılmaz
   try {
-    const token   = localStorage.getItem('fa_auth_token');
-    const sRes    = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-    const sData   = await sRes.json();
-    if (!sData.success) throw new Error(sData.error);
-    const s = sData.shipment;
-
-    let detailHtml = '';
-    let saveFields;
+    const token = localStorage.getItem('fa_auth_token');
 
     if (isBeyanname) {
-      const vergi = data.eur.vergi;
-      const kdv   = data.eur.kdv;
+      const kztPerEur = Number(data.kur?.kzt_per_eur || 0);
+      const vergiToplam = Number(data.eur?.vergi || 0);
+      const kdvToplam = Number(data.eur?.kdv || 0);
+      const kztKdv = Number(data.kzt?.kdv || 0);
+      if (kztPerEur < 50 || kztPerEur > 2000) {
+        throw new Error('KZT/EUR kuru geçersiz. Tenge tutarı EUR alanına yazılmadı.');
+      }
+      if (kztKdv > 0 && !(kdvToplam > 0)) {
+        throw new Error('KDV EUR çevrilemedi. Tenge tutarı olduğu gibi yazılmadı.');
+      }
+      if (kdvToplam >= 50000 || (kztKdv > 1000 && Math.abs(kdvToplam - kztKdv) / kztKdv < 0.05)) {
+        throw new Error('KDV hâlâ tenge görünüyor; EUR alanına yazılmadı.');
+      }
 
-      detailHtml = `<div style="color:var(--success);">✓ Gümrük Beyannamesi — Vergi: ${fmtEur(vergi)} | KDV: ${fmtEur(kdv)}</div>
-        <div style="margin-top:6px;">Vergi (1010+2010): <b>${fmt(data.kzt.vergi)} KZT</b> → ${fmtEur(vergi)}<br>
-        KDV (5060): <b>${fmt(data.kzt.kdv)} KZT</b> → ${fmtEur(kdv)}</div>
-        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.kzt_per_eur)} KZT</div>`;
+      const listRes  = await fetch(`/api/shipments?ulke=${encodeURIComponent('KAZAKİSTAN')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const listData = await listRes.json();
+      if (!listData.success) throw new Error(listData.error);
+      const list = listData.shipments || [];
 
-      saveFields = { gumruk_vergisi_eur: vergi, kdv_eur: kdv };
+      let targets = [];
+      let grupNotu = '';
+      for (const no of faturaNolar) {
+        const hit = list.find(x => meKzNormFatura(x.fatura_no) === no);
+        if (hit) targets.push(hit);
+      }
+      const seenIds = new Set();
+      targets = targets.filter(s => {
+        if (seenIds.has(s.id)) return false;
+        seenIds.add(s.id);
+        return true;
+      });
 
+      if (!targets.length && selectedId) {
+        const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const sData = await sRes.json();
+        if (!sData.success) throw new Error(sData.error);
+        targets = [sData.shipment];
+      }
+      if (!targets.length) {
+        throw new Error('Sevkiyat seçin veya PDF içindeki fatura no eşleşsin.');
+      }
+
+      const seed = targets[0];
+      if (targets.length === 1 && seed.sefer_id) {
+        const gRes  = await fetch(`/api/shipments?sefer_id=${seed.sefer_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const gData = await gRes.json();
+        const group = (gData.success && gData.shipments) ? gData.shipments : [];
+        const fatura = parseFloat(seed.fatura_bedeli_eur) || 0;
+        const pdfTekFatura = faturaNolar.length === 1;
+        const kdvCokBuyuk = fatura > 0 && kdvToplam > fatura * 0.35;
+        if (group.length > 1 && !pdfTekFatura && kdvCokBuyuk) {
+          targets = group;
+          grupNotu = `Grup ${seed.sefer_id}: KDV/vergi fatura bedeline göre dağıtıldı`;
+        }
+      }
+
+      const toplamEur = targets.reduce((sum, x) => sum + (parseFloat(x.fatura_bedeli_eur) || 0), 0);
+      const paylar = targets.map(x => {
+        const bedel = parseFloat(x.fatura_bedeli_eur) || 0;
+        const oran = toplamEur > 0 ? bedel / toplamEur : 1 / targets.length;
+        return { ...x, oran };
+      });
+      const vergiPays = meKzSplitAmount(vergiToplam, paylar);
+      const kdvPays = meKzSplitAmount(kdvToplam, paylar);
+
+      let detailHtml = `<div style="color:var(--success);">✓ Gümrük Beyannamesi — Vergi: ${fmtEur(vergiToplam)} | KDV: ${fmtEur(kdvToplam)}</div>
+        <div style="margin-top:6px;">Vergi (1010+2010): <b>${fmt(data.kzt.vergi)} KZT</b> → ${fmtEur(vergiToplam)}<br>
+        KDV (5060): <b>${fmt(data.kzt.kdv)} KZT</b> → ${fmtEur(kdvToplam)}</div>
+        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(kztPerEur)} KZT</div>`;
+      if (faturaNolar.length) {
+        detailHtml += `<div style="margin-top:6px;font-size:12px;">PDF fatura no: <b>${faturaNolar.map(n => escapeHtml(n)).join(' · ')}</b></div>`;
+      }
+      if (paylar.length > 1) {
+        detailHtml += `<div style="margin-top:8px;font-size:11px;color:var(--text3);">${escapeHtml(grupNotu || 'Orantılı dağıtım (fatura_bedeli_eur)')}:</div>
+          <div style="margin-top:4px;">` +
+          paylar.map((p, i) =>
+            `<div>${escapeHtml(p.fatura_no || p.ihracat_dosya_no)}: vergi <b>${fmtEur(vergiPays[i])}</b> · KDV <b>${fmtEur(kdvPays[i])}</b></div>`
+          ).join('') +
+          `</div>`;
+      }
+
+      resultEl.innerHTML = detailHtml +
+        `<div id="me-kz-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
+      for (let i = 0; i < paylar.length; i++) {
+        await meKzSaveFields(paylar[i], { gumruk_vergisi_eur: vergiPays[i], kdv_eur: kdvPays[i] }, token);
+      }
+      document.getElementById('me-kz-save-status').innerHTML =
+        `<span style="color:var(--success);">✓ Kaydedildi (${paylar.length} sevkiyat güncellendi)</span>`;
+      const inp = document.getElementById('me-kz-input');
+      if (inp) inp.value = '';
+      return;
+    }
+
+    // Broker (AVR) — PDF'de ANT+IHR varsa yarı yarıya böl
+    const brokerage = data.brokerage_eur || 0;
+    const other     = data.other_costs_eur || 0;
+    const kalemHtml = (data.kalemler || []).length
+      ? `<div style="margin-top:6px;font-size:11px;color:var(--text3);">Okunan kalemler:</div>
+         <div style="margin-top:2px;">` +
+         data.kalemler.map(k => `<div>${k.ad}: <b>${fmt(k.tutar)} KZT</b></div>`).join('') +
+         `</div>`
+      : '';
+    let detailHtml = `<div style="color:var(--success);">✓ Broker faturası — Brokerage: ${fmtEur(brokerage)} | Diğer: ${fmtEur(other)}</div>
+      <div style="margin-top:6px;">Brokerage: <b>${fmt(data.brokerage_kzt)} KZT</b> → ${fmtEur(brokerage)}<br>
+      Diğer masraflar: <b>${fmt(data.other_costs_kzt)} KZT</b> → ${fmtEur(other)}</div>
+      ${kalemHtml}
+      <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kzt_per_eur)} KZT</div>`;
+    if (faturaNolar.length) {
+      detailHtml += `<div style="margin-top:6px;font-size:12px;">PDF fatura no: <b>${faturaNolar.map(n => escapeHtml(n)).join(' · ')}</b></div>`;
+    }
+    resultEl.innerHTML = detailHtml;
+
+    let targets = [];
+    let grupNotu = '';
+    if (faturaNolar.length >= 1) {
+      const listRes  = await fetch(`/api/shipments?ulke=${encodeURIComponent('KAZAKİSTAN')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const listData = await listRes.json();
+      if (!listData.success) throw new Error(listData.error);
+      const list = listData.shipments || [];
+      const missing = [];
+      for (const no of faturaNolar) {
+        const hit = list.find(x => meKzNormFatura(x.fatura_no) === no);
+        if (hit) targets.push(hit);
+        else missing.push(no);
+      }
+      if (missing.length && !targets.length) {
+        throw new Error(`PDF'deki fatura no sevkiyatlarda bulunamadı: ${missing.join(', ')}`);
+      }
+    } else if (selectedId) {
+      const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const sData = await sRes.json();
+      if (!sData.success) throw new Error(sData.error);
+      targets = [sData.shipment];
     } else {
-      // Broker (AVR) faturası — brokerage_eur ve other_costs_eur tam olarak seçili sevkiyata yazılır
-      const brokerage = data.brokerage_eur || 0;
-      const other      = data.other_costs_eur || 0;
+      resultEl.innerHTML = detailHtml +
+        `<div style="margin-top:8px;font-size:12px;color:var(--text3);">ℹ Üstten sevkiyat seçerek otomatik kaydedebilirsiniz.</div>`;
+      return;
+    }
 
-      const kalemHtml = (data.kalemler || []).length
-        ? `<div style="margin-top:6px;font-size:11px;color:var(--text3);">Okunan kalemler:</div>
-           <div style="margin-top:2px;">` +
-           data.kalemler.map(k => `<div>${k.ad}: <b>${fmt(k.tutar)} KZT</b></div>`).join('') +
-           `</div>`
-        : '';
+    // Tekrarları düş (OCR aynı numarayı iki kez okursa)
+    const seenIds = new Set();
+    targets = targets.filter(s => {
+      if (seenIds.has(s.id)) return false;
+      seenIds.add(s.id);
+      return true;
+    });
 
-      detailHtml = `<div style="color:var(--success);">✓ Broker faturası — Brokerage: ${fmtEur(brokerage)} | Diğer: ${fmtEur(other)}</div>
-        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.brokerage_kzt)} KZT</b> → ${fmtEur(brokerage)}<br>
-        Diğer masraflar: <b>${fmt(data.other_costs_kzt)} KZT</b> → ${fmtEur(other)}</div>
-        ${kalemHtml}
-        <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kzt_per_eur)} KZT</div>`;
+    // OCR tek numara / hiç numara bulamazsa: seçili (veya bulunan) sevkiyatın
+    // ANT+IHR grubuna yarı yarıya yay.
+    if (targets.length < 2) {
+      const seed = targets[0];
+      if (seed?.sefer_id) {
+        const gRes  = await fetch(`/api/shipments?sefer_id=${seed.sefer_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const gData = await gRes.json();
+        if (gData.success && gData.shipments?.length) {
+          const ant = gData.shipments.find(x => (x.fatura_no || '').startsWith('ANT'));
+          const ihr = gData.shipments.find(x => (x.fatura_no || '').startsWith('IHR'));
+          if (ant && ihr) {
+            targets = [ant, ihr];
+            grupNotu = `Grup ${seed.sefer_id}: ANT+IHR eşit bölündü`;
+          }
+        }
+      }
+    }
 
-      saveFields = { brokerage_eur: brokerage, other_costs_eur: other };
+    const paylar = meKzPaylar(targets);
+    const brokerPays = meKzSplitAmount(brokerage, paylar);
+    const otherPays  = meKzSplitAmount(other, paylar);
+
+    if (paylar.length > 1) {
+      detailHtml += `<div style="margin-top:8px;font-size:11px;color:var(--text3);">Eşit dağıtım (yarı yarıya)${grupNotu ? ' — ' + escapeHtml(grupNotu) : ''}:</div>
+        <div style="margin-top:4px;">` +
+        paylar.map((p, i) =>
+          `<div>${escapeHtml(p.fatura_no || p.ihracat_dosya_no)}: brokerage <b>${fmtEur(brokerPays[i])}</b>` +
+          (otherPays[i] ? ` · diğer <b>${fmtEur(otherPays[i])}</b>` : '') +
+          `</div>`
+        ).join('') +
+        `</div>`;
     }
 
     resultEl.innerHTML = detailHtml +
       `<div id="me-kz-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
 
-    await meKzSaveFields(s, saveFields, token);
+    for (let i = 0; i < paylar.length; i++) {
+      await meKzSaveFields(paylar[i], { brokerage_eur: brokerPays[i], other_costs_eur: otherPays[i] }, token);
+    }
 
     document.getElementById('me-kz-save-status').innerHTML =
-      `<span style="color:var(--success);">✓ Kaydedildi</span>`;
+      `<span style="color:var(--success);">✓ Kaydedildi (${paylar.length} sevkiyat güncellendi)</span>`;
     const inp = document.getElementById('me-kz-input');
     if (inp) inp.value = '';
 
@@ -2812,12 +3463,31 @@ async function meLoadBaShipments() {
 
 const BA_BAM_PER_EUR = 1.95583;
 
+function parseLocaleAmount(raw) {
+  if (raw == null) return 0;
+  let s = String(raw).trim().replace(/\u00a0/g, ' ').replace(/\s+/g, '');
+  if (!s) return 0;
+  s = s.replace(/[^\d,.\-]/g, '');
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (lastComma >= 0) {
+    s = s.replace(',', '.');
+  } else if (lastDot >= 0 && s.split('.').length > 2) {
+    s = s.replace(/\./g, '');
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function meBaManualPreview() {
   const fmt    = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const fmtEur = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
 
-  const osnovica = parseFloat(document.getElementById('me-ba-manual-osnovica')?.value) || 0;
-  const carinski = parseFloat(document.getElementById('me-ba-manual-carinski')?.value) || 0;
+  const osnovica = parseLocaleAmount(document.getElementById('me-ba-manual-osnovica')?.value);
+  const carinski = parseLocaleAmount(document.getElementById('me-ba-manual-carinski')?.value);
   const broker   = osnovica - carinski;
   const brokerEl = document.getElementById('me-ba-manual-broker-eur');
   if (brokerEl) brokerEl.textContent = `Broker = ${fmt(broker)} BAM → ${fmtEur(broker / BA_BAM_PER_EUR)}`;
@@ -2826,7 +3496,7 @@ function meBaManualPreview() {
     const input = document.getElementById(`me-ba-manual-${key}`);
     const out   = document.getElementById(`me-ba-manual-${key}-eur`);
     if (!input || !out) continue;
-    const bam = parseFloat(input.value) || 0;
+    const bam = parseLocaleAmount(input.value);
     out.textContent = `= ${fmtEur(bam / BA_BAM_PER_EUR)}`;
   }
 }
@@ -2841,11 +3511,11 @@ async function meBaManualSave() {
     return;
   }
 
-  const osnovicaBam = parseFloat(document.getElementById('me-ba-manual-osnovica').value) || 0;
-  const carinskiBam = parseFloat(document.getElementById('me-ba-manual-carinski').value) || 0;
+  const osnovicaBam = parseLocaleAmount(document.getElementById('me-ba-manual-osnovica').value);
+  const carinskiBam = parseLocaleAmount(document.getElementById('me-ba-manual-carinski').value);
   const brokerBam   = osnovicaBam - carinskiBam;
-  const vergiBam    = parseFloat(document.getElementById('me-ba-manual-vergi').value) || 0;
-  const kdvBam      = parseFloat(document.getElementById('me-ba-manual-kdv').value) || 0;
+  const vergiBam    = parseLocaleAmount(document.getElementById('me-ba-manual-vergi').value);
+  const kdvBam      = parseLocaleAmount(document.getElementById('me-ba-manual-kdv').value);
 
   const saveFields = {};
   if (brokerBam) saveFields.brokerage_eur      = Math.round(brokerBam / BA_BAM_PER_EUR * 100) / 100;
@@ -2919,7 +3589,7 @@ function meMkManualPreview() {
     const input = document.getElementById(`me-mk-manual-${key}`);
     const out   = document.getElementById(`me-mk-manual-${key}-eur`);
     if (!input || !out) continue;
-    const mkd = parseFloat(input.value) || 0;
+    const mkd = parseLocaleAmount(input.value);
     out.textContent = `= ${fmtEur(mkd / MK_MKD_PER_EUR)}`;
   }
 }
@@ -2934,10 +3604,10 @@ async function meMkManualSave() {
     return;
   }
 
-  const brokerEur = parseFloat(document.getElementById('me-mk-manual-broker').value) || 0;
-  const vergiMkd  = parseFloat(document.getElementById('me-mk-manual-vergi').value) || 0;
-  const kdvMkd    = parseFloat(document.getElementById('me-mk-manual-kdv').value) || 0;
-  const otherMkd  = parseFloat(document.getElementById('me-mk-manual-other').value) || 0;
+  const brokerEur = parseLocaleAmount(document.getElementById('me-mk-manual-broker').value);
+  const vergiMkd  = parseLocaleAmount(document.getElementById('me-mk-manual-vergi').value);
+  const kdvMkd    = parseLocaleAmount(document.getElementById('me-mk-manual-kdv').value);
+  const otherMkd  = parseLocaleAmount(document.getElementById('me-mk-manual-other').value);
 
   const saveFields = {};
   if (brokerEur) saveFields.brokerage_eur      = Math.round(brokerEur * 100) / 100;
@@ -2967,5 +3637,67 @@ async function meMkManualSave() {
     meMkManualPreview();
   } catch (err) {
     if (statusEl) { statusEl.textContent = '⚠ ' + err.message; statusEl.style.color = 'var(--error)'; }
+  }
+}
+
+async function meHandleAksuFile(file) {
+  if (!file) return;
+
+  const statusEl = document.getElementById('me-aksu-status');
+  const resultEl = document.getElementById('me-aksu-result');
+  if (!statusEl || !resultEl) return;
+
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const isExcel = ext === 'xlsx' || ext === 'xls';
+  const isPdf = ext === 'pdf';
+  if (!isExcel && !isPdf) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ PDF veya Excel (.xlsx / .xls) yükleyin';
+    return;
+  }
+
+  statusEl.style.color = 'var(--text3)';
+  statusEl.textContent = isExcel
+    ? '⏳ Excel okunuyor ve eşleştiriliyor...'
+    : '⏳ PDF okunuyor ve eşleştiriliyor...';
+  resultEl.style.display = 'none';
+
+  try {
+    const b64 = await fileToBase64(file);
+    const token = localStorage.getItem('fa_auth_token');
+    const payload = isExcel ? { excel: b64 } : { pdf: b64 };
+    const resp = await fetch('/api/shipments/parse-aksu-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    const okunan = data.okunan != null ? data.okunan + ' satır okundu, ' : '';
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = `✓ ${okunan}${data.eslesen} kayıt güncellendi, ${data.atlanan} atlandı.`;
+
+    if (data.hatalar && data.hatalar.length) {
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+        <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;">Detaylar</div>
+        <div class="me-aksu-log">
+          ${data.hatalar.map(h => {
+            const ok = String(h).startsWith('✓');
+            return `<div class="me-aksu-log-row" style="color:${ok ? 'var(--success)' : 'var(--text3)'}">${ok ? '' : '⚠ '}${escapeHtml(h)}</div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    if (data.eslesen > 0 && typeof loadShipments === 'function') {
+      loadShipments();
+    }
+  } catch (err) {
+    statusEl.style.color = 'var(--error)';
+    statusEl.textContent = '⚠ ' + (err.message || err);
+  } finally {
+    const input = document.getElementById('me-aksu-input');
+    if (input) input.value = '';
   }
 }

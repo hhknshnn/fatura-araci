@@ -113,6 +113,7 @@ def init_db():
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS navlun_usd NUMERIC DEFAULT 0')
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS sigorta_usd NUMERIC DEFAULT 0')
     cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS usd_kuru NUMERIC DEFAULT 0')
+    cur.execute('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS ihracat_beyanname_usd NUMERIC DEFAULT 0')
 
     # fatura_no benzersizliği DB seviyesinde garanti edilmiyordu (aynı anda gelen
     # iki istek mükerrer kayıt oluşturabiliyordu). fatura_no boş/NULL olabilen

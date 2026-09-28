@@ -25,7 +25,8 @@ const KOLON_MAP = {
   fatura_bedeli_eur:     ['fatura bedeli döviz', 'fatura bedeli eur', 'fatura bedeli usd', 'fatura bedeli̇ döviz'],
   arac_bekleme:          ['araç bekleme masrafı', 'arac bekleme', 'araç bekleme masrafı usd'],
   ihracat_beyanname_tl:  ['ihracat beyanname tl', 'i̇hracatbeyanname tl', 'ihracatbeyanname tl'],
-  ihracat_beyanname_eur: ['ihracat beyanname eur', 'ihracat beyanname usd', 'i̇hracatbeyanname eur', 'ihracat beyanname  eur'],
+  ihracat_beyanname_eur: ['ihracat beyanname eur', 'i̇hracatbeyanname eur', 'ihracat beyanname  eur'],
+  ihracat_beyanname_usd: ['ihracat beyanname usd', 'i̇hracatbeyanname usd'],
   brokerage_eur:         ['brokerage fee', 'brokerage eur', 'brokerage fee eur', 'brokerage fee (ulke gumrukleme masrafi)', 'brokerage fee (ulke gumrukleme masrafi) eur'],
   gumruk_vergisi_eur:    ['gümrük vergisi döviz', 'gümrük vergisi eur', 'gümrükvergisi \\nusd', 'import duties döviz', 'customs clearance fee döviz'],
   kdv_eur:               ['kdv döviz', 'kdv eur', 'kdv\\neur'],
@@ -61,6 +62,7 @@ const KOLON_ETIKETLER = {
   arac_bekleme:          'Araç Bekleme',
   ihracat_beyanname_tl:  'İhracat Beyanname TL',
   ihracat_beyanname_eur: 'İhracat Beyanname EUR',
+  ihracat_beyanname_usd: 'İhracat Beyanname USD',
   brokerage_eur:         'Brokerage Fee & Other Costs EUR',
   gumruk_vergisi_eur:    'Gümrük Vergisi EUR',
   kdv_eur:               'KDV EUR',
@@ -100,12 +102,6 @@ function initImportPanel() {
                font-size:13px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);
                margin-bottom:-1.5px;cursor:pointer;">
         📊 Excel Aktar
-      </button>
-      <button id="import-tab-aksu" onclick="switchImportTab('aksu')"
-        style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
-               font-size:13px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;
-               margin-bottom:-1.5px;cursor:pointer;">
-        📄 Aksu Beyanname PDF
       </button>
       <button id="import-tab-fr" onclick="switchImportTab('fr')"
         style="padding:8px 18px;border:none;background:transparent;font-family:var(--font);
@@ -183,32 +179,6 @@ function initImportPanel() {
       </div>
     </div>
     </div><!-- /import-tab-content-excel -->
-
-    <!-- Aksu PDF Sekmesi -->
-    <div id="import-tab-content-aksu" style="display:none;">
-      <div class="panel-title">Aksu Beyanname PDF</div>
-      <div class="panel-desc">Aksu Gümrük faturasını yükle — İhracat Beyanname TL/EUR otomatik dolar.</div>
-
-      <div class="status-box" id="aksuStatus"></div>
-
-      <div id="aksu-drop-zone"
-        ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
-        ondragleave="this.classList.remove('vergi-drag-over')"
-        ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');handleAksuPdf(event.dataTransfer.files[0])"
-        onclick="document.getElementById('aksu-pdf-input').click()"
-        style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-               gap:10px;padding:32px 20px;background:var(--surface2);
-               border:1.5px dashed var(--border2);border-radius:var(--radius-md);
-               cursor:pointer;transition:border-color 0.15s,background 0.15s;text-align:center;">
-        <input type="file" id="aksu-pdf-input" accept=".pdf" style="display:none;"
-          onchange="handleAksuPdf(this.files[0])">
-        <span style="font-size:32px;">📄</span>
-        <div style="font-size:13px;font-weight:600;color:var(--text);">PDF'i buraya sürükleyin veya tıklayın</div>
-        <div style="font-size:12px;color:var(--text3);">Çok sayfalı PDF desteklenir — tüm faturalar taranır</div>
-      </div>
-
-      <div id="aksu-result" style="display:none;margin-top:16px;"></div>
-    </div>
 
   <!-- FR PDF Sekmesi -->
     <div id="import-tab-content-fr" style="display:none;">
@@ -552,7 +522,7 @@ function buildPreviewTable() {
                        'sigorta_eur', 'ihracat_beyanname_eur', 'brokerage_eur',
                        'gumruk_vergisi_eur', 'kdv_eur', 'toplam_maliyet_eur', 'eur_kuru'];
   // USD sütunları — her zaman göster, boşsa uyarı ver
-  const usdSutunlar = ['navlun_usd', 'sigorta_usd', 'usd_kuru'];
+  const usdSutunlar = ['navlun_usd', 'sigorta_usd', 'usd_kuru', 'ihracat_beyanname_usd'];
   const gosterilecek = [...zorunlu, ...eurSutunlar, ...usdSutunlar];
 
   // Hangi EUR/USD sütunları tamamen boş?
@@ -703,7 +673,7 @@ function showImportStatus(type, html) {
 
 // ── SEKME GEÇİŞİ ─────────────────────────────────────────────────────────────
 function switchImportTab(tab) {
-  const tabs = ['excel', 'aksu', 'fr', 'palet'];
+  const tabs = ['excel', 'fr', 'palet'];
   tabs.forEach(t => {
     const btn     = document.getElementById('import-tab-' + t);
     const content = document.getElementById('import-tab-content-' + t);
@@ -1320,52 +1290,4 @@ function resetPaletImport() {
   document.getElementById('paletStatus').innerHTML = '';
   const input = document.getElementById('palet-pdf-input');
   if (input) input.value = '';
-}
-
-async function handleAksuPdf(file) {
-  if (!file) return;
-
-  const statusEl = document.getElementById('aksuStatus');
-  const resultEl = document.getElementById('aksu-result');
-  statusEl.className = 'status-box visible info';
-  statusEl.innerHTML = '⏳ PDF okunuyor ve eşleştiriliyor...';
-  resultEl.style.display = 'none';
-
-  try {
-    const b     = await file.arrayBuffer();
-    const bytes = new Uint8Array(b);
-    let s = '';
-    for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
-    const pdf_b64 = btoa(s);
-
-    const token = localStorage.getItem('fa_auth_token');
-    const resp  = await fetch('/api/shipments/parse-aksu-pdf', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body:    JSON.stringify({ pdf: pdf_b64 }),
-    });
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error);
-
-    statusEl.className = 'status-box visible success';
-    statusEl.innerHTML = `✓ ${data.eslesen} kayıt güncellendi, ${data.atlanan} atlandı.`;
-
-    if (data.hatalar && data.hatalar.length) {
-      resultEl.style.display = 'block';
-      resultEl.innerHTML = `
-        <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;">Detaylar:</div>
-        ${data.hatalar.map(h =>
-          `<div style="font-size:12px;color:${h.startsWith('✓') ? 'var(--success)' : 'var(--text3)'};padding:4px 0;border-bottom:0.5px solid var(--border);">${h.startsWith('✓') ? '' : '⚠ '}${h}</div>`
-        ).join('')}
-      `;
-    }
-
-    if (data.eslesen > 0) {
-      loadShipments();
-    }
-
-  } catch (err) {
-    statusEl.className = 'status-box visible error';
-    statusEl.innerHTML = '⚠ ' + err.message;
-  }
 }

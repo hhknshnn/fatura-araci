@@ -65,19 +65,20 @@ function initMensePanel() {
     const badge = document.getElementById('mensePdfBadge');
     if (badge) { badge.textContent = '⏳ PDF okunuyor...'; badge.style.display = 'inline-flex'; }
 
-    // PDF parse
+    // PDF parse — önceki faturadan kalan kilo değerleri yeni PDF'e sızmasın
+    window._pdfBrutKg = 0;
+    window._pdfNetKg = 0;
     const b = new Uint8Array(buf);
     let s = '';
     for (let i = 0; i < b.byteLength; i++) s += String.fromCharCode(b[i]);
-    fetch('/api/taslak', {
+    mensePdfParsePromise = fetch('/api/taslak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'parsePdf', pdf: btoa(s) })
     }).then(r => r.json()).then(data => {
       if (data.success && data.pdfFields) {
         const pf = data.pdfFields;
-        const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
-        if (badge) badge.textContent = `✓ KAP: ${pf.kap || '—'} · Navlun: ${fmt(pf.navlun)} · Sigorta: ${fmt(pf.sigorta)}`;
+        if (badge) badge.textContent = menseFormatPdfBadge(pf);
         if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
         if (pf.netKg && pf.netKg > 0) window._pdfNetKg = pf.netKg;
       } else {
@@ -85,7 +86,7 @@ function initMensePanel() {
       }
     }).catch(() => {
       if (badge) badge.textContent = '✓ PDF aktarıldı';
-    });
+    }).finally(() => { mensePdfParsePromise = null; });
   }
 
   // Drag-drop
@@ -142,6 +143,17 @@ function handleMenseExcel(file) {
   r.readAsArrayBuffer(file);
 }
 
+// GTİP'ten gelen PDF parse'ı bitmeden "Uygula" basılırsa beklemek için
+let mensePdfParsePromise = null;
+
+function menseFormatPdfBadge(pf) {
+  const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
+  const kg = pf.brutKg > 0
+    ? 'B.KG: ' + pf.brutKg.toLocaleString('tr-TR', { minimumFractionDigits: 2 })
+    : 'B.KG bulunamadı';
+  return `✓ KAP: ${pf.kap || '—'} · Navlun: ${fmt(pf.navlun)} · Sigorta: ${fmt(pf.sigorta)} · ${kg}`;
+}
+
 async function handleMensePdf(file) {
   if (!file) return;
   const badge = document.getElementById('mensePdfBadge');
@@ -150,6 +162,9 @@ async function handleMensePdf(file) {
 
   const buf = await fileToArrayBuffer(file);
   lastPdfData = buf;
+  // Önceki faturadan kalan kilo değerleri yeni PDF'e sızmasın
+  window._pdfBrutKg = 0;
+  window._pdfNetKg = 0;
 
   try {
     const b = new Uint8Array(buf);
@@ -163,8 +178,7 @@ async function handleMensePdf(file) {
     const data = await resp.json();
     if (data.success && data.pdfFields) {
       const pf = data.pdfFields;
-      const fmt = n => n ? n.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TRY' : '—';
-      badge.textContent = `✓ KAP: ${pf.kap || '—'} · Navlun: ${fmt(pf.navlun)} · Sigorta: ${fmt(pf.sigorta)}`;
+      badge.textContent = menseFormatPdfBadge(pf);
       if (pf.brutKg && pf.brutKg > 0) window._pdfBrutKg = pf.brutKg;
       if (pf.netKg && pf.netKg > 0) window._pdfNetKg = pf.netKg;
     } else {
@@ -180,7 +194,13 @@ async function handleMensePdf(file) {
 }
 
 // ── KG TABLOSU ────────────────────────────────────────────────────────────────
+// Grup kiloları başka sekme/ekrandan güncellenmiş olabilir — önce sunucudan tazele.
 function buildMenseKgTable(rows) {
+  renderMenseKgTable(rows);
+  syncGrupKilolariFromServer().then(() => renderMenseKgTable(rows));
+}
+
+function renderMenseKgTable(rows) {
   const groups = [...new Set(
     rows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== '')
   )].sort();
@@ -233,8 +253,10 @@ function toggleMenseKgTable() {
 }
 
 // ── KİLO UYGULA ───────────────────────────────────────────────────────────────
-function applyMenseWeights() {
+async function applyMenseWeights() {
   if (!menseRows) return;
+  // PDF parse hâlâ sürüyorsa eski/boş kilo ile hedef doldurulmasın
+  if (mensePdfParsePromise) { try { await mensePdfParsePromise; } catch (e) {} }
 
   const groups = [...new Set(menseRows.map(r => String(r['ÜRÜN ARA GRUBU'])).filter(g => g && g !== ''))];
   const admin = isAdminUser();
@@ -322,8 +344,8 @@ function showMenseResult() {
   if (!menseWorkingRows) return;
 
   const fmt = n => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  const trRows = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() === 'TURKIYE');
-  const otherRows = menseWorkingRows.filter(r => String(r['MENŞEİ Açıklama']).trim().toUpperCase() !== 'TURKIYE');
+  const trRows = menseWorkingRows.filter(r => isTurkiyeMensei(getMenseiAciklama(r)));
+  const otherRows = menseWorkingRows.filter(r => !isTurkiyeMensei(getMenseiAciklama(r)));
 
   const trBrut = round2(trRows.reduce((s, r) => s + parseNum(r['BRÜT']), 0));
   const trNet = round2(trRows.reduce((s, r) => s + parseNum(r['NET']), 0));
@@ -336,9 +358,12 @@ function showMenseResult() {
   document.getElementById('menseResOtherNet').textContent = 'NET: ' + fmt(otherNet) + ' kg';
 
   document.getElementById('menseResultBox').classList.add('visible');
+  const uyari = (trRows.length === 0 || otherRows.length === 0)
+    ? `<div class="stat" style="color:var(--gold);">⚠ Tüm satırlar tek grupta — MENŞEİ Açıklama değerleri: ${escapeHtml(menseiDegerOzeti(menseWorkingRows))}</div>`
+    : '';
   showMenseStatus('success',
     `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
-     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>`);
+     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>${uyari}`);
 
   // wizard.js'in triggerMenseTaslak() fonksiyonu workingRows'u kullanır — senkronize et
   workingRows = menseWorkingRows;

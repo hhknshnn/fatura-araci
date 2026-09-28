@@ -1,0 +1,173 @@
+{
+  "ulke": "xk",
+  "aylar": [
+    {
+      "ay": "2026-01",
+      "ciro_eur": 221990.0,
+      "lojistik": 4237.09,
+      "inbound": {
+        "miktar": 2.0,
+        "tutar": 101.7
+      },
+      "storage": {
+        "miktar": 2.0,
+        "tutar": 355.94
+      },
+      "outbound": {
+        "miktar": 2.0,
+        "tutar": 101.7
+      },
+      "transport": {
+        "miktar": 43.0,
+        "tutar": 3677.75
+      }
+    },
+    {
+      "ay": "2026-02",
+      "ciro_eur": 151430.0,
+      "lojistik": 4090.0,
+      "inbound": {
+        "miktar": 2.0,
+        "tutar": 120.0
+      },
+      "storage": {
+        "miktar": 2.0,
+        "tutar": 420.0
+      },
+      "outbound": {
+        "miktar": 2.0,
+        "tutar": 120.0
+      },
+      "transport": {
+        "miktar": 35.0,
+        "tutar": 3430.0
+      }
+    },
+    {
+      "ay": "2026-03",
+      "ciro_eur": 185600.0,
+      "lojistik": 4935.0,
+      "inbound": {
+        "miktar": 3.0,
+        "tutar": 180.0
+      },
+      "storage": {
+        "miktar": 3.0,
+        "tutar": 630.0
+      },
+      "outbound": {
+        "miktar": 3.0,
+        "tutar": 180.0
+      },
+      "transport": {
+        "miktar": 40.0,
+        "tutar": 3945.0
+      }
+    },
+    {
+      "ay": "2026-04",
+      "ciro_eur": 174221.0,
+      "lojistik": 5665.0,
+      "inbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "storage": {
+        "miktar": 5.0,
+        "tutar": 1050.0
+      },
+      "outbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "transport": {
+        "miktar": 41.0,
+        "tutar": 4015.0
+      }
+    },
+    {
+      "ay": "2026-05",
+      "ciro_eur": 175180.0,
+      "lojistik": 6890.0,
+      "inbound": {
+        "miktar": 4.0,
+        "tutar": 240.0
+      },
+      "storage": {
+        "miktar": 4.0,
+        "tutar": 840.0
+      },
+      "outbound": {
+        "miktar": 4.0,
+        "tutar": 240.0
+      },
+      "transport": {
+        "miktar": 57.0,
+        "tutar": 5570.0
+      }
+    },
+    {
+      "ay": "2026-06",
+      "ciro_eur": 137256.0,
+      "lojistik": 5240.0,
+      "inbound": {
+        "miktar": 2.0,
+        "tutar": 120.0
+      },
+      "storage": {
+        "miktar": 2.0,
+        "tutar": 420.0
+      },
+      "outbound": {
+        "miktar": 2.0,
+        "tutar": 120.0
+      },
+      "transport": {
+        "miktar": 47.0,
+        "tutar": 4580.0
+      }
+    },
+    {
+      "ay": "2026-07",
+      "ciro_eur": 0.0,
+      "lojistik": 7355.0,
+      "inbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "storage": {
+        "miktar": 5.0,
+        "tutar": 1050.0
+      },
+      "outbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "transport": {
+        "miktar": 58.0,
+        "tutar": 5705.0
+      }
+    },
+    {
+      "ay": "2026-08",
+      "ciro_eur": 0.0,
+      "lojistik": 8145.0,
+      "inbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "storage": {
+        "miktar": 5.0,
+        "tutar": 1050.0
+      },
+      "outbound": {
+        "miktar": 5.0,
+        "tutar": 300.0
+      },
+      "transport": {
+        "miktar": 70.0,
+        "tutar": 6495.0
+      }
+    }
+  ]
+}

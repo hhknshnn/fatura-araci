@@ -10,7 +10,11 @@ import pandas as pd
 import pdfplumber
 
 from .constants import DARK_BLUE, GOLD, CY_PL_COLS
-from .helpers   import hdr, dat, parse_num, sku_grupla, set_print, brd
+from .helpers   import (
+    hdr, dat, parse_num, sku_grupla, set_print, brd,
+    extract_fatura_no_from_pdf, resolve_fatura_no,
+    apply_pdf_fatura_fallback, is_blank_fatura_no,
+)
 from .weights   import calculate_weights, get_net_list
 from .templates import find_cy_template_path, apply_cy_header
 
@@ -90,21 +94,16 @@ def _parse_cy_pdf(pdf_bytes):
                 (p.extract_text() or '') for p in pdf.pages[-2:]
             )
 
-        def _ext(t, pats):
-            for p in pats:
-                m = re.search(p, t, re.IGNORECASE)
-                if m:
-                    try:
-                        return float(m.group(1).replace(',', '.'))
-                    except Exception:
-                        pass
-            return 0.0
+        from .helpers import extract_pdf_brut_net_kg, parse_pdf, _extract_pdf_packages
+        result['brutKg'], result['netKg'] = extract_pdf_brut_net_kg(
+            re.sub(r'\s+', ' ', text or ''))
+        if result['brutKg'] <= 0 or result['netKg'] <= 0:
+            fallback = parse_pdf(pdf_bytes)
+            if result['brutKg'] <= 0:
+                result['brutKg'] = float(fallback.get('brutKg') or 0)
+            if result['netKg'] <= 0:
+                result['netKg'] = float(fallback.get('netKg') or 0)
 
-        result['brutKg'] = _ext(text, [r'\bB\.KG\s*[:.]?\s*([\d.,]+)'])
-        result['netKg']  = _ext(text, [r'\bN\.KG\s*[:.]?\s*([\d.,]+)'])
-
-        # Kap sayısı
-        from .helpers import _extract_pdf_packages
         result['kap'] = _extract_pdf_packages(text)
     except Exception:
         pass
@@ -139,7 +138,15 @@ def generate_cy(faturalar, grup_kilolari, exception_skus):
         hedef_brut = float(pdf_fields.get('brutKg', 0) or 0)
         hedef_net  = float(pdf_fields.get('netKg',  0) or 0)
 
-        fatura_no   = str(df['E-Fatura Seri Numarası'].iloc[0]).strip()
+        if raw_pdf_bytes:
+            pdf_fields['fatura_no'] = extract_fatura_no_from_pdf(raw_pdf_bytes)
+        apply_pdf_fatura_fallback(df, pdf_fields)
+        apply_pdf_fatura_fallback(df_raw, pdf_fields)
+        fatura_no = resolve_fatura_no(df, pdf_fields)
+        if not fatura_no:
+            alt = str(f.get('faturaNo') or '').strip()
+            if not is_blank_fatura_no(alt):
+                fatura_no = alt
         fatura_date = df['Fatura Tarihi'].iloc[0]
         if hasattr(fatura_date, 'date'):
             fatura_date = fatura_date.date()

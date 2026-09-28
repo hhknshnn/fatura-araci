@@ -525,21 +525,24 @@ function buildTaslakForm() {
     container.appendChild(div);
   });
 
-  // ── NAVLUN OTOMATİK HESAP UI (yalnız tanımlı kurumsal ülkeler) ──────────────
-  if (NAVLUN_ULKELER.has(taslakUlke)) {
-    injectNavlunUI(container);
-  }
+  // Gruplu sevkiyat seçeneği tüm standart taslaklarda çıkar.
+  // Navlun otomatik hesap yalnız tanımlı kurumsal ülkelerde eklenir.
+  injectGrupluUI(container, { withNavlun: NAVLUN_ULKELER.has(taslakUlke) });
 
   updateTaslakActionButtons();
 }
 
-// ── NAVLUN OTOMATİK HESAP: FORM ALTINA GRUPLU/PARTNER ALANLARI EKLE ───────────
-function injectNavlunUI(container) {
+// ── GRUPLU SEVKİYAT + (VARSA) NAVLUN OTOMATİK HESAP UI ────────────────────────
+function injectGrupluUI(container, opts) {
+  const withNavlun = !!(opts && opts.withNavlun);
   // Her yeni form kurulumunda bekleyen tahsis kilidini sıfırla
   _navlunBekleyenAktif = false;
   _navlunBekleyenDosyaNo = null;
 
   const yil = window.APP_YIL || '2026';
+  const partnerNot = withNavlun
+    ? 'Bu taslak kaydedilince kalan navlun/sigorta bu partner dosyaya otomatik aktarılır.'
+    : 'Bu taslak indirilince partner dosya ile aynı sefer grubuna alınır.';
   const box = document.createElement('div');
   box.style.cssText = 'margin-top:6px;padding:12px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);';
   box.innerHTML = `
@@ -559,11 +562,13 @@ function injectNavlunUI(container) {
         <input class="target-input" id="taslak_partnerNo" placeholder="örn: 101" style="flex:1;">
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px;">
-        Bu taslak kaydedilince kalan navlun/sigorta bu partner dosyaya otomatik aktarılır.
+        ${partnerNot}
       </div>
     </div>
-    <div id="taslak_navlunNot" style="font-size:11px;color:var(--accent2);margin-top:8px;display:none;"></div>`;
+    ${withNavlun ? '<div id="taslak_navlunNot" style="font-size:11px;color:var(--accent2);margin-top:8px;display:none;"></div>' : ''}`;
   container.appendChild(box);
+
+  if (!withNavlun) return;
 
   // KAP değişince otomatik hesap tetikle
   const kapEl = document.getElementById('taslak_kap');
@@ -870,9 +875,9 @@ async function indirTaslak() {
       loadTaslakDraftlar();
     }
 
-    // ── NAVLUN GRUPLU: kalanı partner dosyaya sakla / tükettiğini işaretle ─────
-    if (NAVLUN_ULKELER.has(taslakUlke)) {
-      try {
+    // ── NAVLUN BESLEME + GRUPLU PARTNER EŞLEMESİ ─────────────────────────────
+    try {
+      if (NAVLUN_ULKELER.has(taslakUlke)) {
         // Hesaplanan (override edilmiş olabilen) navlun/sigortayı Sevkiyatlar'a besle.
         // Backend doğru para birimi kolonuna yazar (EUR ülke→EUR, ge/kz→USD).
         await fetch('/api/navlun/sevkiyat', {
@@ -885,23 +890,6 @@ async function indirTaslak() {
             sigorta: formData.sigorta || 0,
           }),
         });
-
-        const gb = getNavlunGrupluBilgi();
-        // İlk (gruplu) taslak: kalanı partner dosyaya bekleyen tahsis olarak yaz.
-        // Nihai (override edilmiş olabilen) navlun/sigorta değerleri gönderilir.
-        if (gb.gruplu && gb.partnerDosyaNo) {
-          await fetch('/api/navlun/tahsis', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ulkeKodu: taslakUlke,
-              partnerDosyaNo: gb.partnerDosyaNo,
-              kaynakDosyaNo: formData.referansNo,
-              navlunFinal: formData.navlun || 0,
-              sigortaFinal: formData.sigorta || 0,
-            }),
-          });
-        }
         // Partner taslağı: bu dosyanın bekleyen tahsisini kullanıldı işaretle
         if (_navlunBekleyenAktif && _navlunBekleyenDosyaNo) {
           await fetch('/api/navlun/tahsis-kullan', {
@@ -910,9 +898,25 @@ async function indirTaslak() {
             body: JSON.stringify({ dosyaNo: _navlunBekleyenDosyaNo }),
           });
         }
-      } catch(e) {
-        console.warn('Navlun tahsis hatası:', e);
       }
+
+      const gb = getNavlunGrupluBilgi();
+      // İlk (gruplu) taslak: partner dosyaya eşleme yaz (navlun ülkelerinde kalan tahsis de gider).
+      if (gb.gruplu && gb.partnerDosyaNo) {
+        await fetch('/api/navlun/tahsis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ulkeKodu: taslakUlke,
+            partnerDosyaNo: gb.partnerDosyaNo,
+            kaynakDosyaNo: formData.referansNo,
+            navlunFinal: formData.navlun || 0,
+            sigortaFinal: formData.sigorta || 0,
+          }),
+        });
+      }
+    } catch(e) {
+      console.warn('Navlun/grup tahsis hatası:', e);
     }
   } catch (err) {
     showTaslakStatus('error', '⚠ ' + err.message);
@@ -954,6 +958,25 @@ async function indirMenseTaslak(trKg, yabanciKg, brutKg, netKg) {
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
     indir(data.excel, data.dosyaAdi);
     showTaslakStatus('success', `<div class="stat">✓ Menşe taslağı indirildi: <span>${data.dosyaAdi}</span></div>`);
+
+    // Taslağı DB'ye kaydet (arka planda, hata olsa indirme etkilenmez) —
+    // indirTaslak() ile aynı davranış: sonradan "Kayıtlı Taslaklar"dan kontrol edilebilsin.
+    try {
+      await fetch('/api/taslak-store/kaydet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referansNo: refNo,
+          ulkeKodu:   taslakUlke || 'rs',
+          ulkeAdi:    TASLAK_ULKELER[taslakUlke || 'rs']?.label || (taslakUlke || 'rs'),
+          depoTipi:   taslakDepoTipi,
+          excel:      data.excel,
+          kullanici:  window.currentUser?.displayName || window.currentUser?.username || '',
+        })
+      });
+    } catch(e) {
+      console.warn('Menşe taslağı DB kayıt hatası:', e);
+    }
   } catch (err) {
     showTaslakStatus('error', '⚠ ' + err.message);
   } finally {

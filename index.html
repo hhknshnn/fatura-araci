@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/">
   <title>Fatura Aracı</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 13L8 3l5 10H3z' fill='%232563EB'/></svg>">
@@ -12,7 +13,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260807-grup-kilo-kirmizi">
+  <link rel="stylesheet" href="css/style.css?v=20260928-bildirim-sade">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/tabler-icons.min.css">
 
@@ -97,26 +98,35 @@
 
   <div class="app-shell" id="app-shell" style="display:none;">
 
+    <!-- ── ÜST İNCE ŞERİT ─────────────────────────────────────────────────── -->
+    <div class="util-strip">
+      <div class="util-strip-left">
+        <span class="util-strip-mod">Dış Ticaret Operasyon Modülü</span>
+      </div>
+      <div class="util-strip-right">
+        <div id="bildirim-wrap">
+          <button type="button" id="bildirim-btn" class="bildirim-btn" onclick="toggleBildirimPanel(event)" title="Bildirimler">
+            <i class="ti ti-bell" aria-hidden="true"></i>
+            <span id="bildirim-badge" class="bildirim-badge" style="display:none"></span>
+          </button>
+          <div id="bildirim-panel" class="bildirim-panel"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shell-body">
+
     <!-- ── SIDEBAR ────────────────────────────────────────────────────────── -->
     <aside class="sidebar" id="mainSidebar">
-      <a class="sidebar-logo" href="#" onclick="return false;">
-        <div class="logo-mark">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 13L8 3l5 10H3z" fill="white" opacity="0.95" />
-          </svg>
-        </div>
-        <div class="logo-text-wrap" style="flex:1;min-width:0;">
-          <div class="logo-text">Fatura Aracı</div>
-          <div class="logo-sub">v2.0 · Lojistik Evrak</div>
-        </div>
-        <button class="logo-toggle-btn" onclick="toggleSidebar(); return false;" title="Menüyü daralt">
-          <i class="ti ti-layout-sidebar-left-collapse" id="toggleIcon"></i>
-        </button>
-      </a>
       <nav class="sidebar-nav">
 
-        <div class="nav-section-label">GENEL</div>
-        <div class="nav-item" id="nav-dashboard" onclick="sidebarSelect('dashboard')">
+        <div class="nav-top-row">
+          <div class="nav-section-label">GENEL</div>
+          <button class="logo-toggle-btn" onclick="toggleSidebar(); return false;" title="Menüyü daralt">
+            <i class="ti ti-layout-sidebar-left-collapse" id="toggleIcon"></i>
+          </button>
+        </div>
+        <div class="nav-item" id="nav-dashboard" data-label="Dashboard" onclick="sidebarSelect('dashboard')">
           <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
           <span class="nav-label">Dashboard</span>
         </div>
@@ -126,28 +136,28 @@
           <i class="ti ti-chevron-down nav-group-chevron" id="ngc-ihracat" aria-hidden="true"></i>
         </div>
         <div class="nav-group-body open" id="ngb-ihracat">
-          <div class="nav-item" id="nav-sevkiyatlar" onclick="sidebarSelect('sevkiyatlar')">
+          <div class="nav-item" id="nav-sevkiyatlar" data-label="Sevkiyatlar" onclick="sidebarSelect('sevkiyatlar')">
             <i class="ti ti-ship" aria-hidden="true"></i>
             <span class="nav-label">Sevkiyatlar</span>
           </div>
-          <div class="nav-item" id="nav-fatura-uret" onclick="sidebarSelect('fatura-uret')">
+          <div class="nav-item" id="nav-fatura-uret" data-label="Fatura Üret" onclick="sidebarSelect('fatura-uret')">
             <i class="ti ti-file-invoice" aria-hidden="true"></i>
             <span class="nav-label">Fatura Üret</span>
           </div>
-          <div class="nav-item" id="nav-maliyet-evrak" onclick="sidebarSelect('maliyet-evrak')">
+          <div class="nav-item" id="nav-maliyet-evrak" data-label="Maliyet Evrak" onclick="sidebarSelect('maliyet-evrak')">
             <i class="ti ti-file-upload" aria-hidden="true"></i>
             <span class="nav-label">Maliyet Evrak</span>
           </div>
-          <div class="nav-item" id="nav-landed-cost" onclick="sidebarSelect('landed-cost')">
+          <div class="nav-item" id="nav-landed-cost" data-label="Landed Cost" onclick="sidebarSelect('landed-cost')">
             <i class="ti ti-chart-bar" aria-hidden="true"></i>
             <span class="nav-label">Landed Cost</span>
           </div>
-          <div class="nav-item" id="nav-nebim-delivery" onclick="sidebarSelect('nebim-delivery')">
+          <div class="nav-item" id="nav-nebim-delivery" data-label="Nebim İrsaliye" onclick="sidebarSelect('nebim-delivery')">
             <i class="ti ti-truck-delivery" aria-hidden="true"></i>
             <span class="nav-label">Nebim İrsaliye</span>
             <span class="nav-warn-badge" id="nav-nebim-warn-badge" style="display:none;" title=""></span>
           </div>
-          <div class="nav-item" id="nav-navlun-tanim" onclick="sidebarSelect('navlun-tanim')">
+          <div class="nav-item" id="nav-navlun-tanim" data-label="Navlun Tanımları" onclick="sidebarSelect('navlun-tanim')">
             <i class="ti ti-currency-euro" aria-hidden="true"></i>
             <span class="nav-label">Navlun Tanımları</span>
           </div>
@@ -158,14 +168,13 @@
           <i class="ti ti-chevron-down nav-group-chevron" id="ngc-yurtdisi" aria-hidden="true"></i>
         </div>
         <div class="nav-group-body open" id="ngb-yurtdisi">
-          <div class="nav-item" id="nav-maliyet-takip" onclick="sidebarSelect('maliyet-takip')">
-            <i class="ti ti-chart-line" aria-hidden="true"></i>
+          <div class="nav-item" id="nav-maliyet-takip" data-label="Maliyet Takip" onclick="sidebarSelect('maliyet-takip')">
+            <i class="ti ti-chart-dots-3" aria-hidden="true"></i>
             <span class="nav-label">Maliyet Takip</span>
           </div>
-          <div class="nav-item nav-item-soon">
-            <i class="ti ti-currency-exchange" aria-hidden="true"></i>
+          <div class="nav-item" id="nav-kur-yonetimi" data-label="Kur Yönetimi" onclick="sidebarSelect('kur-yonetimi')">
+            <i class="ti ti-arrows-exchange" aria-hidden="true"></i>
             <span class="nav-label">Kur Yönetimi</span>
-            <span class="nav-soon-badge">yakında</span>
           </div>
         </div>
 
@@ -174,12 +183,12 @@
           <i class="ti ti-chevron-down nav-group-chevron" id="ngc-antrepo" aria-hidden="true"></i>
         </div>
         <div class="nav-group-body open" id="ngb-antrepo">
-          <div class="nav-item nav-item-soon">
+          <div class="nav-item nav-item-soon" data-label="Stok Takip">
             <i class="ti ti-package" aria-hidden="true"></i>
             <span class="nav-label">Stok Takip</span>
             <span class="nav-soon-badge">yakında</span>
           </div>
-          <div class="nav-item nav-item-soon">
+          <div class="nav-item nav-item-soon" data-label="Giriş / Çıkış">
             <i class="ti ti-arrows-transfer-up" aria-hidden="true"></i>
             <span class="nav-label">Giriş / Çıkış</span>
             <span class="nav-soon-badge">yakında</span>
@@ -188,19 +197,19 @@
 
         <div class="nav-divider"></div>
 
-        <div class="nav-item" id="nav-gecmis-item" onclick="sidebarSelect('gecmis')" style="display:none;">
+        <div class="nav-item" id="nav-gecmis-item" data-label="Son İşlemler" onclick="sidebarSelect('gecmis')" style="display:none;">
           <i class="ti ti-history" aria-hidden="true"></i>
           <span class="nav-label">Son İşlemler</span>
         </div>
-        <div class="nav-item" id="nav-permissions-item" onclick="sidebarSelect('permissions')" style="display:none;">
+        <div class="nav-item" id="nav-permissions-item" data-label="Admin Portalı" onclick="sidebarSelect('permissions')" style="display:none;">
           <i class="ti ti-shield-check" aria-hidden="true"></i>
           <span class="nav-label">Admin Portalı</span>
         </div>
-        <div class="nav-item" id="nav-users-item" onclick="sidebarSelect('users')" style="display:none;">
+        <div class="nav-item" id="nav-users-item" data-label="Kullanıcılar" onclick="sidebarSelect('users')" style="display:none;">
           <i class="ti ti-users" aria-hidden="true"></i>
           <span class="nav-label">Kullanıcılar</span>
         </div>
-        <div class="nav-item" id="nav-audit-item" onclick="sidebarSelect('audit')" style="display:none;">
+        <div class="nav-item" id="nav-audit-item" data-label="İşlem Kayıtları" onclick="sidebarSelect('audit')" style="display:none;">
           <i class="ti ti-list-details" aria-hidden="true"></i>
           <span class="nav-label">İşlem Kayıtları</span>
         </div>
@@ -500,13 +509,32 @@
 
             <!-- Filtre ve buton satırı -->
             <div
-              style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;flex-wrap:nowrap;overflow-x:auto;">
+              style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 14px;flex-wrap:nowrap;overflow-x:auto;">
 
               <!-- Sol taraf: filtreler -->
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;flex-shrink:0;" id="filter-bar">
+              <div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;" id="filter-bar" class="dd-chip-mode">
 
-                <!-- Müşteri Tipi -->
-                <div class="custom-dd" id="dd-tip">
+                <!-- Serbest Arama -->
+                <div style="position:relative;flex-shrink:0;" id="shipments-search-wrap">
+                  <button type="button" class="custom-dd-btn" id="shipments-search-btn"
+                    onclick="toggleShipmentsSearch(event)" title="Ara"
+                    style="width:32px;padding:0;justify-content:center;">
+                    <i class="ti ti-search" aria-hidden="true"></i>
+                  </button>
+                  <div id="shipments-search-panel"
+                    style="display:none;position:fixed;z-index:1000;background:var(--surface);
+                           border:0.5px solid var(--border2);border-radius:var(--radius-md);
+                           box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px;">
+                    <input type="text" id="shipments-search" placeholder="Dosya, fatura, plaka, nakliyeci veya ülke ara..."
+                      oninput="onShipmentsSearch(this.value)"
+                      style="height:32px;width:240px;padding:0 10px;border-radius:var(--radius-sm);
+                             border:0.5px solid var(--border2);background:var(--surface2);color:var(--text);
+                             font-family:var(--font);font-size:12px;">
+                  </div>
+                </div>
+
+                <!-- Müşteri Tipi — Ülkeler menüsündeki grup başlıklarına taşındı; geri açmak için hidden kaldır -->
+                <div class="custom-dd" id="dd-tip" hidden>
                   <button class="custom-dd-btn" onclick="toggleDD('dd-tip')">
                     <i class="ti ti-building" aria-hidden="true"></i>
                     <span id="dd-tip-label">Tipler</span>
@@ -533,11 +561,11 @@
                 <div class="custom-dd" id="dd-ulke">
                   <button class="custom-dd-btn" onclick="toggleDD('dd-ulke')">
                     <i class="ti ti-world" aria-hidden="true"></i>
-                    <span id="dd-ulke-label">Ülkeler</span>
+                    <span class="dd-btn-baslik">Ülke</span><span class="dd-btn-deger" id="dd-ulke-label">Ülkeler</span>
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
                   <div class="custom-dd-menu" style="min-width:180px;" id="dd-ulke-menu">
-                    <div class="dd-group-label">Kurumsal</div>
+                    <button type="button" class="dd-group-label dd-group-toggle" data-grup="kurumsal" onclick="toggleUlkeGrubu(this)"><span>Kurumsal</span><i class="ti ti-square" aria-hidden="true"></i></button>
                     <label class="dd-item"><input type="checkbox" value="ALMANYA"
                         onchange="onUlkeChange()"><span>Almanya</span></label>
                     <label class="dd-item"><input type="checkbox" value="BELÇİKA"
@@ -556,7 +584,7 @@
                         onchange="onUlkeChange()"><span>Makedonya</span></label>
                     <label class="dd-item"><input type="checkbox" value="SIRBİSTAN"
                         onchange="onUlkeChange()"><span>Sırbistan</span></label>
-                    <div class="dd-group-label">Franchise</div>
+                    <button type="button" class="dd-group-label dd-group-toggle" data-grup="franchise" onclick="toggleUlkeGrubu(this)"><span>Franchise</span><i class="ti ti-square" aria-hidden="true"></i></button>
                     <label class="dd-item"><input type="checkbox" value="IRAK"
                         onchange="onUlkeChange()"><span>Irak</span></label>
                     <label class="dd-item"><input type="checkbox" value="KIBRIS"
@@ -573,11 +601,12 @@
                         onchange="onUlkeChange()"><span>Rusya</span></label>
                     <label class="dd-item"><input type="checkbox" value="ÜRDÜN"
                         onchange="onUlkeChange()"><span>Ürdün</span></label>
+                    <button type="button" class="dd-group-label dd-group-toggle" data-grup="toptan" onclick="toggleUlkeGrubu(this)"><span>Toptan</span><i class="ti ti-square" aria-hidden="true"></i></button>
                     <label class="dd-item"><input type="checkbox" value="ABHAZYA"
                         onchange="onUlkeChange()"><span>Abhazya</span></label>
                     <label class="dd-item"><input type="checkbox" value="MAURITIUS"
                         onchange="onUlkeChange()"><span>Mauritius</span></label>
-                    <div class="dd-group-label">Devir</div>
+                    <button type="button" class="dd-group-label dd-group-toggle" data-grup="devir" onclick="toggleUlkeGrubu(this)"><span>Devir</span><i class="ti ti-square" aria-hidden="true"></i></button>
                     <label class="dd-item"><input type="checkbox" value="KENYA"
                         onchange="onUlkeChange()"><span>Kenya</span></label>
                     <div class="dd-apply-row">
@@ -590,10 +619,10 @@
                 <div class="custom-dd" id="dd-durum">
                   <button class="custom-dd-btn" onclick="toggleDD('dd-durum')">
                     <i class="ti ti-loader" aria-hidden="true"></i>
-                    <span id="dd-durum-label">Durumlar</span>
+                    <span class="dd-btn-baslik">Durum</span><span class="dd-btn-deger" id="dd-durum-label">Durumlar</span>
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
-                  <div class="custom-dd-menu" id="dd-durum-menu">
+                  <div class="custom-dd-menu dd-liste" id="dd-durum-menu">
                     <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="" checked
                         onchange="onDDChange('durum',this)"><span>Tümü</span></label>
                     <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Yüklenecek"
@@ -602,8 +631,6 @@
                         onchange="onDDChange('durum',this)"><span>Yolda</span></label>
                     <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Varış Gümrük"
                         onchange="onDDChange('durum',this)"><span>Varış Gümrük</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="Gümrükleme"
-                        onchange="onDDChange('durum',this)"><span>Gümrükleme</span></label>
                     <label class="dd-item"><input type="checkbox" name="dd-durum-r" value="TESLİM EDİLDİ"
                         onchange="onDDChange('durum',this)"><span>Teslim Edildi</span></label>
                     <div class="dd-apply-row">
@@ -616,10 +643,10 @@
                 <div class="custom-dd" id="dd-depo">
                   <button class="custom-dd-btn" onclick="toggleDD('dd-depo')">
                     <i class="ti ti-building-warehouse" aria-hidden="true"></i>
-                    <span id="dd-depo-label">Depolar</span>
+                    <span class="dd-btn-baslik">Depo</span><span class="dd-btn-deger" id="dd-depo-label">Depolar</span>
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
-                  <div class="custom-dd-menu" id="dd-depo-menu">
+                  <div class="custom-dd-menu dd-liste" id="dd-depo-menu">
                     <label class="dd-item"><input type="radio" name="dd-depo-r" value="" checked
                         onchange="onDDChange('depo',this)"><span>Tümü</span></label>
                     <label class="dd-item"><input type="radio" name="dd-depo-r" value="IHR"
@@ -629,52 +656,56 @@
                   </div>
                 </div>
 
-                <!-- Ay Filtresi -->
-                <div class="custom-dd" id="dd-ay">
-                  <button class="custom-dd-btn" onclick="toggleDD('dd-ay')">
+                <!-- Dönem Filtresi (Ay + Yıl) -->
+                <div class="custom-dd" id="dd-donem">
+                  <button class="custom-dd-btn" onclick="toggleDD('dd-donem')">
                     <i class="ti ti-calendar" aria-hidden="true"></i>
-                    <span id="dd-ay-label">Ay</span>
+                    <span class="dd-btn-baslik">Dönem</span><span class="dd-btn-deger" id="dd-donem-label">Dönem</span>
                     <i class="ti ti-chevron-down dd-arrow" aria-hidden="true"></i>
                   </button>
-                  <div class="custom-dd-menu" id="dd-ay-menu">
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="" checked
-                        onchange="onDDChange('ay',this)"><span>Tümü</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="01"
-                        onchange="onDDChange('ay',this)"><span>Ocak</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="02"
-                        onchange="onDDChange('ay',this)"><span>Şubat</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="03"
-                        onchange="onDDChange('ay',this)"><span>Mart</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="04"
-                        onchange="onDDChange('ay',this)"><span>Nisan</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="05"
-                        onchange="onDDChange('ay',this)"><span>Mayıs</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="06"
-                        onchange="onDDChange('ay',this)"><span>Haziran</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="07"
-                        onchange="onDDChange('ay',this)"><span>Temmuz</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="08"
-                        onchange="onDDChange('ay',this)"><span>Ağustos</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="09"
-                        onchange="onDDChange('ay',this)"><span>Eylül</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="10"
-                        onchange="onDDChange('ay',this)"><span>Ekim</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="11"
-                        onchange="onDDChange('ay',this)"><span>Kasım</span></label>
-                    <label class="dd-item"><input type="checkbox" name="dd-ay-r" value="12"
-                        onchange="onDDChange('ay',this)"><span>Aralık</span></label>
-                    <div class="dd-apply-row">
-                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('ay')">Uygula</button>
+                  <div class="custom-dd-menu dd-donem-menu" id="dd-donem-menu">
+                    <div class="dd-group-label">Yıl</div>
+                    <div class="dd-chip-grid" id="dd-yil-menu"></div>
+                    <div class="dd-group-label">Ay</div>
+                    <div class="dd-chip-grid" id="dd-ay-menu">
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="01"
+                          onchange="onDDChange('ay',this)"><span>Oca</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="02"
+                          onchange="onDDChange('ay',this)"><span>Şub</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="03"
+                          onchange="onDDChange('ay',this)"><span>Mar</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="04"
+                          onchange="onDDChange('ay',this)"><span>Nis</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="05"
+                          onchange="onDDChange('ay',this)"><span>May</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="06"
+                          onchange="onDDChange('ay',this)"><span>Haz</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="07"
+                          onchange="onDDChange('ay',this)"><span>Tem</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="08"
+                          onchange="onDDChange('ay',this)"><span>Ağu</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="09"
+                          onchange="onDDChange('ay',this)"><span>Eyl</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="10"
+                          onchange="onDDChange('ay',this)"><span>Eki</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="11"
+                          onchange="onDDChange('ay',this)"><span>Kas</span></label>
+                      <label class="dd-chip"><input type="checkbox" name="dd-ay-r" value="12"
+                          onchange="onDDChange('ay',this)"><span>Ara</span></label>
+                    </div>
+                    <div class="dd-apply-row dd-apply-row-split">
+                      <button type="button" class="dd-clear-btn" onclick="clearDonemFilter()">Temizle</button>
+                      <button type="button" class="dd-apply-btn" onclick="onMultiDDApply('donem')">Uygula</button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Temizle -->
-                <button onclick="clearFilters()" title="Filtreleri Temizle" style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;
-                         border-radius:var(--radius-md);border:0.5px solid #FECACA;
-                         background:#FFF5F5;color:#EF4444;cursor:pointer;flex-shrink:0;transition:background 0.15s;"
-                  onmouseenter="this.style.background='#FEE2E2'" onmouseleave="this.style.background='#FFF5F5'">
-                  <i class="ti ti-trash" style="font-size:15px;" aria-hidden="true"></i>
+                <button type="button" id="filter-clear-btn" class="filter-clear-btn" onclick="clearFilters()"
+                  title="Tüm filtreleri temizle">
+                  <i class="ti ti-trash" aria-hidden="true"></i>
+                  <span>Temizle</span>
+                  <em class="filter-clear-count" id="filter-clear-count"></em>
                 </button>
 
               </div>
@@ -682,6 +713,7 @@
               <!-- Hidden inputs — eski kod uyumluluğu için -->
               <input type="hidden" id="filter-musteri-tipi">
               <input type="hidden" id="filter-ay">
+              <input type="hidden" id="filter-yil">
               <input type="hidden" id="filter-ulke">
               <input type="hidden" id="filter-durum">
               <input type="hidden" id="filter-depo">
@@ -694,15 +726,15 @@
                 .custom-dd-btn {
                   display: flex;
                   align-items: center;
-                  gap: 6px;
+                  gap: 4px;
                   height: 32px;
-                  padding: 0 10px;
+                  padding: 0 8px;
                   border-radius: var(--radius-md);
                   border: 0.5px solid var(--border2);
                   background: var(--surface2);
                   color: var(--text);
                   font-family: var(--font);
-                  font-size: 12px;
+                  font-size: 11.5px;
                   font-weight: 500;
                   cursor: pointer;
                   white-space: nowrap;
@@ -807,18 +839,368 @@
                   font-weight: 600;
                   cursor: pointer;
                 }
+
+                .dd-donem-menu {
+                  width: 232px;
+                }
+
+                .dd-chip-grid {
+                  display: grid;
+                  grid-template-columns: repeat(3, 1fr);
+                  gap: 4px;
+                  padding: 0 6px 4px;
+                }
+
+                .dd-chip {
+                  position: relative;
+                  cursor: pointer;
+                  user-select: none;
+                }
+
+                .dd-chip input {
+                  position: absolute;
+                  opacity: 0;
+                  pointer-events: none;
+                }
+
+                .dd-chip span {
+                  display: block;
+                  padding: 6px 0;
+                  text-align: center;
+                  border-radius: 6px;
+                  border: 0.5px solid var(--border2);
+                  font-size: 12px;
+                  color: var(--text);
+                  transition: background 0.1s, border-color 0.1s;
+                }
+
+                .dd-chip:hover span {
+                  background: var(--accent-dim);
+                }
+
+                .dd-chip input:checked + span {
+                  background: var(--accent);
+                  border-color: var(--accent);
+                  color: #fff;
+                  font-weight: 600;
+                }
+
+                .dd-chip input:focus-visible + span {
+                  outline: 2px solid var(--accent);
+                  outline-offset: 1px;
+                }
+
+                .dd-apply-row-split {
+                  display: flex;
+                  gap: 6px;
+                }
+
+                .dd-clear-btn {
+                  flex: 0 0 auto;
+                  height: 30px;
+                  padding: 0 12px;
+                  border: 0.5px solid var(--border2);
+                  border-radius: var(--radius-md);
+                  background: var(--surface);
+                  color: var(--text2);
+                  font-family: var(--font);
+                  font-size: 12px;
+                  font-weight: 500;
+                  cursor: pointer;
+                }
+
+                /* ── CHIP MODU (deneysel) ─────────────────────────────────────
+                   Ülkeler (.dd-liste menüler liste kalır) menülerini Dönem gibi kutucuk
+                   ızgarasında gösterir. GERİ ALMAK İÇİN: #filter-bar üzerindeki
+                   "dd-chip-mode" class'ını kaldırmak yeterli (JS değişmedi). */
+                .dd-chip-mode .custom-dd.open .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) {
+                  display: grid;
+                  grid-template-columns: repeat(2, 1fr);
+                  gap: 4px;
+                  padding: 6px;
+                  width: 232px;
+                }
+
+                .dd-chip-mode #dd-ulke-menu {
+                  grid-template-columns: repeat(4, 1fr) !important;
+                  width: 340px !important;
+                  max-height: none;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-group-label,
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-apply-row,
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item:has(input[value=""]) {
+                  grid-column: 1 / -1;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-group-label {
+                  padding: 6px 2px 0;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-apply-row {
+                  margin: 4px -6px -6px;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item {
+                  position: relative;
+                  display: block;
+                  padding: 0;
+                  background: none;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item input {
+                  position: absolute;
+                  opacity: 0;
+                  pointer-events: none;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item span {
+                  display: block;
+                  padding: 6px 4px;
+                  text-align: center;
+                  border-radius: 6px;
+                  border: 0.5px solid var(--border2);
+                  font-size: 12px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  transition: background 0.1s, border-color 0.1s;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item:hover span {
+                  background: var(--accent-dim);
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item input:checked + span {
+                  background: var(--accent);
+                  border-color: var(--accent);
+                  color: #fff;
+                  font-weight: 600;
+                }
+
+                .dd-chip-mode .custom-dd-menu:not(.dd-donem-menu):not(.dd-liste) .dd-item input:focus-visible + span {
+                  outline: 2px solid var(--accent);
+                  outline-offset: 1px;
+                }
+              
+                /* Ülke grup başlıkları — tıklayınca gruptaki tüm ülkeleri seçer */
+                .dd-group-toggle {
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  width: 100%;
+                  border: none;
+                  background: none;
+                  font-family: var(--font);
+                  text-align: left;
+                  cursor: pointer;
+                  border-radius: 6px;
+                }
+
+                .dd-group-toggle .ti {
+                  font-size: 14px;
+                }
+
+                .dd-group-toggle:hover {
+                  color: var(--accent);
+                }
+
+                .dd-group-toggle.partial,
+                .dd-group-toggle.active {
+                  color: var(--accent);
+                }
+
+                /* ── Renkli filtre menüleri (grup/durum rengi) ──
+                   Renk JS'te item'a --grp olarak yazılır (decorateFilterMenuleri).
+                   Geri almak için bu bloğu silmek yeterli. */
+                #dd-ulke-menu [data-grup="kurumsal"] { --grp: #2563eb; }
+                #dd-ulke-menu [data-grup="franchise"] { --grp: #ea580c; }
+                #dd-ulke-menu [data-grup="toptan"] { --grp: #7c3aed; }
+                #dd-ulke-menu [data-grup="devir"] { --grp: #0d9488; }
+                #dd-donem-menu { --grp: #4f46e5; }
+
+                #dd-ulke-menu .dd-group-toggle {
+                  color: var(--grp);
+                  justify-content: flex-start;
+                  gap: 6px;
+                }
+
+                #dd-ulke-menu .dd-group-toggle::before {
+                  content: '';
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: var(--grp);
+                }
+
+                #dd-ulke-menu .dd-group-toggle .ti {
+                  margin-left: auto;
+                }
+
+
+
+                .dd-bos:not(:has(input:checked)) {
+                  opacity: 0.5;
+                }
+
+                /* Kutucuk menüler: Ülkeler, Depolar */
+                .dd-chip-mode #dd-ulke-menu {
+                  width: 420px !important;
+                }
+
+                #filter-bar.dd-chip-mode #dd-ulke-menu .dd-item {
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  padding: 6px 8px;
+                  border-radius: 6px;
+                  border: 0.5px solid var(--border2);
+                  border-left: 3px solid var(--grp);
+                  background: color-mix(in srgb, var(--grp) 5%, var(--surface));
+                  transition: background 0.1s, border-color 0.1s;
+                }
+
+                #filter-bar.dd-chip-mode #dd-ulke-menu .dd-item span {
+                  padding: 0;
+                  border: none;
+                  background: none !important;
+                  text-align: left;
+                  font-weight: 500;
+                  color: var(--text);
+                }
+
+                /* Liste menü: Durumlar, Depolar */
+                #filter-bar #dd-durum-menu .dd-item,
+                #filter-bar #dd-depo-menu .dd-item {
+                  border-left: 3px solid var(--grp);
+                  border-radius: 0 6px 6px 0;
+                  margin: 2px 0;
+                  min-width: 150px;
+                }
+
+                /* Ortak hover / seçili */
+                #filter-bar.dd-chip-mode #dd-ulke-menu .dd-item:hover,
+                #filter-bar #dd-depo-menu .dd-item:hover,
+                #filter-bar #dd-durum-menu .dd-item:hover {
+                  background: color-mix(in srgb, var(--grp) 14%, var(--surface));
+                }
+
+                #filter-bar.dd-chip-mode #dd-ulke-menu .dd-item:has(input:checked) {
+                  background: var(--grp);
+                  border-color: var(--grp);
+                }
+
+                #filter-bar.dd-chip-mode #dd-ulke-menu .dd-item:has(input:checked) span {
+                  color: #fff;
+                  font-weight: 600;
+                }
+
+                #filter-bar #dd-durum-menu .dd-item:has(input:checked),
+                #filter-bar #dd-depo-menu .dd-item:has(input:checked) {
+                  background: color-mix(in srgb, var(--grp) 12%, var(--surface));
+                  color: var(--grp);
+                  font-weight: 600;
+                }
+
+                #filter-bar #dd-durum-menu .dd-item input,
+                #filter-bar #dd-depo-menu .dd-item input {
+                  accent-color: var(--grp);
+                }
+
+                /* Dönem kutucukları */
+                #filter-bar #dd-donem-menu .dd-chip span {
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 5px;
+                  border-left: 3px solid var(--grp);
+                  background: color-mix(in srgb, var(--grp) 5%, var(--surface));
+                }
+
+                #filter-bar #dd-donem-menu .dd-chip:hover span {
+                  background: color-mix(in srgb, var(--grp) 14%, var(--surface));
+                }
+
+                #filter-bar #dd-donem-menu .dd-chip input:checked + span {
+                  background: var(--grp);
+                  border-color: var(--grp);
+                }
+
+
+
+                #dd-donem-menu .dd-apply-btn,
+                #dd-durum-menu .dd-apply-btn {
+                  background: var(--accent);
+                }
+              
+                /* ── Temizle butonu ── */
+                .filter-clear-btn {
+                  display: flex;
+                  align-items: center;
+                  gap: 5px;
+                  height: 34px;
+                  padding: 0 10px;
+                  border-radius: 8px;
+                  border: 1px dashed rgba(15, 23, 42, 0.16);
+                  background: transparent;
+                  color: var(--text3);
+                  font-family: var(--font);
+                  font-size: 12px;
+                  font-weight: 500;
+                  white-space: nowrap;
+                  flex-shrink: 0;
+                  cursor: default;
+                  transition: background 0.15s, border-color 0.15s, color 0.15s;
+                }
+
+                .filter-clear-btn .ti {
+                  font-size: 14px;
+                }
+
+                .filter-clear-count {
+                  display: none;
+                  min-width: 16px;
+                  height: 16px;
+                  padding: 0 4px;
+                  border-radius: 8px;
+                  background: #DC2626;
+                  color: #fff;
+                  font-style: normal;
+                  font-size: 10px;
+                  font-weight: 700;
+                  line-height: 16px;
+                  text-align: center;
+                }
+
+                .filter-clear-btn.has-filter {
+                  border: 1px solid #FECACA;
+                  background: #FFF5F5;
+                  color: #B91C1C;
+                  cursor: pointer;
+                  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+                }
+
+                .filter-clear-btn.has-filter .filter-clear-count {
+                  display: inline-block;
+                }
+
+                .filter-clear-btn.has-filter:hover {
+                  background: #FEE2E2;
+                  border-color: #FCA5A5;
+                }
               </style>
 
               <!-- Sağ taraf: butonlar -->
-              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+                <!-- İçe Aktar gizlendi; geri açmak için style'daki display:none!important kaldır -->
                 <button onclick="openImportModal()" class="role-admin-only"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  style="display:none!important;height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
                   <i class="ti ti-upload" aria-hidden="true"></i>İçe Aktar</button>
                 <button onclick="downloadMaliyetRaporu()"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  style="height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
                   <i class="ti ti-download" aria-hidden="true"></i>Maliyet Raporu</button>
                 <button onclick="openNewShipmentForm()" class="role-write-only"
-                  style="height:32px;padding:0 12px;border-radius:var(--radius-md);border:none;background:#0e9f6e;color:#fff;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                  style="height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#0e9f6e;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
                   <i class="ti ti-plus" aria-hidden="true"></i>Yeni Sevkiyat</button>
               </div>
 
@@ -979,6 +1361,8 @@
               <div class="detail-field"><label>İhracat Beyanname TL</label><input id="edit-beyanname-tl" type="number"
                   placeholder="0"></div>
               <div class="detail-field"><label>İhracat Beyanname EUR</label><input id="edit-beyanname-eur" type="number"
+                  placeholder="0"></div>
+              <div class="detail-field"><label>İhracat Beyanname USD</label><input id="edit-beyanname-usd" type="number"
                   placeholder="0"></div>
               <div class="detail-field"><label>Araç Bekleme</label><input id="edit-bekleme" type="number"
                   placeholder="0"></div>
@@ -1267,7 +1651,7 @@
               </div>
               <div class="form-field" id="plakaSection" style="display:none;grid-column:2;">
                 <label>Plaka</label>
-                <input class="target-input" id="plakaInput" type="text" placeholder="34ABC123" style="height:36px;">
+                <input class="target-input" id="plakaInput" type="text" placeholder="34ABC123" style="height:36px;" onblur="this.value = normalizePlaka(this.value)">
               </div>
               <div class="form-field" id="nakliyeSection" style="display:none;grid-column:3;">
                 <label>Nakliye Firması</label>
@@ -1677,6 +2061,47 @@
             </div>
           </div>
 
+          <div class="fu-tabs me-tabs" role="tablist" aria-label="Maliyet evrak bölümleri">
+            <button class="fu-tab active" id="me-tab-btn-ulkeler" onclick="switchMaliyetEvrakTab('ulkeler')" type="button">
+              <i class="ti ti-world" aria-hidden="true"></i><span>Ülke Evrakları</span>
+            </button>
+            <button class="fu-tab" id="me-tab-btn-aksu" onclick="switchMaliyetEvrakTab('aksu')" type="button">
+              <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Aksu Beyanname</span>
+            </button>
+          </div>
+
+          <div id="me-tab-aksu" class="me-tab-panel" style="display:none;">
+            <div class="me-aksu-card">
+              <div class="me-aksu-head">
+                <div>
+                  <div class="me-card-title">Aksu İhracat Beyanname</div>
+                  <div class="me-card-sub">PDF faturası veya maliyet Excel'i — referans / fatura no ile eşleşir, TL yazılır, EUR ve USD sevkiyat kuru ile hesaplanır.</div>
+                </div>
+                <span class="me-pill me-pill-pdf">PDF + Excel</span>
+              </div>
+              <div class="me-card-desc">
+                Aksu Gümrük PDF'i veya Sevkiyatlar maliyet raporundaki gibi doldurulmuş Excel'i yükleyin.
+                Satırlar fatura no veya ihracat dosya no ile eşleşir; İhracat Beyanname TL alanına yazılır.
+                Sevkiyattaki EUR / USD kuru doluysa karşılıkları da hesaplanır.
+              </div>
+              <div id="me-aksu-drop" class="me-dropzone me-aksu-drop"
+                ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
+                ondragleave="this.classList.remove('vergi-drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('vergi-drag-over');meHandleAksuFile(event.dataTransfer.files[0])"
+                onclick="document.getElementById('me-aksu-input').click()">
+                <input type="file" id="me-aksu-input" accept=".pdf,.xlsx,.xls" style="display:none;"
+                  onchange="meHandleAksuFile(this.files[0])">
+                <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
+                <div class="me-dz-body">
+                  <div id="me-aksu-status" class="me-dz-status">PDF veya Excel'i buraya sürükleyin veya tıklayın</div>
+                  <div class="me-aksu-hint">Çok sayfalı PDF ve Maliyet Raporu Excel (.xlsx) desteklenir</div>
+                </div>
+              </div>
+              <div id="me-aksu-result" class="me-result" style="display:none;"></div>
+            </div>
+          </div>
+
+          <div id="me-tab-ulkeler" class="me-tab-panel">
           <div class="me-grid">
 
             <!-- Sırbistan Bölümü -->
@@ -1721,7 +2146,7 @@
                 <span class="me-pill me-pill-manual">Elle Giriş</span>
               </div>
               <div class="me-card-desc">
-                Sevkiyatı seçin, tutarları BAM olarak elle girin. Broker = Osnovica − Carinski dug (OBRACUN CARINSKOG DUGA) otomatik hesaplanır. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
+                Sevkiyatı seçin, tutarları BAM olarak elle girin (ör. 12.587,99). Broker = Osnovica − Carinski dug (OBRACUN CARINSKOG DUGA) otomatik hesaplanır. Her tutar sadece seçili sevkiyata yazılır — oranlama yapılmaz.
               </div>
               <div class="me-select-row">
                 <select id="me-ba-select" class="me-select">
@@ -1736,11 +2161,11 @@
                 <div class="me-field-grid cols-2">
                   <div class="me-field">
                     <label>Osnovica (BAM)</label>
-                    <input type="number" id="me-ba-manual-osnovica" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-ba-manual-osnovica" placeholder="13.190,75" oninput="meBaManualPreview()">
                   </div>
                   <div class="me-field">
                     <label>Carinski dug (BAM)</label>
-                    <input type="number" id="me-ba-manual-carinski" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-ba-manual-carinski" placeholder="12.587,99" oninput="meBaManualPreview()">
                   </div>
                 </div>
                 <div id="me-ba-manual-broker-eur" class="me-manual-total">Broker = 0,00 BAM → 0,00 €</div>
@@ -1748,12 +2173,12 @@
                 <div class="me-field-grid cols-2">
                   <div class="me-field">
                     <label>Vergi / 001 (BAM)</label>
-                    <input type="number" id="me-ba-manual-vergi" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-ba-manual-vergi" placeholder="1.234,56" oninput="meBaManualPreview()">
                     <div id="me-ba-manual-vergi-eur" class="me-field-eur">= 0,00 €</div>
                   </div>
                   <div class="me-field">
                     <label>KDV / 090 (BAM)</label>
-                    <input type="number" id="me-ba-manual-kdv" step="0.01" placeholder="0.00" oninput="meBaManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-ba-manual-kdv" placeholder="1.234,56" oninput="meBaManualPreview()">
                     <div id="me-ba-manual-kdv-eur" class="me-field-eur">= 0,00 €</div>
                   </div>
                 </div>
@@ -1791,17 +2216,17 @@
                 <div class="me-field-grid cols-3">
                   <div class="me-field">
                     <label>Vergi / Tax (MKD)</label>
-                    <input type="number" id="me-mk-manual-vergi" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-mk-manual-vergi" placeholder="12.587,99" oninput="meMkManualPreview()">
                     <div id="me-mk-manual-vergi-eur" class="me-field-eur">= 0,00 €</div>
                   </div>
                   <div class="me-field">
                     <label>KDV (MKD)</label>
-                    <input type="number" id="me-mk-manual-kdv" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-mk-manual-kdv" placeholder="12.587,99" oninput="meMkManualPreview()">
                     <div id="me-mk-manual-kdv-eur" class="me-field-eur">= 0,00 €</div>
                   </div>
                   <div class="me-field">
                     <label>Other Costs (MKD)</label>
-                    <input type="number" id="me-mk-manual-other" step="0.01" placeholder="0.00" oninput="meMkManualPreview()">
+                    <input type="text" inputmode="decimal" autocomplete="off" id="me-mk-manual-other" placeholder="12.587,99" oninput="meMkManualPreview()">
                     <div id="me-mk-manual-other-eur" class="me-field-eur">= 0,00 €</div>
                   </div>
                 </div>
@@ -1887,7 +2312,7 @@
                 <span class="me-pill me-pill-pdf">PDF</span>
               </div>
               <div class="me-card-desc">
-                Sevkiyatı seçin, PDF'i yükleyin. Beyannamede kod 1010+2010 → vergi, kod 5060 → KDV. Broker faturasında "Итого" (KDV hariç) → brokerage. Her fatura/beyanname sadece seçili sevkiyata yazılır — gruplu araçlarda dağıtım yapılmaz.
+                Sevkiyatı seçin, PDF'i yükleyin. Beyannamede kod 1010+2010 → vergi, kod 5060 → KDV (KZT→EUR çevrilir; tenge olduğu gibi yazılmaz). PDF'de fatura no varsa o sevkiyata yazılır. Gruplu ANT+IHR ve tek beyanname KDV'si seçili faturaya göre çok büyükse tutar fatura bedeline orantılı dağıtılır. Broker faturasında "Итого" (KDV hariç) → brokerage; ANT+IHR varsa yarı yarıya bölünür.
               </div>
               <div class="me-select-row">
                 <select id="me-kz-select" class="me-select">
@@ -2009,6 +2434,7 @@
             </div>
 
           </div>
+          </div>
         </div>
 
         <!-- ── SON İŞLEMLER ───────────────────────────────────────────────── -->
@@ -2040,32 +2466,36 @@
 
       </div><!-- /content-area -->
     </div><!-- /main-area -->
+
+    </div><!-- /shell-body -->
   </div><!-- /app-shell -->
 
   <script src="js/utils.js"></script>
   <script src="js/countries.js"></script>
-  <script src="js/processor.js"></script>
+  <script src="js/processor.js?v=20260922-pdfkg-reset"></script>
   <script src="js/sku.js"></script>
-  <script src="js/wizard.js"></script>
-  <script src="js/taslak.js?v=20260728-all-draft-save"></script>
-  <script src="js/gtip.js"></script>
+  <script src="js/wizard.js?v=20260922-grupkilo-sync"></script>
+  <script src="js/taslak.js?v=20260916-mensei-fix"></script>
+  <script src="js/gtip.js?v=20260916-mensei-fix"></script>
   <script src="js/evrak.js"></script>
   <script src="js/t1ayrimi.js?v=20260729-be-baslik"></script>
-  <script src="js/mense.js"></script>
+  <script src="js/mense.js?v=20260922-grupkilo-sync"></script>
   <script src="js/nebim-delivery.js?v=20260710-start-dashboard"></script>
-  <script src="js/shell.js?v=20260729-be-baslik"></script>
+  <script src="js/shell.js?v=20260917-secim-bar"></script>
   <script src="js/gecmis.js"></script>
   <script src="js/auth.js?v=20260710-login-refresh"></script>
   <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
   <script src="js/users.js?v=20260710-admin-portal"></script>
   <script src="js/audit-log.js"></script>
   <script src="js/dashboard.js?v=20260710-ulke-donut-2"></script>
-  <script src="js/shipments.js?v=20260714-all-date-updates"></script>
-  <script src="js/landed-cost.js?v=20260703-modern-lc"></script>
+  <script src="js/shipments.js?v=20260928-ozet-bildirim"></script>
+  <script src="js/bildirim.js?v=20260928-grup-tarih2"></script>
+  <script src="js/landed-cost.js?v=20260914-lc-nav-all"></script>
   <script src="js/vendor/chart.umd.js"></script>
-  <script src="js/maliyet.js?v=20260714-hide-all-country-detail"></script>
-  <script src="js/navlun.js?v=20260721-navlun-kaydet-btn-fix"></script>
-  <script src="js/import.js"></script>
+  <script src="js/maliyet2.js?v=20260909-lt-heat"></script>
+  <script src="js/kur.js?v=20260911-para-tabs"></script>
+  <script src="js/navlun.js?v=20260911-navlun-compact"></script>
+  <script src="js/import.js?v=20260910-aksu-me"></script>
 
   <!-- ── İÇE AKTAR MODAL ───────────────────────────────────────────────── -->
   <div id="import-overlay" onclick="closeImportModal()"

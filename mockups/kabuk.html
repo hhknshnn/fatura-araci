@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fatura Aracı — kabuk önerisi v5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F3F4F6;
+      --surface: #FFFFFF;
+      --surface-alt: #F8F9FA;
+      --border: #D7DBE1;
+      --border-strong: #B7BEC9;
+      --util-bg: #141A22;
+      --header-bg: #1E2733;
+      --nav-text: #A9B2BE;
+      --nav-text-dim: #5C6675;
+      --text: #1A2027;
+      --text2: #4B5563;
+      --text3: #8B94A0;
+      --accent: #0F5FA6;
+      --accent-dim: #E8F1F8;
+      --accent-text: #0B4A80;
+      --warn: #92620F;
+      --warn-dim: #F5EEDF;
+      --crit: #9C3B3B;
+      --crit-dim: #F7E9E9;
+      --ok: #3E7A52;
+      --ok-dim: #E9F3EC;
+      --font: 'Source Sans 3', Arial, sans-serif;
+      --mono: 'IBM Plex Mono', monospace;
+      --radius: 3px;
+    }
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45; }
+    button, input, select { font-family: inherit; }
+    table { border-collapse: collapse; width: 100%; }
+
+    .app { display: flex; flex-direction: column; height: 100%; }
+
+    /* utility strip */
+    .util { height: 26px; flex-shrink: 0; background: var(--util-bg); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+    .util-left { display: flex; align-items: center; gap: 10px; }
+    .util-brand { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #E4E7EB; }
+    .util-sep { width: 1px; height: 12px; background: rgba(255,255,255,.18); }
+    .util-mod { font-size: 11px; color: #8B94A3; }
+    .util-right { display: flex; align-items: center; gap: 14px; }
+    .util-user { font-size: 11px; color: #C4CAD2; }
+
+    .body-row { flex: 1; display: flex; min-height: 0; }
+
+    /* sidebar */
+    .sidebar { width: 172px; flex-shrink: 0; background: var(--header-bg); display: flex; flex-direction: column; }
+    .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+    .nav-label { font-size: 9.5px; font-weight: 700; color: var(--nav-text-dim); letter-spacing: .09em; padding: 0 14px; margin: 14px 0 6px; }
+    .nav-label:first-child { margin-top: 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 8px; padding: 6.5px 14px; color: var(--nav-text);
+      font-size: 12px; border-left: 3px solid transparent; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0;
+      background: none; width: 100%; text-align: left; font-family: inherit;
+    }
+    .nav-item:hover { color: #EAF0F6; }
+    .nav-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .nav-item.active { color: #EAF0F6; font-weight: 600; border-left-color: #3E8FCB; background: rgba(62,143,203,.08); }
+    .nav-item.active svg { stroke: #6EB2E0; }
+    .sidebar-footer { padding: 12px 18px; border-top: 1px solid rgba(255,255,255,.08); font-size: 10.5px; color: var(--nav-text-dim); }
+
+    /* main */
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .page-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 9px 22px; flex-shrink: 0; }
+    .crumb { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+    .page-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .page-header h1 { font-size: 17px; font-weight: 700; letter-spacing: -.1px; }
+    .page-sub { font-size: 11.5px; color: var(--text2); margin-top: 2px; }
+    .actions { display: flex; gap: 8px; }
+
+    .btn {
+      height: 27px; padding: 0 12px; border: 1px solid var(--border-strong); background: var(--surface);
+      border-radius: var(--radius); font-size: 11.5px; font-weight: 600; color: #374151; cursor: pointer; font-family: inherit;
+    }
+    .btn:hover { background: var(--surface-alt); }
+    .btn-primary { border-color: var(--accent-text); background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-text); }
+    .btn-sm { height: 26px; padding: 0 11px; font-size: 11.5px; }
+
+    .content { flex: 1; overflow: auto; padding: 10px 22px 14px; }
+    .view { display: none; }
+    .view.on { display: block; }
+
+    /* summary band */
+    .summary { display: flex; background: var(--surface); border: 1px solid var(--border); margin-bottom: 8px; }
+    .summary-cell { flex: 1; padding: 5px 16px; border-right: 1px solid var(--border); cursor: pointer; }
+    .summary-cell:last-child { border-right: 0; }
+    .summary-cell.sel { background: var(--accent-dim); }
+    .summary-lbl { font-size: 9.5px; font-weight: 700; color: var(--text3); letter-spacing: .08em; }
+    .summary-val { font-family: var(--mono); font-size: 15px; font-weight: 600; margin-top: 1px; }
+
+    /* table */
+    .table-card { background: var(--surface); border: 1px solid var(--border); overflow-x: auto; }
+    th { text-align: left; padding: 7px 9px; font-size: 9.5px; font-weight: 700; color: #6B7280; letter-spacing: .05em; background: var(--surface-alt); border-bottom: 2px solid var(--border); white-space: nowrap; }
+    th.num { text-align: right; }
+    td { padding: 6px 9px; font-size: 12px; border-bottom: 1px solid #E5E7EB; }
+    td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    tbody tr:nth-child(even) { background: #FAFBFC; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: var(--accent-dim); }
+    .mono { font-family: var(--mono); font-size: 11.5px; }
+    .chk { width: 34px; padding-left: 14px; }
+    td.chk-cell { padding-left: 14px; }
+    table.auto { table-layout: auto; width: 100%; }
+    table.auto th, table.auto td { white-space: nowrap; }
+
+    /* pagination footer */
+    .pager { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-top: 1px solid var(--border); background: var(--surface-alt); font-size: 12px; color: var(--text2); }
+    .pager .pbtn { height: 26px; padding: 0 11px; border: 1px solid var(--border-strong); background: #fff; border-radius: var(--radius); font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--text2); }
+    .pager .pbtn:disabled { opacity: .4; cursor: default; }
+    .pager .pnum { font-family: var(--mono); }
+    .pager .pctl { display: flex; align-items: center; gap: 8px; }
+
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 7px; border-radius: 2px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .chip-dot { width: 5px; height: 5px; flex-shrink: 0; }
+    .chip-warn { background: var(--warn-dim); color: var(--warn); }
+    .chip-crit { background: var(--crit-dim); color: var(--crit); }
+    .chip-info { background: var(--accent-dim); color: var(--accent-text); }
+    .chip-ok { background: var(--ok-dim); color: var(--ok); }
+    .chip-gray { background: #F1F2F4; color: #4B5563; }
+    .pri { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+    .pri-dot { width: 7px; height: 7px; flex-shrink: 0; }
+
+    /* filter chips */
+    .fchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .fchip { height: 27px; padding: 0 11px; border: 1px solid var(--border-strong); background: var(--surface); border-radius: var(--radius); font-size: 11.5px; color: var(--text2); cursor: pointer; font-family: inherit; }
+    .fchip.on { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+    /* cards / forms */
+    .split { display: grid; grid-template-columns: 1fr 1.15fr; gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--border); padding: 18px; }
+    .card-title { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+    label.field { display: block; font-size: 12px; color: var(--text2); font-weight: 600; margin-bottom: 12px; }
+    label.field span { display: block; margin-bottom: 5px; }
+    label.field input, label.field select {
+      width: 100%; height: 32px; border: 1px solid var(--border-strong); border-radius: var(--radius);
+      padding: 0 10px; font: inherit; color: var(--text); background: #fff;
+    }
+    fieldset.seg { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; }
+    fieldset.seg legend { padding: 0 4px; font-size: 12px; color: var(--text2); font-weight: 600; }
+    .check, fieldset.seg label { display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--text); font-size: 12.5px; margin-bottom: 6px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .drop { border: 1.5px dashed var(--border-strong); border-radius: var(--radius); padding: 16px; text-align: center; color: var(--text2); font-size: 12.5px; margin-bottom: 12px; }
+    .drop b { display: block; color: var(--accent-text); margin-top: 5px; font-family: var(--mono); font-weight: 500; font-size: 12px; }
+    .form-act { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+    /* pipeline (formal step tracker) */
+    .pipeline { display: flex; margin: 4px 0 20px; }
+    .pl-step { flex: 1; position: relative; padding-left: 0; }
+    .pl-step::before { content: ""; position: absolute; top: 11px; left: -50%; width: 100%; height: 1px; background: var(--border-strong); }
+    .pl-step:first-child::before { display: none; }
+    .pl-row { display: flex; align-items: center; gap: 8px; }
+    .pl-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--text3); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; }
+    .pl-lbl { font-size: 11.5px; color: var(--text3); font-weight: 600; }
+    .pl-step.done .pl-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .pl-step.done .pl-lbl { color: var(--ok); }
+    .pl-step.done::before { background: var(--ok); }
+    .pl-step.current .pl-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pl-step.current .pl-lbl { color: var(--accent-text); }
+
+    /* master-detail */
+    .split-pane { display: flex; border: 1px solid var(--border); height: 540px; background: var(--surface); }
+    .pane-list { width: 300px; flex-shrink: 0; border-right: 1px solid var(--border); overflow-y: auto; }
+    .prow { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .prow:hover { background: var(--surface-alt); }
+    .prow.sel { background: var(--accent-dim); box-shadow: inset 3px 0 0 var(--accent); }
+    .prow-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .prow-country { font-weight: 700; font-size: 12.5px; }
+    .prow-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .prow-id { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .prow-amt { font-family: var(--mono); font-size: 11.5px; color: var(--text2); font-weight: 600; }
+    .pane-detail { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px; }
+    .pd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .pd-title { font-size: 17px; font-weight: 700; }
+    .pd-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
+    .dl { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 4px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .dl dt { font-size: 10.5px; color: var(--text3); letter-spacing: .04em; }
+    .dl dd { font-family: var(--mono); font-weight: 600; margin-top: 2px; }
+    .timeline { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .timeline-item { display: flex; gap: 10px; font-size: 12px; }
+    .timeline-dot { width: 6px; height: 6px; background: var(--text3); margin-top: 5px; flex-shrink: 0; }
+    .timeline-item.now .timeline-dot { background: var(--accent); }
+    .timeline-body b { display: block; color: var(--text); font-weight: 600; }
+    .timeline-time { color: var(--text3); font-size: 11px; }
+    .detail-act { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* bar chart */
+    .barchart-row { display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #EEF0F2; }
+    .barchart-row:last-child { border-bottom: 0; }
+    .barchart-lbl { font-size: 12.5px; font-weight: 600; }
+    .barchart-track { height: 8px; background: var(--surface-alt); border: 1px solid var(--border); }
+    .barchart-fill { height: 100%; background: var(--accent); }
+    .barchart-val { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--text2); }
+
+    .ratio-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .ratio-track { width: 50px; height: 6px; background: var(--surface-alt); border: 1px solid var(--border); flex-shrink: 0; }
+    .ratio-fill { height: 100%; background: var(--accent); }
+
+    /* filter bar (real filter semantics: Tipler/Ülkeler/Durumlar/Depo/Ay) */
+    .filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .fselect {
+      height: 26px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius);
+      background: var(--surface); font-size: 11.5px; color: var(--text2); display: flex; align-items: center; gap: 5px; cursor: pointer;
+    }
+    .fselect b { color: var(--text); font-weight: 600; }
+    .fselect:hover { background: var(--surface-alt); }
+    .fclear { height: 26px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--crit); font-size: 11.5px; cursor: pointer; font-family: inherit; }
+    .fclear:hover { background: var(--crit-dim); }
+
+    /* bulk selection toolbar */
+    .bulkbar {
+      background: var(--header-bg); color: #fff; padding: 10px 16px; display: none; align-items: center; justify-content: space-between;
+      border: 1px solid var(--header-bg); border-top: 0;
+    }
+    .bulkbar.show { display: flex; }
+    .bulkbar span { font-size: 12.5px; }
+    .bulkbar .actions { display: flex; gap: 8px; }
+    .bbtn { height: 27px; padding: 0 12px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: #fff; border-radius: var(--radius); font-size: 11.5px; cursor: pointer; font-family: inherit; }
+    .bbtn:hover { background: rgba(255,255,255,.14); }
+    .bbtn.danger { border-color: rgba(240,87,107,.5); color: #F5B4BC; }
+
+    /* slide-over drawer (row detail) */
+    .overlay { position: fixed; inset: 0; background: rgba(10,14,20,.35); display: none; z-index: 40; }
+    .overlay.show { display: block; }
+    .drawer {
+      position: fixed; top: 0; right: -460px; width: 440px; height: 100%; background: var(--surface);
+      box-shadow: -10px 0 30px rgba(15,23,32,.18); z-index: 41; transition: right .18s ease; overflow-y: auto; padding: 24px 24px 30px;
+    }
+    .drawer.show { right: 0; }
+    .drawer-close { position: absolute; top: 18px; right: 20px; width: 26px; height: 26px; border: 1px solid var(--border-strong); background: #fff; border-radius: var(--radius); cursor: pointer; font-size: 14px; color: var(--text2); line-height: 1; }
+    .drawer h2 { font-size: 17px; font-weight: 700; }
+    .drawer-sub { font-size: 12px; color: var(--text2); margin-top: 3px; margin-bottom: 18px; }
+    .dsec { margin-bottom: 18px; }
+    .dsec-title { font-size: 10.5px; font-weight: 700; color: var(--text3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 9px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+    .dgrid dt { font-size: 10.5px; color: var(--text3); }
+    .dgrid dd { font-family: var(--mono); font-size: 12.5px; font-weight: 600; margin-top: 2px; }
+
+    /* landed cost country rail + tabs */
+    .lc-layout { display: flex; border: 1px solid var(--border); background: var(--surface); }
+    .lc-rail { width: 190px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 10px 0; }
+    .lc-rail-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; border-left: 3px solid transparent; }
+    .lc-rail-item:hover { background: var(--surface-alt); }
+    .lc-rail-item.sel { background: var(--accent-dim); border-left-color: var(--accent); font-weight: 600; }
+    .lc-rail-country { display: flex; align-items: center; gap: 7px; }
+    .lc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .lc-rail-val { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .lc-main { flex: 1; min-width: 0; padding: 16px 20px; }
+    .lc-tabs { display: flex; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .lc-tab { padding: 8px 4px; margin-right: 22px; font-size: 12.5px; font-weight: 600; color: var(--text3); cursor: pointer; border: 0; border-bottom: 2px solid transparent; background: none; font-family: inherit; }
+    .lc-tab.on { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+    /* 5-up / 4-up kpi grid (hairline seams instead of gaps) */
+    .kpi5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 14px; }
+    .kpi5.four { grid-template-columns: repeat(4,1fr); }
+    .kpi5-cell { background: var(--surface); padding: 11px 14px; }
+    .kpi5-lbl { font-size: 9.5px; font-weight: 700; color: var(--text3); letter-spacing: .06em; }
+    .kpi5-val { font-family: var(--mono); font-size: 17px; font-weight: 600; margin-top: 3px; }
+
+    .warn-panel { background: var(--warn-dim); border: 1px solid #E4CB8F; padding: 12px 16px; margin-bottom: 14px; }
+    .warn-panel-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--warn); margin-bottom: 4px; }
+    .warn-panel p { font-size: 12px; color: #6B5A2E; margin-bottom: 10px; }
+    .warn-panel table { background: var(--surface); border: 1px solid #E4CB8F; }
+    .warn-more { font-size: 11.5px; color: var(--accent-text); margin-top: 8px; cursor: pointer; display: inline-block; }
+
+    .depo-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .depo-card { border: 1px solid var(--border); padding: 14px; background: var(--surface); }
+    .depo-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .depo-tag { font-size: 11.5px; font-weight: 700; }
+    .depo-line { font-size: 12px; color: var(--text2); margin-top: 4px; }
+    .depo-line b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+
+    .scenario-editor input {
+      width: 74px; height: 26px; border: 1px solid var(--border-strong); border-radius: 2px; padding: 0 6px;
+      font-family: var(--mono); font-size: 11.5px; text-align: right; color: var(--text);
+    }
+    .scenario-editor .prev { font-size: 9.5px; color: var(--text3); display: block; margin-top: 3px; }
+
+    @media (max-width: 900px) {
+      .split, .dl, .barchart-row, .dgrid, .depo-compare { grid-template-columns: 1fr; }
+      .split-pane { flex-direction: column; height: auto; }
+      .lc-layout { flex-direction: column; }
+      .lc-rail { width: 100%; }
+      .drawer { width: 100%; right: -100%; }
+      .kpi5, .kpi5.four { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <div class="util">
+      <div class="util-left">
+        <span class="util-brand">FATURA ARACI</span>
+        <span class="util-sep"></span>
+        <span class="util-mod" id="crumbMod">Dış Ticaret Operasyon Modülü</span>
+      </div>
+      <div class="util-right">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8B94A3" stroke-width="1.6"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span class="util-user">Ayşe Yılmaz &nbsp;&middot;&nbsp; Lojistik Ekibi</span>
+      </div>
+    </div>
+
+    <div class="body-row">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="nav-label">GENEL</div>
+          <button class="nav-item" data-view="dashboard" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>
+            Gösterge Paneli
+          </button>
+          <button class="nav-item active" data-view="bugun" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            Bugün
+          </button>
+          <div class="nav-label">OPERASYON</div>
+          <button class="nav-item" data-view="sevk" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 17l1-7h9l2 7"/><path d="M9 10V5h3l2 5"/></svg>
+            Sevkiyatlar
+          </button>
+          <button class="nav-item" data-view="evrak" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 3h8l5 5v13H7z"/><path d="M15 3v5h5"/></svg>
+            Fatura Üret
+          </button>
+          <button class="nav-item" data-view="landed" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V9.5l6-3.2 6 3.2V19"/><path d="M4 19h12"/></svg>
+            Landed Cost
+          </button>
+          <div class="nav-label">YURTDIŞI MALİYET</div>
+          <button class="nav-item" data-view="maliyet" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20V11M9.5 20V6M15 20v-8"/></svg>
+            Maliyet Takip
+          </button>
+          <button class="nav-item" data-view="kur" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 9.5l-3.2 3 3.2 3"/><path d="M3.8 12.5h13"/><path d="M17 14.5l3.2-3-3.2-3"/><path d="M20.2 11.5h-13"/></svg>
+            Kur Yönetimi
+          </button>
+        </nav>
+        <div class="sidebar-footer">v2.0 &middot; PostgreSQL &middot; canlı</div>
+      </aside>
+
+      <div class="main">
+
+        <!-- BUGÜN / AÇIK KAYITLAR -->
+        <div class="page-header view on" id="hdr-bugun">
+          <div class="crumb">Operasyon &nbsp;/&nbsp; Bugün</div>
+          <div class="page-header-row">
+            <div>
+              <h1>Açık Kayıtlar</h1>
+              <div class="page-sub">6 kayıt &middot; 15 Eylül 2026, Salı &middot; son güncelleme 08:42</div>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button">Filtrele</button>
+              <button class="btn" type="button">Dışa Aktar</button>
+              <button class="btn btn-primary" type="button">Yeni Kayıt</button>
+            </div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-dashboard">
+          <div class="crumb">Genel &nbsp;/&nbsp; Gösterge Paneli</div>
+          <div class="page-header-row">
+            <div><h1>Gösterge Paneli</h1><div class="page-sub">Eylül 2026 &middot; tüm ülkeler</div></div>
+            <div class="actions"><button class="btn" type="button">Dışa Aktar</button></div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-sevk">
+          <div class="page-header-row">
+            <div class="crumb" style="margin-bottom:0;">Operasyon &nbsp;/&nbsp; Sevkiyatlar</div>
+            <div class="actions"><button class="btn" type="button">&#8593; İçe Aktar</button><button class="btn" type="button">&#8595; Maliyet Raporu</button><button class="btn btn-primary" type="button">+ Yeni Sevkiyat</button></div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-evrak">
+          <div class="crumb">Operasyon &nbsp;/&nbsp; Fatura Üret</div>
+          <div class="page-header-row">
+            <div><h1>Fatura Üret</h1><div class="page-sub">Kosova &middot; 2026-214 &middot; taslak adımı</div></div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-landed">
+          <div class="crumb">Operasyon &nbsp;/&nbsp; Landed Cost</div>
+          <div class="page-header-row">
+            <div><h1>Landed Cost</h1><div class="page-sub">01.01.2026 &ndash; 15.09.2026 &middot; kurumsal ülkeler</div></div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-maliyet">
+          <div class="crumb">Yurtdışı Maliyet &nbsp;/&nbsp; Maliyet Takip</div>
+          <div class="page-header-row">
+            <div><h1>Maliyet Takip</h1><div class="page-sub">Yurtdışı lojistik maliyetleri &middot; 2026</div></div>
+            <div class="actions"><button class="btn" type="button">Excel İndir</button></div>
+          </div>
+        </div>
+        <div class="page-header view" id="hdr-kur">
+          <div class="crumb">Yurtdışı Maliyet &nbsp;/&nbsp; Kur Yönetimi</div>
+          <div class="page-header-row">
+            <div><h1>Kur Yönetimi</h1><div class="page-sub">8 Eylül 2026 &middot; TCMB + ECB &middot; EUR bazlı</div></div>
+            <div class="actions"><button class="btn" type="button">Yenile</button></div>
+          </div>
+        </div>
+
+        <div class="content">
+
+          <section class="view on" id="bugun">
+            <div class="summary">
+              <div class="summary-cell sel" onclick="filterRows(this,'all')"><div class="summary-lbl">TOPLAM AÇIK</div><div class="summary-val">6</div></div>
+              <div class="summary-cell" onclick="filterRows(this,'evrak')"><div class="summary-lbl">EVRAK EKSİK</div><div class="summary-val" style="color:var(--warn)">3</div></div>
+              <div class="summary-cell" onclick="filterRows(this,'gumruk')"><div class="summary-lbl">GÜMRÜKTE</div><div class="summary-val" style="color:var(--accent-text)">1</div></div>
+              <div class="summary-cell" onclick="filterRows(this,'yuk')"><div class="summary-lbl">YÜKLENECEK</div><div class="summary-val" style="color:var(--text2)">2</div></div>
+            </div>
+
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="chk"><input type="checkbox"></th>
+                    <th>DOSYA NO</th>
+                    <th>ÜLKE / TİP</th>
+                    <th>AÇIKLAMA</th>
+                    <th style="width:90px;">ÖNCELİK</th>
+                    <th style="width:130px;">DURUM</th>
+                    <th class="num" style="width:120px;">AKSİYON</th>
+                  </tr>
+                </thead>
+                <tbody id="bugunRows">
+                  <tr data-tag="evrak">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-214</td>
+                    <td style="font-weight:600;">Sırbistan &middot; ANT</td>
+                    <td style="color:var(--text2);">Taslak kaydedildi, INV+PL üretilmedi</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:var(--crit)"></span>Yüksek</span></td>
+                    <td><span class="chip chip-warn"><span class="chip-dot" style="background:var(--warn)"></span>Evrak eksik</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                  <tr data-tag="evrak">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-210</td>
+                    <td style="font-weight:600;">Bosna &middot; IHR</td>
+                    <td style="color:var(--text2);">Fatura hazır, mill test bekliyor</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:var(--warn)"></span>Orta</span></td>
+                    <td><span class="chip chip-warn"><span class="chip-dot" style="background:var(--warn)"></span>Ek evrak</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                  <tr data-tag="gumruk">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-198</td>
+                    <td style="font-weight:600;">Kosova &middot; grup 4</td>
+                    <td style="color:var(--text2);">Varış gümrük &middot; partner 2026-199</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:var(--warn)"></span>Orta</span></td>
+                    <td><span class="chip chip-info"><span class="chip-dot" style="background:var(--accent-text)"></span>Gümrükte</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                  <tr data-tag="yuk">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-221</td>
+                    <td style="font-weight:600;">Kazakistan &middot; IHR</td>
+                    <td style="color:var(--text2);">Navlun taslağa yazıldı, sevkiyat henüz yok</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:#9CA3AF"></span>Düşük</span></td>
+                    <td><span class="chip chip-gray"><span class="chip-dot" style="background:#9CA3AF"></span>Yüklenecek</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                  <tr data-tag="evrak">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-223</td>
+                    <td style="font-weight:600;">Makedonya &middot; ANT &middot; grup 4</td>
+                    <td style="color:var(--text2);">Partner 2026-198 ile eşleşti, taslak bekliyor</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:#9CA3AF"></span>Düşük</span></td>
+                    <td><span class="chip chip-warn"><span class="chip-dot" style="background:var(--warn)"></span>Evrak eksik</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                  <tr data-tag="yuk">
+                    <td class="chk-cell"><input type="checkbox"></td>
+                    <td class="mono">2026-225</td>
+                    <td style="font-weight:600;">Gürcistan &middot; IHR</td>
+                    <td style="color:var(--text2);">Fatura tamam, kap sayısı onay bekliyor</td>
+                    <td><span class="pri"><span class="pri-dot" style="background:#9CA3AF"></span>Düşük</span></td>
+                    <td><span class="chip chip-gray"><span class="chip-dot" style="background:#9CA3AF"></span>Yüklenecek</span></td>
+                    <td class="num"><button class="btn btn-sm" type="button">İşlem Yap</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" id="dashboard">
+            <div class="summary" style="margin-bottom:16px;">
+              <div class="summary-cell"><div class="summary-lbl">BU AY ÜRETİLEN</div><div class="summary-val">58</div></div>
+              <div class="summary-cell"><div class="summary-lbl">TESLİM EDİLEN</div><div class="summary-val" style="color:var(--ok)">41</div></div>
+              <div class="summary-cell"><div class="summary-lbl">YOLDA</div><div class="summary-val" style="color:var(--accent-text)">11</div></div>
+              <div class="summary-cell"><div class="summary-lbl">ORT. GECİKME</div><div class="summary-val" style="color:var(--warn)">1,4g</div></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Ülke Bazlı Lojistik Hacmi</div>
+              <div class="barchart-row"><span class="barchart-lbl">Gürcistan</span><div class="barchart-track"><div class="barchart-fill" style="width:100%"></div></div><span class="barchart-val">184.200 &euro;</span></div>
+              <div class="barchart-row"><span class="barchart-lbl">Kosova</span><div class="barchart-track"><div class="barchart-fill" style="width:52%"></div></div><span class="barchart-val">96.400 &euro;</span></div>
+              <div class="barchart-row"><span class="barchart-lbl">Makedonya</span><div class="barchart-track"><div class="barchart-fill" style="width:39%"></div></div><span class="barchart-val">71.800 &euro;</span></div>
+              <div class="barchart-row"><span class="barchart-lbl">Bosna</span><div class="barchart-track"><div class="barchart-fill" style="width:21%"></div></div><span class="barchart-val">38.900 &euro;</span></div>
+            </div>
+          </section>
+
+          <section class="view" id="sevk">
+            <div class="filterbar">
+              <div class="fselect">Tipler: <b>Tümü</b></div>
+              <div class="fselect">Ülkeler: <b>Kurumsal (9)</b></div>
+              <div class="fselect">Durumlar: <b>Tümü</b></div>
+              <div class="fselect">Depo: <b>Tümü</b></div>
+              <div class="fselect">Ay: <b>Eylül</b></div>
+              <button class="fclear" type="button">Temizle</button>
+            </div>
+
+            <div class="summary">
+              <div class="summary-cell"><div class="summary-lbl">SEVKİYAT</div><div class="summary-val" id="sumCount">&nbsp;</div></div>
+              <div class="summary-cell"><div class="summary-lbl">FATURA EUR</div><div class="summary-val" id="sumFatura" style="font-size:16px;">&nbsp;</div></div>
+              <div class="summary-cell"><div class="summary-lbl">NAVLUN EUR</div><div class="summary-val" id="sumNavlun" style="font-size:16px;">&nbsp;</div></div>
+              <div class="summary-cell"><div class="summary-lbl">SİGORTA EUR</div><div class="summary-val" id="sumSigorta" style="font-size:16px;">&nbsp;</div></div>
+            </div>
+
+            <div class="table-card">
+              <table class="auto">
+                <thead>
+                  <tr>
+                    <th class="chk"><input type="checkbox" id="shipAll" onclick="toggleAllShip(this)"></th>
+                    <th>DOSYA</th>
+                    <th>FATURA</th>
+                    <th class="num">PLT</th>
+                    <th>DEPO</th>
+                    <th>ÜLKE</th>
+                    <th>NAKLİYECİ</th>
+                    <th>PLAKA</th>
+                    <th>GRUP</th>
+                    <th class="num">EUR</th>
+                    <th>YÜKLEME</th>
+                    <th>DURUM</th>
+                  </tr>
+                </thead>
+                <tbody id="shipRows"></tbody>
+              </table>
+              <div class="pager">
+                <span id="pagerInfo">&nbsp;</span>
+                <div class="pctl">
+                  <button class="pbtn" id="pgPrev" type="button" onclick="shipPage(-1)">&larr; Önceki</button>
+                  <span class="pnum" id="pgNum">1 / 1</span>
+                  <button class="pbtn" id="pgNext" type="button" onclick="shipPage(1)">Sonraki &rarr;</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="bulkbar" id="bulkbar">
+              <span id="bulkCount">0 satır seçildi</span>
+              <div class="actions">
+                <button class="bbtn" type="button">&#128279; Grupla</button>
+                <button class="bbtn danger" type="button">Seçilenleri Sil</button>
+                <button class="bbtn" type="button" onclick="clearShipSel()">İptal</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="evrak">
+            <div class="pipeline">
+              <div class="pl-step done"><div class="pl-row"><div class="pl-dot">&#10003;</div><div class="pl-lbl">Ülke</div></div></div>
+              <div class="pl-step current"><div class="pl-row"><div class="pl-dot">2</div><div class="pl-lbl">Taslak</div></div></div>
+              <div class="pl-step"><div class="pl-row"><div class="pl-dot">3</div><div class="pl-lbl">INV + PL</div></div></div>
+              <div class="pl-step"><div class="pl-row"><div class="pl-dot">4</div><div class="pl-lbl">Ek evrak</div></div></div>
+            </div>
+            <div class="split">
+              <div class="card">
+                <div class="card-title">Sevkiyat Bilgisi</div>
+                <label class="field"><span>Ülke</span>
+                  <select><option>Sırbistan &middot; TRY &middot; kurumsal</option><option selected>Kosova &middot; EUR &middot; kurumsal</option><option>Bosna &middot; TRY &middot; kurumsal</option></select>
+                </label>
+                <fieldset class="seg"><legend>Depo</legend>
+                  <label><input type="radio" name="depo" checked> Serbest &middot; IHR</label>
+                  <label><input type="radio" name="depo"> Antrepo &middot; ANT</label>
+                </fieldset>
+                <label class="check"><input type="checkbox" checked> Gruplu sevk, partner kalan navlun</label>
+              </div>
+              <div class="card">
+                <div class="card-title">Dosya</div>
+                <label class="field"><span>Dosya no</span><input type="text" value="2026-214"></label>
+                <div class="drop">Nebim PDF veya Excel bırakın<b>SIR_2026-214.pdf</b></div>
+                <div class="row2">
+                  <label class="field"><span>Kap</span><input type="text" value="28"></label>
+                  <label class="field"><span>Navlun</span><input type="text" value="2.400 EUR"></label>
+                </div>
+                <div class="form-act">
+                  <button class="btn" type="button">Taslağı Kaydet</button>
+                  <button class="btn btn-primary" type="button">İndir ve Devam Et</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="landed">
+            <div class="lc-layout">
+              <aside class="lc-rail">
+                <div class="lc-rail-item sel" onclick="lcSelectCountry(this)"><span class="lc-rail-country">Tüm ülkeler</span><span class="lc-rail-val">526,0k</span></div>
+                <div class="lc-rail-item" onclick="lcSelectCountry(this)"><span class="lc-rail-country"><span class="lc-dot" style="background:#0E7490"></span>Gürcistan</span><span class="lc-rail-val">184,2k</span></div>
+                <div class="lc-rail-item" onclick="lcSelectCountry(this)"><span class="lc-rail-country"><span class="lc-dot" style="background:#B45309"></span>Kosova</span><span class="lc-rail-val">96,4k</span></div>
+                <div class="lc-rail-item" onclick="lcSelectCountry(this)"><span class="lc-rail-country"><span class="lc-dot" style="background:#0F5FA6"></span>Makedonya</span><span class="lc-rail-val">71,8k</span></div>
+                <div class="lc-rail-item" onclick="lcSelectCountry(this)"><span class="lc-rail-country"><span class="lc-dot" style="background:#3E7A52"></span>Bosna</span><span class="lc-rail-val">38,9k</span></div>
+                <div class="lc-rail-item" onclick="lcSelectCountry(this)"><span class="lc-rail-country"><span class="lc-dot" style="background:#9C3B3B"></span>Kazakistan</span><span class="lc-rail-val">62,1k</span></div>
+              </aside>
+
+              <div class="lc-main">
+                <div class="lc-tabs">
+                  <button class="lc-tab on" type="button" onclick="lcTab(this,'ozet')">Landed Cost</button>
+                  <button class="lc-tab" type="button" onclick="lcTab(this,'senaryo')">Navlun Senaryosu</button>
+                </div>
+
+                <div class="filterbar">
+                  <div class="fselect">Başlangıç: <b>01.01.2026</b></div>
+                  <div class="fselect">Bitiş: <b>15.09.2026</b></div>
+                  <div class="fselect">Depo: <b>Tümü</b></div>
+                  <div class="fselect">Sefer: <b>Tümü</b></div>
+                  <button class="fclear" type="button">Temizle</button>
+                  <button class="btn btn-sm" type="button" style="margin-left:auto;">Uygula</button>
+                  <button class="btn btn-sm" type="button">Excel</button>
+                </div>
+
+                <div id="lc-ozet">
+                  <div class="kpi5">
+                    <div class="kpi5-cell"><div class="kpi5-lbl">FATURA TOPLAMI</div><div class="kpi5-val">6.770.000 &euro;</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">LANDED COST</div><div class="kpi5-val">526.000 &euro;</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">MALİYET / FATURA</div><div class="kpi5-val" style="color:var(--warn)">7,8%</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">ORT. SEFER MALİYETİ</div><div class="kpi5-val">5.480 &euro;</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">SEFER / FATURA</div><div class="kpi5-val">96 / 84</div></div>
+                  </div>
+
+                  <div class="warn-panel">
+                    <div class="warn-panel-head">&#9888; Landed cost hesabına dahil edilmeyenler (4)</div>
+                    <p>Brokerage Fee &amp; Other Costs EUR alanı boş olduğu için hesaba katılmadı.</p>
+                    <table>
+                      <thead><tr><th>FATURA</th><th>DOSYA</th><th>ÜLKE</th><th style="width:70px;">DEPO</th><th>YÜKLEME</th><th style="width:120px;">DURUM</th><th class="num">FATURA EUR</th></tr></thead>
+                      <tbody>
+                        <tr><td class="mono">FTGEO-1201</td><td class="mono">2026-231</td><td>Gürcistan</td><td>IHR</td><td class="mono">13.09.2026</td><td><span class="chip chip-gray"><span class="chip-dot" style="background:#9CA3AF"></span>Yolda</span></td><td class="num mono">41.200 &euro;</td></tr>
+                        <tr><td class="mono">FTKOS-1055</td><td class="mono">2026-229</td><td>Kosova</td><td>ANT</td><td class="mono">12.09.2026</td><td><span class="chip chip-warn"><span class="chip-dot" style="background:var(--warn)"></span>Yüklenecek</span></td><td class="num mono">18.600 &euro;</td></tr>
+                      </tbody>
+                    </table>
+                    <span class="warn-more">+2 kaydı daha göster</span>
+                  </div>
+
+                  <div class="card" style="margin-bottom:14px;">
+                    <div class="card-title">Ülkelere Göre Landed Cost</div>
+                    <div class="barchart-row"><span class="barchart-lbl">Gürcistan</span><div class="barchart-track"><div class="barchart-fill" style="width:100%"></div></div><span class="barchart-val">184.200 &euro;</span></div>
+                    <div class="barchart-row"><span class="barchart-lbl">Kosova</span><div class="barchart-track"><div class="barchart-fill" style="width:52%"></div></div><span class="barchart-val">96.400 &euro;</span></div>
+                    <div class="barchart-row"><span class="barchart-lbl">Makedonya</span><div class="barchart-track"><div class="barchart-fill" style="width:39%"></div></div><span class="barchart-val">71.800 &euro;</span></div>
+                    <div class="barchart-row"><span class="barchart-lbl">Bosna</span><div class="barchart-track"><div class="barchart-fill" style="width:21%"></div></div><span class="barchart-val">38.900 &euro;</span></div>
+                  </div>
+
+                  <div class="table-card">
+                    <table>
+                      <thead><tr><th>ÜLKE</th><th class="num">FATURA</th><th class="num">LANDED COST</th><th style="width:130px;">ORAN</th><th class="num">OPERASYON</th><th class="num">NAVLUN</th><th class="num">VERGİ</th><th class="num">SİGORTA</th><th class="num" style="width:60px;">SEFER</th></tr></thead>
+                      <tbody>
+                        <tr><td style="font-weight:600;">Gürcistan</td><td class="num mono">2.410.000 &euro;</td><td class="num mono">184.200 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:88%"></div></div><span class="mono">7,6%</span></div></td><td class="num mono">62.400</td><td class="num mono">88.100</td><td class="num mono">24.300</td><td class="num mono">9.400</td><td class="num mono">24</td></tr>
+                        <tr><td style="font-weight:600;">Kosova</td><td class="num mono">1.120.000 &euro;</td><td class="num mono">96.400 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:100%"></div></div><span class="mono">8,6%</span></div></td><td class="num mono">28.100</td><td class="num mono">51.200</td><td class="num mono">12.900</td><td class="num mono">4.200</td><td class="num mono">18</td></tr>
+                        <tr><td style="font-weight:600;">Makedonya</td><td class="num mono">890.000 &euro;</td><td class="num mono">71.800 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:94%"></div></div><span class="mono">8,1%</span></div></td><td class="num mono">19.800</td><td class="num mono">39.400</td><td class="num mono">9.100</td><td class="num mono">3.500</td><td class="num mono">12</td></tr>
+                        <tr><td style="font-weight:600;">Bosna</td><td class="num mono">640.000 &euro;</td><td class="num mono">38.900 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:71%"></div></div><span class="mono">6,1%</span></div></td><td class="num mono">10.200</td><td class="num mono">21.400</td><td class="num mono">5.600</td><td class="num mono">1.700</td><td class="num mono">21</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div id="lc-senaryo" style="display:none;">
+                  <div class="warn-panel">
+                    <div class="warn-panel-head">&#9888; Tarif dönemi uygulanmadı</div>
+                    <p>Kazakistan için 2 Nisan 2026 sonrası navlun tarifesi henüz senaryoya uygulanmadı — oranlar 2026-164 referans faturasından itibaren geçerli, 2026-148 (27 Mar) bu pencerenin dışında.</p>
+                    <button class="btn btn-sm" type="button">KZ &middot; 2 Nisan 2026+ Uygula</button>
+                  </div>
+
+                  <div class="card" style="margin-bottom:14px;">
+                    <div class="card-title">Navlun Tanımı &mdash; Kazakistan (USD)</div>
+                    <table class="scenario-editor">
+                      <thead><tr><th>ÜLKE</th><th>PB</th><th class="num">KOMPLE İHRACAT</th><th class="num">İHRACAT + TRANSİT</th><th class="num">KOMPLE TRANSİT</th></tr></thead>
+                      <tbody>
+                        <tr>
+                          <td style="font-weight:600;">Kazakistan</td><td class="mono">USD</td>
+                          <td class="num"><input type="text" value="3.200"><span class="prev">kayıtlı 2.950</span></td>
+                          <td class="num"><input type="text" value="2.100"><span class="prev">kayıtlı 2.100</span></td>
+                          <td class="num"><input type="text" value="1.450"><span class="prev">kayıtlı 1.450</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="form-act">
+                      <button class="btn btn-sm" type="button">Kayıtlıya Dön</button>
+                      <button class="btn btn-sm btn-primary" type="button">Senaryo Excel</button>
+                    </div>
+                  </div>
+
+                  <div class="kpi5 four">
+                    <div class="kpi5-cell"><div class="kpi5-lbl">YENİ LANDED COST</div><div class="kpi5-val">64.800 &euro;</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">NAVLUN</div><div class="kpi5-val" style="color:var(--warn)">38.100 &euro;</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">NAVLUN PAYI (LC İÇİ)</div><div class="kpi5-val">58,8%</div></div>
+                    <div class="kpi5-cell"><div class="kpi5-lbl">LC DEĞİŞİMİ</div><div class="kpi5-val" style="color:var(--warn)">+2,1%</div></div>
+                  </div>
+
+                  <div class="depo-compare">
+                    <div class="depo-card">
+                      <div class="depo-card-head"><span class="depo-tag">Serbest (IHR)</span><span class="mono" style="color:var(--warn)">7,4% &rarr; 8,1%</span></div>
+                      <div class="depo-line">14 fatura &middot; 9 komple, 5 gruplu</div>
+                      <div class="depo-line">Navlun payı: <b>52,0%</b> &rarr; <b>58,1%</b></div>
+                    </div>
+                    <div class="depo-card">
+                      <div class="depo-card-head"><span class="depo-tag">Antrepo (ANT)</span><span class="mono" style="color:var(--ok)">9,0% &rarr; 8,6%</span></div>
+                      <div class="depo-line">10 fatura &middot; 4 komple, 6 gruplu</div>
+                      <div class="depo-line">Navlun payı: <b>61,4%</b> &rarr; <b>59,2%</b></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="maliyet">
+            <div class="fchips">
+              <button class="fchip on" type="button">Tümü</button>
+              <button class="fchip" type="button">Gürcistan</button>
+              <button class="fchip" type="button">Kosova</button>
+              <button class="fchip" type="button">Makedonya</button>
+              <button class="fchip" type="button">Bosna</button>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead><tr><th>ÜLKE</th><th class="num">LOJİSTİK</th><th class="num">CİRO</th><th style="width:140px;">ORAN</th><th class="num" style="width:80px;">FATURA</th></tr></thead>
+                <tbody>
+                  <tr><td style="font-weight:600;">Gürcistan</td><td class="num mono">184.200 &euro;</td><td class="num mono">2.410.000 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:88%"></div></div><span class="mono">7,6%</span></div></td><td class="num mono">24</td></tr>
+                  <tr><td style="font-weight:600;">Kosova</td><td class="num mono">96.400 &euro;</td><td class="num mono">1.120.000 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:100%"></div></div><span class="mono">8,6%</span></div></td><td class="num mono">18</td></tr>
+                  <tr><td style="font-weight:600;">Makedonya</td><td class="num mono">71.800 &euro;</td><td class="num mono">890.000 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:94%"></div></div><span class="mono">8,1%</span></div></td><td class="num mono">12</td></tr>
+                  <tr><td style="font-weight:600;">Bosna</td><td class="num mono">38.900 &euro;</td><td class="num mono">640.000 &euro;</td><td><div class="ratio-cell"><div class="ratio-track"><div class="ratio-fill" style="width:71%"></div></div><span class="mono">6,1%</span></div></td><td class="num mono">21</td></tr>
+                  <tr style="font-weight:700;"><td>Toplam</td><td class="num mono">526.000 &euro;</td><td class="num mono">6.770.000 &euro;</td><td style="text-align:right; padding-right:10px;" class="mono">7,8%</td><td class="num mono">96</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" id="kur">
+            <div class="split">
+              <div class="card">
+                <div class="card-title">Para Birimleri</div>
+                <table>
+                  <thead><tr><th>KOD</th><th>AD</th><th class="num">1 EUR =</th></tr></thead>
+                  <tbody>
+                    <tr><td class="mono" style="font-weight:600;">TRY</td><td>Türk Lirası</td><td class="num mono">49,12</td></tr>
+                    <tr><td class="mono" style="font-weight:600;">USD</td><td>ABD Doları</td><td class="num mono">1,17</td></tr>
+                    <tr><td class="mono" style="font-weight:600;">GEL</td><td>Gürcistan Larisi</td><td class="num mono">3,62</td></tr>
+                    <tr><td class="mono" style="font-weight:600;">BAM</td><td>Bosna Markı</td><td class="num mono">1,9558</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="card">
+                <div class="card-title">Çevirici</div>
+                <div class="row2">
+                  <label class="field"><span>Tutar</span><input type="text" value="100"></label>
+                  <label class="field"><span>Birim</span><select><option>EUR</option><option>TRY</option><option>USD</option></select></label>
+                </div>
+                <div style="background:var(--ok-dim); border:1px solid var(--ok); border-radius:var(--radius); padding:16px; text-align:center; margin-bottom:16px;">
+                  <div style="font-family:var(--mono); font-size:24px; font-weight:700; color:var(--text);">4.912,00 &#8378;</div>
+                  <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">100 EUR &times; 49,12</div>
+                </div>
+                <div class="card-title" style="margin-bottom:6px;">Son 7 Gün &middot; TRY/EUR <span style="color:var(--warn); font-weight:700; text-transform:none; letter-spacing:0;">&#9650; %1,1</span></div>
+                <div class="barchart-track" style="height:5px; position:relative; overflow:visible;">
+                  <div class="barchart-fill" style="width:100%; background:var(--warn);"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer"></div>
+
+  <script>
+    const SHIP_LIST = [
+      { id:"2026-198", faturaNo:"FTKOS-1042", palet:24, depo:"IHR", grup:"Grup 4", ulke:"Kosova", nakliyeci:"Balkan Trans", plaka:"34 ABC 123", faturaEur:48200, yukleme:"10.09.2026", durum:"Varış Gümrük", ref:"IHR2026000000064", malBedeli:46900, navlun:2400, sigorta:180, kur:"1,00", gumruk:"14.09.2026", varis:"—", gumrukVergisi:1240, kdv:2860, brokerage:410 },
+      { id:"2026-199", faturaNo:"FTMKD-0871", palet:18, depo:"ANT", grup:"Grup 4", ulke:"Makedonya", nakliyeci:"Vardar Nakliyat", plaka:"MK-5521-BT", faturaEur:31450, yukleme:"10.09.2026", durum:"Varış Gümrük", ref:"ANT2026000000041", malBedeli:30100, navlun:1900, sigorta:140, kur:"1,00", gumruk:"14.09.2026", varis:"—", gumrukVergisi:890, kdv:1920, brokerage:350 },
+      { id:"2026-187", faturaNo:"FTDEU-2290", palet:30, depo:"IHR", grup:null, ulke:"Almanya", nakliyeci:"EuroCargo GmbH", plaka:"DE-HH-771", faturaEur:72080, yukleme:"08.09.2026", durum:"Yolda", ref:"DE2026000000198", malBedeli:69400, navlun:3100, sigorta:240, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-176", faturaNo:"FTSRB-0456", palet:12, depo:"ANT", grup:null, ulke:"Sırbistan", nakliyeci:"Balkan Trans", plaka:"34 XYZ 987", faturaEur:19900, yukleme:"05.09.2026", durum:"Teslim Edildi", ref:"RS2026000000177", malBedeli:19100, navlun:1250, sigorta:95, kur:"1,00", gumruk:"08.09.2026", varis:"09.09.2026", gumrukVergisi:680, kdv:1140, brokerage:260 },
+      { id:"2026-165", faturaNo:"FTGEO-1183", palet:22, depo:"IHR", grup:null, ulke:"Gürcistan", nakliyeci:"Cauca Logistics", plaka:"GE-01-345", faturaEur:54300, yukleme:"12.09.2026", durum:"Yolda", ref:"GE2026000000152", malBedeli:52600, navlun:2800, sigorta:210, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-221", faturaNo:"FTKAZ-0339", palet:16, depo:"IHR", grup:null, ulke:"Kazakistan", nakliyeci:"Silk Route Cargo", plaka:"KZ-771-AB", faturaEur:37650, yukleme:"16.09.2026", durum:"Yüklenecek", ref:"KZ2026000000172", malBedeli:36200, navlun:2950, sigorta:190, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-233", faturaNo:"FTBOS-0512", palet:14, depo:"ANT", grup:null, ulke:"Bosna", nakliyeci:"Adria Trans", plaka:"71-A-4432", faturaEur:22150, yukleme:"17.09.2026", durum:"Yüklenecek", ref:"BA2026000000099", malBedeli:21300, navlun:1180, sigorta:105, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-240", faturaNo:"FTNLD-0187", palet:28, depo:"IHR", grup:null, ulke:"Hollanda", nakliyeci:"NoordCargo BV", plaka:"NL-88-XZ-4", faturaEur:81400, yukleme:"09.09.2026", durum:"Yolda", ref:"NL2026000000061", malBedeli:78900, navlun:3600, sigorta:290, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-241", faturaNo:"FTBEL-0243", palet:20, depo:"ANT", grup:null, ulke:"Belçika", nakliyeci:"Flandria Log.", plaka:"1-ABC-234", faturaEur:46700, yukleme:"07.09.2026", durum:"Gümrükleme", ref:"BE2026000000078", malBedeli:44900, navlun:2200, sigorta:170, kur:"1,00", gumruk:"13.09.2026", varis:"—", gumrukVergisi:1050, kdv:2310, brokerage:300 },
+      { id:"2026-190", faturaNo:"FTUZB-0091", palet:10, depo:"IHR", grup:null, ulke:"Özbekistan", nakliyeci:"Registan Nakliyat", plaka:"01-A-771-UZ", faturaEur:15800, yukleme:"01.09.2026", durum:"Teslim Edildi", ref:"UZ2026000000033", malBedeli:15200, navlun:980, sigorta:70, kur:"1,00", gumruk:"04.09.2026", varis:"06.09.2026", gumrukVergisi:420, kdv:890, brokerage:150 },
+      { id:"2026-192", faturaNo:"FTIRQ-0140", palet:26, depo:"ANT", grup:null, ulke:"Irak", nakliyeci:"Mesopotamia Trans", plaka:"12-BGD-556", faturaEur:59200, yukleme:"11.09.2026", durum:"Yolda", ref:"IQ2026000000055", malBedeli:57100, navlun:2650, sigorta:220, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-205", faturaNo:"FTCYP-0071", palet:15, depo:"IHR", grup:"Grup 7", ulke:"Kıbrıs", nakliyeci:"Levant Denizcilik", plaka:"KKTC-3391", faturaEur:28300, yukleme:"13.09.2026", durum:"Varış Gümrük", ref:"CY2026000000029", malBedeli:27100, navlun:1400, sigorta:120, kur:"1,00", gumruk:"15.09.2026", varis:"—", gumrukVergisi:610, kdv:1320, brokerage:190 },
+      { id:"2026-206", faturaNo:"FTCYP-0072", palet:9, depo:"ANT", grup:"Grup 7", ulke:"Kıbrıs", nakliyeci:"Levant Denizcilik", plaka:"KKTC-3392", faturaEur:14100, yukleme:"13.09.2026", durum:"Varış Gümrük", ref:"CY2026000000030", malBedeli:13500, navlun:820, sigorta:60, kur:"1,00", gumruk:"15.09.2026", varis:"—", gumrukVergisi:305, kdv:660, brokerage:95 },
+      { id:"2026-150", faturaNo:"FTLBY-0028", palet:19, depo:"IHR", grup:null, ulke:"Libya", nakliyeci:"Trablus Nakliyat", plaka:"LY-4471", faturaEur:33900, yukleme:"29.08.2026", durum:"Teslim Edildi", ref:"LY2026000000018", malBedeli:32600, navlun:1750, sigorta:140, kur:"1,00", gumruk:"02.09.2026", varis:"04.09.2026", gumrukVergisi:730, kdv:1580, brokerage:210 },
+      { id:"2026-161", faturaNo:"FTLBN-0044", palet:8, depo:"ANT", grup:null, ulke:"Lübnan", nakliyeci:"Cedar Cargo", plaka:"LB-889-K", faturaEur:12400, yukleme:"18.09.2026", durum:"Yüklenecek", ref:"LB2026000000012", malBedeli:11900, navlun:740, sigorta:55, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-172", faturaNo:"FTMUS-0009", palet:33, depo:"IHR", grup:null, ulke:"Mauritius", nakliyeci:"Indian Ocean Log.", plaka:"MU-2201", faturaEur:64500, yukleme:"06.09.2026", durum:"Yolda", ref:"MU2026000000005", malBedeli:62300, navlun:4100, sigorta:310, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-183", faturaNo:"FTABH-0017", palet:11, depo:"ANT", grup:null, ulke:"Abhazya", nakliyeci:"Sukhumi Trans", plaka:"AB-115", faturaEur:9800, yukleme:"27.08.2026", durum:"Teslim Edildi", ref:"AB2026000000009", malBedeli:9400, navlun:520, sigorta:42, kur:"1,00", gumruk:"30.08.2026", varis:"31.08.2026", gumrukVergisi:210, kdv:455, brokerage:80 },
+      { id:"2026-194", faturaNo:"FTRUS-0208", palet:24, depo:"IHR", grup:null, ulke:"Rusya", nakliyeci:"Sever Logistics", plaka:"A445BC 77", faturaEur:71200, yukleme:"12.09.2026", durum:"Gümrükleme", ref:"RU2026000000090", malBedeli:68700, navlun:3350, sigorta:260, kur:"1,00", gumruk:"16.09.2026", varis:"—", gumrukVergisi:1520, kdv:3280, brokerage:420 },
+      { id:"2026-209", faturaNo:"FTJOR-0063", palet:13, depo:"ANT", grup:null, ulke:"Ürdün", nakliyeci:"Amman Cargo", plaka:"JO-771-K", faturaEur:24700, yukleme:"19.09.2026", durum:"Yüklenecek", ref:"JO2026000000027", malBedeli:23700, navlun:1230, sigorta:100, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 },
+      { id:"2026-215", faturaNo:"FTKEN-0011", palet:17, depo:"IHR", grup:null, ulke:"Kenya", nakliyeci:"Nairobi Freight", plaka:"KAA 221K", faturaEur:39400, yukleme:"14.09.2026", durum:"Yolda", ref:"KE2026000000006", malBedeli:38000, navlun:2050, sigorta:160, kur:"1,00", gumruk:"—", varis:"—", gumrukVergisi:0, kdv:0, brokerage:0 }
+    ];
+    const SHIP_BY_ID = {};
+    SHIP_LIST.forEach(s => SHIP_BY_ID[s.id] = s);
+
+    const CHIP_TONE = { info:"chip-info", gray:"chip-gray", ok:"chip-ok", warn:"chip-warn" };
+    const DOT_TONE = { info:"var(--accent-text)", gray:"#9CA3AF", ok:"var(--ok)", warn:"var(--warn)" };
+    const DURUM_TONE = { "Yüklenecek":"warn", "Yolda":"gray", "Varış Gümrük":"info", "Gümrükleme":"info", "Teslim Edildi":"ok" };
+    const fmt = n => n.toLocaleString("tr-TR");
+    const chipHtml = (label, tone) => `<span class="chip ${CHIP_TONE[tone]}"><span class="chip-dot" style="background:${DOT_TONE[tone]}"></span>${label}</span>`;
+
+    const SHIP_PAGE_SIZE = 10;
+    let shipPageNum = 1;
+    function shipRowHtml(s) {
+      const grupShort = s.grup ? "G" + s.grup.replace(/\D/g, "") : "—";
+      return `<tr data-id="${s.id}" onclick="openDrawer('${s.id}')">
+        <td class="chk-cell" onclick="event.stopPropagation()"><input type="checkbox" class="shipChk" onclick="onShipChk()"></td>
+        <td class="mono">${s.id}</td>
+        <td class="mono">${s.faturaNo}</td>
+        <td class="num mono">${s.palet}</td>
+        <td>${chipHtml(s.depo, s.grup ? "info" : "gray")}</td>
+        <td>${s.ulke}</td>
+        <td>${s.nakliyeci}</td>
+        <td class="mono">${s.plaka}</td>
+        <td>${chipHtml(grupShort, "gray")}</td>
+        <td class="num mono">${fmt(s.faturaEur)}</td>
+        <td class="mono">${s.yukleme}</td>
+        <td>${chipHtml(s.durum, DURUM_TONE[s.durum])}</td>
+      </tr>`;
+    }
+    function shipTotalPages() { return Math.max(1, Math.ceil(SHIP_LIST.length / SHIP_PAGE_SIZE)); }
+    function renderShipTable() {
+      const start = (shipPageNum - 1) * SHIP_PAGE_SIZE;
+      const items = SHIP_LIST.slice(start, start + SHIP_PAGE_SIZE);
+      document.getElementById("shipRows").innerHTML = items.map(shipRowHtml).join("");
+      const end = Math.min(start + SHIP_PAGE_SIZE, SHIP_LIST.length);
+      document.getElementById("pagerInfo").textContent = (start + 1) + "–" + end + " / " + SHIP_LIST.length + " kayıt";
+      document.getElementById("pgNum").textContent = shipPageNum + " / " + shipTotalPages();
+      document.getElementById("pgPrev").disabled = shipPageNum <= 1;
+      document.getElementById("pgNext").disabled = shipPageNum >= shipTotalPages();
+      document.getElementById("shipAll").checked = false;
+      onShipChk();
+    }
+    function shipPage(delta) {
+      shipPageNum = Math.min(shipTotalPages(), Math.max(1, shipPageNum + delta));
+      renderShipTable();
+    }
+    function updateShipSummary() {
+      const n = SHIP_LIST.length;
+      const fatura = SHIP_LIST.reduce((a, s) => a + s.faturaEur, 0);
+      const navlun = SHIP_LIST.reduce((a, s) => a + s.navlun, 0);
+      const sigorta = SHIP_LIST.reduce((a, s) => a + s.sigorta, 0);
+      document.getElementById("sumCount").textContent = n;
+      document.getElementById("sumFatura").textContent = fmt(fatura);
+      document.getElementById("sumNavlun").textContent = fmt(navlun);
+      document.getElementById("sumSigorta").textContent = fmt(sigorta);
+    }
+    renderShipTable();
+    updateShipSummary();
+
+    function openDrawer(id) {
+      const s = SHIP_BY_ID[id];
+      if (!s) return;
+      document.getElementById("drawer").innerHTML = `
+        <button class="drawer-close" type="button" onclick="closeDrawer()">&#10005;</button>
+        <h2>${id}</h2>
+        <div class="drawer-sub">${s.ulke} &middot; ${s.ref}${s.grup ? " &middot; " + s.grup : ""}
+          <span class="chip ${CHIP_TONE[DURUM_TONE[s.durum]]}" style="margin-left:8px;"><span class="chip-dot" style="background:${DOT_TONE[DURUM_TONE[s.durum]]}"></span>${s.durum}</span>
+        </div>
+        <div class="dsec">
+          <div class="dsec-title">Fatura Bilgileri</div>
+          <dl class="dgrid">
+            <div><dt>Fatura Bedeli EUR</dt><dd>${fmt(s.faturaEur)}</dd></div>
+            <div><dt>Mal Bedeli EUR</dt><dd>${fmt(s.malBedeli)}</dd></div>
+            <div><dt>Navlun EUR</dt><dd>${fmt(s.navlun)}</dd></div>
+            <div><dt>Sigorta EUR</dt><dd>${fmt(s.sigorta)}</dd></div>
+            <div><dt>EUR Kuru</dt><dd>${s.kur}</dd></div>
+            <div><dt>Fatura No</dt><dd>${s.faturaNo}</dd></div>
+          </dl>
+        </div>
+        <div class="dsec">
+          <div class="dsec-title">Genel Bilgiler</div>
+          <dl class="dgrid">
+            <div><dt>İhracat Dosya No</dt><dd>${id}</dd></div>
+            <div><dt>Nakliye Firması</dt><dd>${s.nakliyeci}</dd></div>
+            <div><dt>Plaka</dt><dd>${s.plaka}</dd></div>
+            <div><dt>Palet</dt><dd>${s.palet}</dd></div>
+          </dl>
+        </div>
+        <div class="dsec">
+          <div class="dsec-title">Tarihler</div>
+          <dl class="dgrid">
+            <div><dt>Yükleme Tarihi</dt><dd>${s.yukleme}</dd></div>
+            <div><dt>Gümrük Tarihi</dt><dd>${s.gumruk}</dd></div>
+            <div><dt>Varış Tarihi</dt><dd>${s.varis}</dd></div>
+          </dl>
+        </div>
+        <div class="dsec">
+          <div class="dsec-title">Maliyet Bilgileri</div>
+          <dl class="dgrid">
+            <div><dt>Gümrük Vergisi EUR</dt><dd>${s.gumrukVergisi ? fmt(s.gumrukVergisi) : "—"}</dd></div>
+            <div><dt>KDV EUR</dt><dd>${s.kdv ? fmt(s.kdv) : "—"}</dd></div>
+            <div><dt>Brokerage &amp; Diğer EUR</dt><dd>${s.brokerage ? fmt(s.brokerage) : "—"}</dd></div>
+          </dl>
+        </div>
+        <div class="detail-act">
+          <button class="btn" type="button">Sil</button>
+          <button class="btn" type="button">${s.grup ? "Gruptan Çıkar" : "Grupla"}</button>
+          <button class="btn btn-primary" type="button">Kaydet</button>
+        </div>
+      `;
+      document.getElementById("overlay").classList.add("show");
+      document.getElementById("drawer").classList.add("show");
+    }
+    function closeDrawer() {
+      document.getElementById("overlay").classList.remove("show");
+      document.getElementById("drawer").classList.remove("show");
+    }
+
+    function onShipChk() {
+      const n = document.querySelectorAll(".shipChk:checked").length;
+      document.getElementById("bulkCount").textContent = n + " satır seçildi";
+      document.getElementById("bulkbar").classList.toggle("show", n > 0);
+    }
+    function toggleAllShip(el) {
+      document.querySelectorAll(".shipChk").forEach(c => c.checked = el.checked);
+      onShipChk();
+    }
+    function clearShipSel() {
+      document.querySelectorAll(".shipChk").forEach(c => c.checked = false);
+      document.getElementById("shipAll").checked = false;
+      onShipChk();
+    }
+
+    function lcSelectCountry(el) {
+      document.querySelectorAll(".lc-rail-item").forEach(i => i.classList.remove("sel"));
+      el.classList.add("sel");
+    }
+    function lcTab(el, tab) {
+      document.querySelectorAll(".lc-tab").forEach(t => t.classList.remove("on"));
+      el.classList.add("on");
+      document.getElementById("lc-ozet").style.display = tab === "ozet" ? "" : "none";
+      document.getElementById("lc-senaryo").style.display = tab === "senaryo" ? "" : "none";
+    }
+
+    const navs = document.querySelectorAll(".nav-item[data-view]");
+    navs.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const view = btn.dataset.view;
+        navs.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".view").forEach(v => v.classList.remove("on"));
+        document.getElementById(view).classList.add("on");
+        document.getElementById("hdr-" + view).classList.add("on");
+      });
+    });
+
+    function filterRows(el, tag) {
+      document.querySelectorAll(".summary-cell").forEach(c => c.classList.remove("sel"));
+      el.classList.add("sel");
+      document.querySelectorAll("#bugunRows tr").forEach(r => {
+        r.style.display = (tag === "all" || r.dataset.tag === tag) ? "" : "none";
+      });
+    }
+  </script>
+</body>
+</html>
