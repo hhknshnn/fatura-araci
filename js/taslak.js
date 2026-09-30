@@ -6,10 +6,10 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_rs.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
@@ -18,10 +18,10 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_rs.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
@@ -30,10 +30,10 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_ge.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun', label: 'Navlun (USD)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (USD)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (USD)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
@@ -42,10 +42,10 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_rs.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
@@ -54,10 +54,10 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_rs.xlsx',
     alanlar: [
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
     ]
   },
@@ -66,9 +66,9 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_be.xlsx',
     alanlar: [
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -78,9 +78,9 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_de.xlsx',
     alanlar: [
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -90,9 +90,9 @@ const TASLAK_ULKELER = {
     template: 'templates/taslak_nl.xlsx',
     alanlar: [
       { id: 'kap', label: 'Kap Sayısı', tip: 'number', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
-      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3100,00' },
+      { id: 'navlun', label: 'Navlun (EUR)', tip: 'number', placeholder: 'örn: 3.100,00' },
       { id: 'sigorta', label: 'Sigorta (EUR)', tip: 'number', placeholder: 'örn: 14,00' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -101,10 +101,10 @@ const TASLAK_ULKELER = {
     label: 'Kazakistan', flag: 'kz', grup: 'kurumsal',
     template: 'templates/taslak_kz.xlsx',
     alanlar: [
-      { id: 'navlun', label: 'Freight (TL)', tip: 'number', placeholder: 'örn: 102186,04' },
-      { id: 'sigorta', label: 'Insurance (TL)', tip: 'number', placeholder: 'örn: 371,59' },
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 33 (22 Palet + 11 Koli)' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'navlun', label: 'Navlun (USD)', tip: 'number', placeholder: 'örn: 3.100,00' },
+      { id: 'sigorta', label: 'Sigorta (USD)', tip: 'number', placeholder: 'örn: 14,00' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 33 (22 Palet + 11 Koli)' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -119,8 +119,8 @@ const TASLAK_ULKELER = {
     label: 'Irak', flag: 'iq', grup: 'franchise',
     template: 'templates/taslak_iq.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 43 (33 palet + 10 Koli)' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 43 (33 palet + 10 Koli)' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -129,8 +129,8 @@ const TASLAK_ULKELER = {
     label: 'Liberya', flag: 'lr', grup: 'franchise',
     template: 'templates/taslak_lr.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -139,8 +139,8 @@ const TASLAK_ULKELER = {
     label: 'Libya', flag: 'ly', grup: 'franchise',
     template: 'templates/taslak_ly.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -149,8 +149,8 @@ const TASLAK_ULKELER = {
     label: 'Lübnan', flag: 'lb', grup: 'franchise',
     template: 'templates/taslak_lb.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -159,8 +159,8 @@ const TASLAK_ULKELER = {
     label: 'Özbekistan', flag: 'uz', grup: 'franchise',
     template: 'templates/taslak_uz.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -169,8 +169,8 @@ const TASLAK_ULKELER = {
     label: 'Rusya', flag: 'ru', grup: 'franchise',
     template: 'templates/taslak_ru.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -179,8 +179,8 @@ const TASLAK_ULKELER = {
     label: 'Abhazya', flag: 'un', grup: 'toptan',
     template: 'templates/taslak_abh.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -189,8 +189,8 @@ const TASLAK_ULKELER = {
     label: 'Ürdün', flag: 'jo', grup: 'franchise',
     template: 'templates/taslak_lb.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -199,8 +199,8 @@ const TASLAK_ULKELER = {
     label: 'Mauritius', flag: 'mu', grup: 'toptan',
     template: 'templates/taslak_lb.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 28' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8500,00', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 28' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 8.500,00', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
       { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
@@ -209,10 +209,10 @@ const TASLAK_ULKELER = {
     label: 'Kenya', flag: 'ke', grup: 'devir',
     template: 'templates/taslak_ke.xlsx',
     alanlar: [
-      { id: 'kap', label: 'Packages', tip: 'text', placeholder: 'örn: 470' },
-      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 4388,65', oninput: 'hesaplaNet()' },
+      { id: 'kap', label: 'Kap Sayısı', tip: 'text', placeholder: 'örn: 470' },
+      { id: 'brutKg', label: 'Toplam BRÜT (kg)', tip: 'number', placeholder: 'örn: 4.388,65', oninput: 'hesaplaNet()' },
       { id: 'netKg', label: 'Toplam NET (kg)', tip: 'number', placeholder: 'Otomatik hesaplanır' },
-      { id: 'referansNo', label: 'Dosya No', tip: 'text', prefix: '2026-', placeholder: 'örn: 105' },
+      { id: 'referansNo', label: 'Referans No', tip: 'text', prefix: '2026-', placeholder: 'örn: 100' },
     ]
   },
 };
@@ -251,6 +251,8 @@ function initTaslakPanel() {
   _navlunBekleyenDosyaNo = null;
 
   buildTaslakUlkeGrid();
+  if (typeof fuMdSecim === 'function') fuMdSecim('taslakMd', null);
+  if (typeof fuUlkeAdresGuncelle === 'function') fuUlkeAdresGuncelle('taslak', null);
 
   document.getElementById('taslakDepoSection').style.display = 'none';
   document.getElementById('taslakFormSection').style.display = 'none';
@@ -373,6 +375,9 @@ async function selectTaslakUlke(kod) {
   document.querySelectorAll('#tcbody-kurumsal .cc, #tcbody-franchise .cc, #tcbody-toptan .cc, #tcbody-devir .cc').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('taslak-ulke-' + kod);
   if (btn) btn.classList.add('active');
+  if (typeof fuMdSecim === 'function') fuMdSecim('taslakMd', btn);
+  if (typeof fuUlkeAdresGuncelle === 'function') fuUlkeAdresGuncelle('taslak', kod);
+  taslakDraftListesiniGoster();
 
   const cfg = TASLAK_ULKELER[kod];
   if (cfg && cfg.template) {
@@ -382,13 +387,28 @@ async function selectTaslakUlke(kod) {
       if (!resp.ok) throw new Error('Template bulunamadı');
       const buf = await resp.arrayBuffer();
       taslakBytes = buf;
-      document.getElementById('taslakFileName').textContent = '✓ ' + cfg.label + ' taslağı yüklendi';
-      document.getElementById('taslakFileName').style.display = 'inline-flex';
-      showTaslakStatus('success', '<div class="stat">✓ Taslak otomatik yüklendi</div>');
+      document.getElementById('taslakFileName').style.display = 'none';
+      // Başarıda mesaj gösterme; sadece hata durumunda uyarı kalır
+      const sb = document.getElementById('taslakStatus');
+      if (sb) { sb.className = 'status-box'; sb.innerHTML = ''; }
     } catch (e) {
       showTaslakStatus('error', '⚠ Taslak yüklenemedi: ' + e.message);
     }
   }
+
+  // Yeni ülke = temiz sayfa: önceki ülkeden kalan depo/komple/form durumu sıfırlanır
+  taslakDepoTipi = null;
+  taslakKomple = false;
+  _navlunBekleyenAktif = false;
+  _navlunBekleyenDosyaNo = null;
+  ['taslak-depo-serbest', 'taslak-depo-antrepo'].forEach(id =>
+    document.getElementById(id)?.classList.remove('active'));
+  const kompleEl = document.getElementById('taslakKomple');
+  if (kompleEl) kompleEl.checked = false;
+  const kompleWrap = document.getElementById('taslakKompleWrap');
+  if (kompleWrap) kompleWrap.style.display = 'none';
+  const alanlar = document.getElementById('taslakFormAlanlari');
+  if (alanlar) alanlar.innerHTML = '';
 
   document.getElementById('taslakDepoSection').style.display = 'block';
   document.getElementById('taslakFormSection').style.display = 'none';
@@ -439,8 +459,21 @@ function taslakKompleDegisti() {
     }
     navlunKompleHesapla();
   } else {
+    kompleDegerleriniTemizle();
     navlunOtomatikHesapla();
   }
+}
+
+// Komple kaldırılınca onun yazdığı tam tutarlar ve notu temizlenir; kap varsa
+// ardından normal (kap oranlı) hesap yeniden doldurur.
+function kompleDegerleriniTemizle() {
+  if (_navlunBekleyenAktif) return;  // ANT seçimi/bekleyen tahsis değerleri korunur
+  const navEl = document.getElementById('taslak_navlun');
+  const sigEl = document.getElementById('taslak_sigorta');
+  if (navEl) navEl.value = '';
+  if (sigEl) sigEl.value = '';
+  const not = document.getElementById('taslak_navlunNot');
+  if (not) { not.style.display = 'none'; not.textContent = ''; }
 }
 
 // ── KOMPLE: NAVLUN/SİGORTA TAMAMINI YAZ ───────────────────────────────────────
@@ -458,8 +491,8 @@ async function navlunKompleHesapla() {
 
     const navEl = document.getElementById('taslak_navlun');
     const sigEl = document.getElementById('taslak_sigorta');
-    if (navEl) navEl.value = data.navlun;
-    if (sigEl) sigEl.value = data.sigorta;
+    if (navEl) navEl.value = trSayiYaz(data.navlun);
+    if (sigEl) sigEl.value = trSayiYaz(data.sigorta);
 
     const not = document.getElementById('taslak_navlunNot');
     if (not) {
@@ -489,6 +522,8 @@ function buildTaslakForm() {
   const formCfg = TASLAK_ULKELER[taslakUlke];
   const container = document.getElementById('taslakFormAlanlari');
   container.innerHTML = '';
+  // Standart alanlar iki sütunlu grid'e dizilir; Kıbrıs formu kendi düzenini korur
+  container.classList.toggle('taslak-alan-grid', formCfg.tip !== 'kibris');
 
   // Kıbrıs özel form
   if (formCfg.tip === 'kibris') {
@@ -497,8 +532,12 @@ function buildTaslakForm() {
     return;
   }
 
-  // Standart form alanları
-  formCfg.alanlar.forEach(alan => {
+  // Standart form alanları — tüm ülkelerde aynı sıra/yer:
+  // Referans No · Kap | BRÜT · NET | (sadece kurumsal) Navlun · Sigorta
+  const ALAN_SIRASI = ['referansNo', 'kap', 'brutKg', 'netKg', 'navlun', 'sigorta'];
+  const sira = id => { const i = ALAN_SIRASI.indexOf(id); return i === -1 ? ALAN_SIRASI.length : i; };
+  const alanlar = [...formCfg.alanlar].sort((a, b) => sira(a.id) - sira(b.id));
+  alanlar.forEach(alan => {
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
     const isNetKg = alan.id === 'netKg';
@@ -516,7 +555,7 @@ function buildTaslakForm() {
           id="taslak_${alan.id}"
           type="text"
           inputmode="${alan.tip === 'number' ? 'decimal' : 'text'}"
-          placeholder="${alan.placeholder || ''}"
+          placeholder="${isNetKg && taslakDepoTipi === 'antrepo' ? 'örn: 7.650,00' : (alan.placeholder || '')}"
           ${alan.oninput ? `oninput="${alan.oninput}"` : ''}
           ${isNetKg && taslakDepoTipi === 'serbest' ? 'readonly style="opacity:0.7;"' : ''}
         >
@@ -524,6 +563,14 @@ function buildTaslakForm() {
       ${note}`;
     container.appendChild(div);
   });
+
+  if (NAVLUN_ULKELER.has(taslakUlke)) {
+    const not = document.createElement('div');
+    not.id = 'taslak_navlunNot';
+    not.className = 'taslak-tam-satir';
+    not.style.cssText = 'font-size:11px;color:var(--accent2);margin-top:-4px;display:none;';
+    container.appendChild(not);
+  }
 
   // Gruplu sevkiyat seçeneği tüm standart taslaklarda çıkar.
   // Navlun otomatik hesap yalnız tanımlı kurumsal ülkelerde eklenir.
@@ -533,39 +580,26 @@ function buildTaslakForm() {
 }
 
 // ── GRUPLU SEVKİYAT + (VARSA) NAVLUN OTOMATİK HESAP UI ────────────────────────
+// ANT taslağında yalnız "Gruplu Sevkiyat" işaretlenir (partner sorulmaz).
+// İHR taslağında işaretlenince aynı ülkenin eşleşmemiş gruplu ANT'ları listelenir;
+// seçilen ANT'ın kalan navlun/sigortası forma dolar, indirince eşleşme yazılır.
+let _grupluAntSecili = null;
+
 function injectGrupluUI(container, opts) {
   const withNavlun = !!(opts && opts.withNavlun);
-  // Her yeni form kurulumunda bekleyen tahsis kilidini sıfırla
+  // Her yeni form kurulumunda bekleyen tahsis kilidini ve ANT seçimini sıfırla
   _navlunBekleyenAktif = false;
   _navlunBekleyenDosyaNo = null;
+  _grupluAntSecili = null;
 
-  const yil = window.APP_YIL || '2026';
-  const partnerNot = withNavlun
-    ? 'Bu taslak kaydedilince kalan navlun/sigorta bu partner dosyaya otomatik aktarılır.'
-    : 'Bu taslak indirilince partner dosya ile aynı sefer grubuna alınır.';
   const box = document.createElement('div');
-  box.style.cssText = 'margin-top:6px;padding:12px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);';
+  box.className = 'taslak-gruplu taslak-tam-satir';
   box.innerHTML = `
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;">
+    <label class="taslak-gruplu-baslik">
       <input type="checkbox" id="taslak_gruplu" onchange="navlunGrupluDegisti()">
-      Gruplu sevkiyat mı? (ANT + İHR aynı sevkte)
+      Gruplu Sevkiyat
     </label>
-    <div id="taslak_partnerWrap" style="display:none;margin-top:10px;">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Partner Dosya No</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <select id="taslak_partnerYil" class="yil-select" style="font-family:var(--mono);font-size:13px;color:var(--text3);border:none;background:transparent;cursor:pointer;outline:none;padding:0;">
-          <option ${yil === '2026' ? 'selected' : ''}>2026</option>
-          <option ${yil === '2027' ? 'selected' : ''}>2027</option>
-          <option ${yil === '2028' ? 'selected' : ''}>2028</option>
-        </select>
-        <span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
-        <input class="target-input" id="taslak_partnerNo" placeholder="örn: 101" style="flex:1;">
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px;">
-        ${partnerNot}
-      </div>
-    </div>
-    ${withNavlun ? '<div id="taslak_navlunNot" style="font-size:11px;color:var(--accent2);margin-top:8px;display:none;"></div>' : ''}`;
+    <div id="taslak_partnerWrap" class="taslak-gruplu-icerik" style="display:none;"></div>`;
   container.appendChild(box);
 
   if (!withNavlun) return;
@@ -574,24 +608,113 @@ function injectGrupluUI(container, opts) {
   const kapEl = document.getElementById('taslak_kap');
   if (kapEl) kapEl.addEventListener('input', navlunOtomatikHesapla);
 
-  // Referans No girilince bu dosya için bekleyen tahsis var mı diye sor
+  // Referans No girilince bu dosya için (eski akıştan kalan) bekleyen tahsis var mı diye sor
   const refEl = document.getElementById('taslak_referansNo');
   if (refEl) refEl.addEventListener('blur', navlunBekleyenKontrol);
 }
 
 // ── GRUPLU TOGGLE DEĞİŞTİ ─────────────────────────────────────────────────────
-function navlunGrupluDegisti() {
+function navlunGrupluDegisti(opts) {
   const gruplu = document.getElementById('taslak_gruplu')?.checked;
   const wrap = document.getElementById('taslak_partnerWrap');
-  if (wrap) wrap.style.display = gruplu ? 'block' : 'none';
   // Gruplu + komple birlikte anlamsız → gruplu seçilince komple kapanır
   if (gruplu && taslakKomple) {
     taslakKomple = false;
     const kompleEl = document.getElementById('taslakKomple');
     if (kompleEl) kompleEl.checked = false;
+    kompleDegerleriniTemizle();
   }
-  // Gruplu durumu navlun bazını değiştirir → yeniden hesapla
-  navlunOtomatikHesapla();
+  if (!gruplu) {
+    grupluAntSecimiBirak();
+    if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+  } else if (wrap) {
+    wrap.style.display = 'block';
+    if (taslakDepoTipi === 'antrepo') {
+      wrap.innerHTML = '<div class="taslak-gruplu-not">İHR taslağı oluşturulurken bu faturayla eşleştirilecek.</div>';
+    } else {
+      grupluAntListesiYukle(opts);
+    }
+  }
+  // Gruplu durumu navlun bazını değiştirir → yeniden hesapla (ANT seçiliyse kilitli)
+  if (!(opts && opts.hesaplama === false)) navlunOtomatikHesapla();
+}
+
+// ── İHR: EŞLEŞMEMİŞ GRUPLU ANT LİSTESİ ────────────────────────────────────────
+async function grupluAntListesiYukle(opts) {
+  const wrap = document.getElementById('taslak_partnerWrap');
+  if (!wrap || !taslakUlke) return;
+  const onSecim = opts && opts.secili;
+  wrap.innerHTML = '<div class="taslak-gruplu-not">ANT faturaları yükleniyor…</div>';
+  try {
+    const ulkeAdi = TASLAK_ULKELER[taslakUlke]?.label || '';
+    const resp = await fetch('/api/navlun/gruplu-ant?ulke=' + encodeURIComponent(taslakUlke)
+      + '&ulkeAdi=' + encodeURIComponent(ulkeAdi), { cache: 'no-store' });
+    const data = await resp.json().catch(() => null);
+    if (!data || !data.success) throw new Error((data && data.error) || 'Sunucu yanıtı alınamadı (HTTP ' + resp.status + ')');
+    const kayitlar = data.kayitlar || [];
+    // Kayıtlı taslaktan dönülürken seçili ANT artık listede yoksa (eşleşmiş) bırak
+    if (!kayitlar.length) {
+      wrap.innerHTML = '<div class="taslak-gruplu-not">Bu ülke için eşleşmemiş gruplu ANT faturası yok.</div>';
+      if (onSecim) grupluAntSecimiBirak();
+      return;
+    }
+    wrap.innerHTML = '<div class="taslak-gruplu-not">Eşleşecek ANT faturasını seçin</div><div class="taslak-ant-liste"></div>';
+    const liste = wrap.querySelector('.taslak-ant-liste');
+    kayitlar.forEach(k => {
+      const satir = document.createElement('button');
+      satir.type = 'button';
+      satir.className = 'taslak-ant-satir';
+      satir.dataset.dosyaNo = k.dosyaNo;
+      const kapMetni = k.kaynak === 'sevkiyat' ? (k.kap ? k.kap + ' kap (palet)' : '') : (k.kap ? k.kap + ' kap' : '');
+      const detay = [kapMetni, k.tarih, k.ayrilan ? k.ayrilan + ' için ayrılmış' : ''].filter(Boolean).join(' · ');
+      const tutar = data.navlunVar
+        ? `İHR payı: ${k.kalanNavlun} · ${k.kalanSigorta} ${k.paraBirimi || ''}`
+        : '';
+      satir.innerHTML = `<span class="taslak-ant-no"></span><span class="taslak-ant-detay"></span><span class="taslak-ant-tutar"></span>`;
+      satir.querySelector('.taslak-ant-no').textContent = 'ANT ' + k.dosyaNo;
+      satir.querySelector('.taslak-ant-detay').textContent = detay;
+      satir.querySelector('.taslak-ant-tutar').textContent = tutar;
+      satir.addEventListener('click', () => grupluAntSec(k, data.navlunVar));
+      liste.appendChild(satir);
+    });
+    if (onSecim) {
+      const k = kayitlar.find(x => x.dosyaNo === onSecim);
+      // Geri yüklemede kayıtlı navlun/sigorta override'larını ezme
+      if (k) grupluAntSec(k, data.navlunVar, { doldur: false });
+      else grupluAntSecimiBirak();
+    }
+  } catch (e) {
+    wrap.innerHTML = '<div class="taslak-gruplu-not hata"></div>';
+    wrap.querySelector('.hata').textContent = '⚠ ANT listesi alınamadı: ' + e.message;
+  }
+}
+
+function grupluAntSec(k, navlunVar, opts) {
+  _grupluAntSecili = k.dosyaNo;
+  document.querySelectorAll('#taslak_partnerWrap .taslak-ant-satir').forEach(el =>
+    el.classList.toggle('active', el.dataset.dosyaNo === k.dosyaNo));
+  if (!navlunVar) return;
+  // Kalan tutarla doldur, formül bu alanları ezmesin
+  _navlunBekleyenAktif = true;
+  if (opts && opts.doldur === false) return;
+  const navEl = document.getElementById('taslak_navlun');
+  const sigEl = document.getElementById('taslak_sigorta');
+  if (navEl) navEl.value = trSayiYaz(k.kalanNavlun);
+  if (sigEl) sigEl.value = trSayiYaz(k.kalanSigorta);
+  const not = document.getElementById('taslak_navlunNot');
+  if (not) {
+    not.style.display = 'block';
+    not.style.color = 'var(--success,#1a7f37)';
+    not.textContent = `🔗 ANT ${k.dosyaNo} ile gruplu: navlun ${k.kalanNavlun} · sigorta ${k.kalanSigorta} ${k.paraBirimi || ''} (değiştirilebilir)`;
+  }
+}
+
+function grupluAntSecimiBirak() {
+  const vardi = !!_grupluAntSecili;
+  _grupluAntSecili = null;
+  document.querySelectorAll('#taslak_partnerWrap .taslak-ant-satir.active').forEach(el => el.classList.remove('active'));
+  // Seçimin koyduğu kilidi kaldır (eski bekleyen tahsis kilidi _navlunBekleyenDosyaNo ile ayrılır)
+  if (vardi && !_navlunBekleyenDosyaNo) _navlunBekleyenAktif = false;
 }
 
 // ── OTOMATİK NAVLUN/SİGORTA HESAPLA ───────────────────────────────────────────
@@ -619,8 +742,8 @@ async function navlunOtomatikHesapla() {
 
     const navEl = document.getElementById('taslak_navlun');
     const sigEl = document.getElementById('taslak_sigorta');
-    if (navEl) navEl.value = data.navlun;
-    if (sigEl) sigEl.value = data.sigorta;
+    if (navEl) navEl.value = trSayiYaz(data.navlun);
+    if (sigEl) sigEl.value = trSayiYaz(data.sigorta);
 
     const not = document.getElementById('taslak_navlunNot');
     if (not) {
@@ -658,8 +781,8 @@ async function navlunBekleyenKontrol() {
       _navlunBekleyenDosyaNo = dosyaNo;
       const navEl = document.getElementById('taslak_navlun');
       const sigEl = document.getElementById('taslak_sigorta');
-      if (navEl) navEl.value = data.navlun;
-      if (sigEl) sigEl.value = data.sigorta;
+      if (navEl) navEl.value = trSayiYaz(data.navlun);
+      if (sigEl) sigEl.value = trSayiYaz(data.sigorta);
       const not = document.getElementById('taslak_navlunNot');
       if (not) {
         not.style.display = 'block';
@@ -676,18 +799,25 @@ async function navlunBekleyenKontrol() {
   }
 }
 
-// ── GRUPLU/PARTNER BİLGİSİNİ TOPLA ────────────────────────────────────────────
+// ── GRUPLU BİLGİSİNİ TOPLA ────────────────────────────────────────────────────
 function getNavlunGrupluBilgi() {
-  const grupluEl = document.getElementById('taslak_gruplu');
-  const gruplu = grupluEl ? grupluEl.checked : false;
-  if (!gruplu) return { gruplu: false, partnerDosyaNo: null };
-  const noEl = document.getElementById('taslak_partnerNo');
-  const yilEl = document.getElementById('taslak_partnerYil');
-  const no = noEl ? noEl.value.trim() : '';
-  if (!no) return { gruplu: true, partnerDosyaNo: null };
-  const yil = yilEl ? yilEl.value : (window.APP_YIL || '2026');
-  const partnerDosyaNo = no.startsWith(yil + '-') ? no : yil + '-' + no;
-  return { gruplu: true, partnerDosyaNo };
+  const gruplu = document.getElementById('taslak_gruplu')?.checked || false;
+  return { gruplu, antDosyaNo: gruplu && taslakDepoTipi !== 'antrepo' ? _grupluAntSecili : null };
+}
+
+// ── TÜRKÇE SAYI BİÇİMİ ────────────────────────────────────────────────────────
+// Nokta binlik, virgül ondalık: "8.600" → 8600, "8.600,50" → 8600.5, "14,5" → 14.5
+function trSayi(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v || '').trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+// Programın forma yazdığı sayılar da aynı biçimde (geri okununca trSayi ile aynı değer)
+function trSayiYaz(n) {
+  const x = Number(n);
+  if (n === '' || n === null || n === undefined || isNaN(x)) return '';
+  return x.toLocaleString('tr-TR', { maximumFractionDigits: 2 });
 }
 
 // ── NET KG OTOMATİK ──────────────────────────────────────────────────────────
@@ -696,7 +826,7 @@ function hesaplaNet() {
   const brutEl = document.getElementById('taslak_brutKg');
   const netEl = document.getElementById('taslak_netKg');
   if (!brutEl || !netEl) return;
-  const brut = parseFloat(brutEl.value.replace(',', '.'));
+  const brut = trSayi(brutEl.value);
   if (!isNaN(brut) && brut > 0) {
     netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
   } else {
@@ -750,9 +880,7 @@ function buildKibrisForm(container) {
 }
 
 function kibrisHesaplaNet(grupId) {
-  const brut = parseFloat(
-    (document.getElementById(`kibris_${grupId}_brutKg`)?.value || '').replace(',', '.')
-  );
+  const brut = trSayi(document.getElementById(`kibris_${grupId}_brutKg`)?.value || '');
   const netEl = document.getElementById(`kibris_${grupId}_netKg`);
   if (netEl && !isNaN(brut) && brut > 0) {
     netEl.value = (Math.round(brut * 0.9 * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
@@ -768,8 +896,8 @@ function getKibrisFormData() {
     const net = document.getElementById(`kibris_${g}_netKg`)?.value?.trim() || '';
     if (kap || brut) {
       data[g + '_kap'] = kap;
-      data[g + '_brutKg'] = parseFloat(brut.replace(',', '.')) || 0;
-      data[g + '_netKg'] = parseFloat(net.replace(',', '.')) || 0;
+      data[g + '_brutKg'] = trSayi(brut) || 0;
+      data[g + '_netKg'] = trSayi(net) || 0;
     }
   });
   const refEl = document.getElementById('kibris_referansNo');
@@ -799,13 +927,7 @@ function getTaslakFormData() {
     const val = el.value.trim();
     if (!val) continue;
     if (alan.tip === 'number') {
-      let numStr = val;
-      if (numStr.includes('.') && numStr.includes(',')) {
-        numStr = numStr.replace(/\./g, '').replace(',', '.');
-      } else {
-        numStr = numStr.replace(',', '.');
-      }
-      data[alan.id] = parseFloat(numStr) || 0;
+      data[alan.id] = trSayi(val) || 0;
     } else {
       // Referans No ise dropdown'dan seçilen yılı prefix olarak ekle
       if (alan.id === 'referansNo' && alan.prefix) {
@@ -901,19 +1023,34 @@ async function indirTaslak() {
       }
 
       const gb = getNavlunGrupluBilgi();
-      // İlk (gruplu) taslak: partner dosyaya eşleme yaz (navlun ülkelerinde kalan tahsis de gider).
-      if (gb.gruplu && gb.partnerDosyaNo) {
-        await fetch('/api/navlun/tahsis', {
+      if (taslakDepoTipi === 'antrepo') {
+        // ANT: gruplu ise eşleşme bekleyenlere yazılır; değilse (varsa) bekleyen kaydı düşer
+        await fetch('/api/navlun/gruplu-ant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ulkeKodu: taslakUlke,
-            partnerDosyaNo: gb.partnerDosyaNo,
-            kaynakDosyaNo: formData.referansNo,
-            navlunFinal: formData.navlun || 0,
-            sigortaFinal: formData.sigorta || 0,
+            dosyaNo: formData.referansNo,
+            gruplu: gb.gruplu,
+            navlun: formData.navlun || 0,
+            sigorta: formData.sigorta || 0,
+            kap: formData.kap || '',
           }),
         });
+      } else if (gb.antDosyaNo) {
+        // İHR: seçilen ANT ile eşleştir → Sevkiyatlar'da ortak sefer_id
+        const r = await fetch('/api/navlun/gruplu-eslestir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ulkeKodu: taslakUlke,
+            ulkeAdi: TASLAK_ULKELER[taslakUlke]?.label || '',
+            antDosyaNo: gb.antDosyaNo,
+            ihrDosyaNo: formData.referansNo,
+          }),
+        });
+        const rd = await r.json().catch(() => ({}));
+        if (!rd.success) showTaslakStatus('error', '⚠ Gruplu eşleşme yazılamadı: ' + (rd.error || r.status));
       }
     } catch(e) {
       console.warn('Navlun/grup tahsis hatası:', e);
@@ -1119,8 +1256,7 @@ async function kaydetTaslakDraft() {
     yil,
     komple:     taslakKomple,
     gruplu:     document.getElementById('taslak_gruplu')?.checked || false,
-    partnerYil: document.getElementById('taslak_partnerYil')?.value || '',
-    partnerNo:  document.getElementById('taslak_partnerNo')?.value || '',
+    grupluAnt:  _grupluAntSecili || '',
     fields,
   };
 
@@ -1162,17 +1298,29 @@ async function loadTaslakDraftlar() {
     const resp = await fetch('/api/taslak-form/liste');
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Sunucu hatası');
-    const taslaklar = data.taslaklar || [];
-    if (taslaklar.length === 0) {
-      section.style.display = 'none';
-      listEl.innerHTML = '';
-      return;
-    }
-    section.style.display = 'block';
-    renderTaslakDraftListesi(taslaklar);
+    _taslakDraftTumu = data.taslaklar || [];
+    taslakDraftListesiniGoster();
   } catch (e) {
     console.warn('Kayıtlı taslak listesi alınamadı:', e);
   }
+}
+
+// Ülke seçiliyse sadece o ülkenin kayıtlı taslakları, değilse hepsi gösterilir.
+let _taslakDraftTumu = [];
+function taslakDraftListesiniGoster() {
+  const section = document.getElementById('taslakKayitliSection');
+  const listEl  = document.getElementById('taslakKayitliListe');
+  if (!section || !listEl) return;
+  const taslaklar = taslakUlke
+    ? _taslakDraftTumu.filter(t => t.ulkeKodu === taslakUlke)
+    : _taslakDraftTumu;
+  if (taslaklar.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = 'block';
+  renderTaslakDraftListesi(taslaklar);
 }
 
 function renderTaslakDraftListesi(taslaklar) {
@@ -1237,10 +1385,7 @@ async function acTaslakDraft(id) {
 
     const formData = data.formData || {};
 
-    if (!data.depoTipi) {
-      showTaslakStatus('success', '<div class="stat">✓ Taslak yüklendi — devam etmek için depo tipi seçin.</div>');
-      return;
-    }
+    if (!data.depoTipi) return;  // depo tipi seçilince devam edilir
     selectTaslakDepo(data.depoTipi); // formu kurar (buildTaslakForm), komple/gruplu'yu sıfırlar
 
     const isKibris = TASLAK_ULKELER[kod]?.tip === 'kibris';
@@ -1275,15 +1420,11 @@ async function acTaslakDraft(id) {
 
       const grupluEl = document.getElementById('taslak_gruplu');
       if (grupluEl) grupluEl.checked = !!formData.gruplu;
-      const partnerWrap = document.getElementById('taslak_partnerWrap');
-      if (partnerWrap) partnerWrap.style.display = formData.gruplu ? 'block' : 'none';
-      const partnerYilEl = document.getElementById('taslak_partnerYil');
-      if (partnerYilEl) partnerYilEl.value = formData.partnerYil || (window.APP_YIL || '2026');
-      const partnerNoEl = document.getElementById('taslak_partnerNo');
-      if (partnerNoEl) partnerNoEl.value = formData.partnerNo || '';
+      if (formData.gruplu) navlunGrupluDegisti({ hesaplama: false, secili: formData.grupluAnt || null });
     }
 
-    showTaslakStatus('success', '<div class="stat">✓ Taslak yüklendi, kaldığınız yerden devam edin.</div>');
+    const sb = document.getElementById('taslakStatus');
+    if (sb) { sb.className = 'status-box'; sb.innerHTML = ''; }
   } catch (err) {
     showTaslakStatus('error', '⚠ ' + err.message);
   }

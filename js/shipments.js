@@ -921,15 +921,42 @@ function renderShipmentDetail(s) {
   }
   const vergiInput = document.getElementById('vergi-pdf-input');
   if (vergiInput) vergiInput.value = '';
+  _shipmentDetailAcAnim(panel, overlay);
   overlay.style.display = 'block';
   panel.style.display   = 'flex';
 }
 
+// Çekmece kapanırken sağa kayar; gizleme animasyon bitince yapılır.
+// Bu arada panel yeniden açılırsa (is-closing kalkar) gizleme iptal olur.
+let _shipmentDetailKapatTimer = null;
+function _shipmentDetailAcAnim(panel, overlay) {
+  clearTimeout(_shipmentDetailKapatTimer);
+  panel.classList.remove('is-closing');
+  overlay.classList.remove('is-closing');
+}
+
 function closeShipmentDetail() {
-  document.getElementById('shipment-detail-panel').style.display = 'none';
-  document.getElementById('shipment-overlay').style.display      = 'none';
-  const newFields = document.getElementById('new-shipment-fields');
-  if (newFields) newFields.style.display = 'none';
+  const panel   = document.getElementById('shipment-detail-panel');
+  const overlay = document.getElementById('shipment-overlay');
+  if (!panel || !overlay || panel.style.display === 'none' || panel.style.display === '') {
+    if (panel)   panel.style.display   = 'none';
+    if (overlay) overlay.style.display = 'none';
+    const nf = document.getElementById('new-shipment-fields');
+    if (nf) nf.style.display = 'none';
+    return;
+  }
+  panel.classList.add('is-closing');
+  overlay.classList.add('is-closing');
+  clearTimeout(_shipmentDetailKapatTimer);
+  _shipmentDetailKapatTimer = setTimeout(() => {
+    if (!panel.classList.contains('is-closing')) return;
+    panel.style.display   = 'none';
+    overlay.style.display = 'none';
+    panel.classList.remove('is-closing');
+    overlay.classList.remove('is-closing');
+    const newFields = document.getElementById('new-shipment-fields');
+    if (newFields) newFields.style.display = 'none';
+  }, 220);
 }
 
 async function saveShipmentDetail() {
@@ -1079,6 +1106,7 @@ function openNewShipmentForm() {
   document.getElementById('edit-durum').value = 'YOLDA';
 
   document.getElementById('new-shipment-fields').style.display = 'block';
+  _shipmentDetailAcAnim(panel, overlay);
   overlay.style.display = 'block';
   panel.style.display   = 'flex';
 }
@@ -2125,7 +2153,118 @@ async function meLoadRsShipments() {
   }
 }
 
-// Sırbistan PDF — seçili sevkiyata otomatik yazar
+// ── MALİYET EVRAK — KONTROL & DÜZENLE ADIMI ──────────────────────────────────
+// PDF okunduktan sonra yazılacak değerler düzenlenebilir tabloda gösterilir;
+// kullanıcı "Kaydet" demeden hiçbir sevkiyata yazılmaz.
+// plan: [{ shipment, fields: { brokerage_eur: 12.5, ... } }]
+// Döner: düzenlenmiş plan (Kaydet) veya null (İptal).
+const ME_KONTROL_ALANLAR = [
+  ['gumruk_vergisi_eur', 'Gümrük Vergisi €'],
+  ['kdv_eur',            'KDV €'],
+  ['brokerage_eur',      'Brokerage €'],
+  ['other_costs_eur',    'Other Costs €'],
+];
+
+function meKontrolSayi(v) {
+  let s = String(v ?? '').trim().replace(/\s|€/g, '');
+  if (!s) return 0;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
+}
+
+function meKontrolEt(resultEl, prefix, detailHtml, plan) {
+  const fmt = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+  const alanlar = ME_KONTROL_ALANLAR.filter(([k]) => plan.some(r => k in r.fields));
+  const coklu = plan.length > 1;
+
+  const satirlar = plan.map((r, i) => {
+    const s = r.shipment;
+    const etiket = [s.ihracat_dosya_no, s.fatura_no].filter(Boolean).join(' · ') || `#${s.id}`;
+    const hucreler = alanlar.map(([k]) => {
+      if (!(k in r.fields)) return '<td class="me-kontrol-bos">—</td>';
+      const mevcut = parseFloat(s[k]) || 0;
+      return `<td>
+        <input type="text" inputmode="decimal" autocomplete="off" class="me-kontrol-input"
+          data-row="${i}" data-field="${k}" value="${fmt(r.fields[k])}">
+        <div class="me-kontrol-mevcut">mevcut: ${fmt(mevcut)}</div>
+      </td>`;
+    }).join('');
+    return `<tr><td class="me-kontrol-etiket">${escapeHtml(etiket)}</td>${hucreler}</tr>`;
+  }).join('');
+
+  const toplamSatir = coklu
+    ? `<tfoot><tr><td>Toplam</td>${alanlar.map(([k]) =>
+        `<td data-toplam="${k}"></td>`).join('')}</tr></tfoot>`
+    : '';
+
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = detailHtml + `
+    <div class="me-kontrol">
+      <div class="me-kontrol-baslik"><i class="ti ti-checklist"></i> Kontrol &amp; Düzenle
+        <span>Değerleri kontrol edin, gerekirse düzeltin. Kaydet'e basmadan hiçbir şey yazılmaz.</span></div>
+      <div class="me-kontrol-wrap">
+        <table class="me-kontrol-tablo">
+          <thead><tr><th>Sevkiyat</th>${alanlar.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+          <tbody>${satirlar}</tbody>
+          ${toplamSatir}
+        </table>
+      </div>
+      <div class="me-kontrol-aksiyon">
+        <button type="button" class="me-kontrol-iptal">İptal</button>
+        <button type="button" class="me-btn-save me-kontrol-kaydet"><i class="ti ti-device-floppy"></i> Kaydet</button>
+      </div>
+      <div id="me-${prefix}-save-status" class="me-manual-status"></div>
+    </div>`;
+
+  const box = resultEl.querySelector('.me-kontrol');
+  const inputs = [...box.querySelectorAll('.me-kontrol-input')];
+
+  const toplamGuncelle = () => {
+    if (!coklu) return;
+    alanlar.forEach(([k]) => {
+      const td = box.querySelector(`[data-toplam="${k}"]`);
+      const t = inputs.filter(inp => inp.dataset.field === k)
+        .reduce((sum, inp) => sum + (meKontrolSayi(inp.value) || 0), 0);
+      if (td) td.textContent = fmt(t);
+    });
+  };
+  inputs.forEach(inp => inp.addEventListener('input', () => {
+    inp.classList.toggle('hatali', Number.isNaN(meKontrolSayi(inp.value)));
+    toplamGuncelle();
+  }));
+  toplamGuncelle();
+
+  return new Promise(resolve => {
+    box.querySelector('.me-kontrol-iptal').addEventListener('click', () => {
+      box.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
+      const st = document.getElementById(`me-${prefix}-save-status`);
+      st.innerHTML = '<span style="color:var(--text3);">İptal edildi — hiçbir sevkiyata yazılmadı.</span>';
+      const inp = document.getElementById(`me-${prefix}-input`);
+      if (inp) inp.value = '';
+      resolve(null);
+    });
+    box.querySelector('.me-kontrol-kaydet').addEventListener('click', () => {
+      const yeni = plan.map(r => ({ shipment: r.shipment, fields: { ...r.fields } }));
+      let hata = false;
+      inputs.forEach(inp => {
+        const v = meKontrolSayi(inp.value);
+        if (Number.isNaN(v)) { inp.classList.add('hatali'); hata = true; return; }
+        yeni[+inp.dataset.row].fields[inp.dataset.field] = v;
+      });
+      const st = document.getElementById(`me-${prefix}-save-status`);
+      if (hata) {
+        st.innerHTML = '<span style="color:var(--error);">⚠ Geçersiz tutar var (ör. 1.234,56).</span>';
+        return;
+      }
+      box.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
+      st.innerHTML = '<span style="color:var(--text3);">⏳ Kaydediliyor...</span>';
+      resolve(yeni);
+    });
+  });
+}
+
+// Sırbistan PDF — okunan değerler kontrol edilir, Kaydet ile seçili sevkiyata yazılır
 async function meHandleRsPdf(file) {
   if (!file) return;
   const statusEl = document.getElementById('me-rs-status');
@@ -2175,9 +2314,6 @@ async function meHandleRsPdf(file) {
     return;
   }
 
-  resultEl.innerHTML = detailHtml +
-    `<div id="me-rs-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Sevkiyata yazılıyor...</div>`;
-
   try {
     const token = localStorage.getItem('fa_auth_token');
     const sRes  = await fetch(`/api/shipments?id=${selectedId}`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -2185,49 +2321,23 @@ async function meHandleRsPdf(file) {
     if (!sData.success) throw new Error(sData.error);
     const s = sData.shipment;
 
-    const body = {
-      id:                    s.id,
-      ihracat_dosya_no:      s.ihracat_dosya_no || '',
-      nakliye_firmasi:       s.nakliye_firmasi || '',
-      plaka:                 s.plaka || '',
-      palet:                 s.palet || null,
-      durum:                 s.durum || '',
-      varis_tarihi:          s.varis_tarihi || '',
-      gumrukleme_bitis:      s.gumrukleme_bitis || '',
-      fatura_bedeli_tl:      s.fatura_bedeli_tl || 0,
-      fatura_bedeli_eur:     s.fatura_bedeli_eur || 0,
-      mal_bedeli_eur:        s.mal_bedeli_eur || 0,
-      navlun_eur:            s.navlun_eur || 0,
-      sigorta_eur:           s.sigorta_eur || 0,
-      eur_kuru:              s.eur_kuru || 0,
-      navlun_usd:            s.navlun_usd || 0,
-      sigorta_usd:           s.sigorta_usd || 0,
-      usd_kuru:              s.usd_kuru || 0,
-      ihracat_beyanname_tl:  s.ihracat_beyanname_tl || 0,
-      ihracat_beyanname_eur: s.ihracat_beyanname_eur || 0,
-      arac_bekleme:          s.arac_bekleme || 0,
-      other_costs_eur:       s.other_costs_eur || 0,
-      brokerage_eur:         data.tip === 'brokerage' ? data.eur.brokerage       : (s.brokerage_eur      || 0),
-      gumruk_vergisi_eur:    data.tip === 'vergi'     ? data.eur.gumruk_vergisi  : (s.gumruk_vergisi_eur || 0),
-      kdv_eur:               data.tip === 'vergi'     ? data.eur.kdv             : (s.kdv_eur            || 0),
-    };
+    const fields = data.tip === 'brokerage'
+      ? { brokerage_eur: data.eur.brokerage }
+      : { gumruk_vergisi_eur: data.eur.gumruk_vergisi, kdv_eur: data.eur.kdv };
 
-    const upRes  = await fetch('/api/shipments', {
-      method:  'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body:    JSON.stringify(body),
-    });
-    const upData = await upRes.json();
-    if (!upData.success) throw new Error(upData.error);
+    const plan = await meKontrolEt(resultEl, 'rs', detailHtml, [{ shipment: s, fields }]);
+    if (!plan) return;
+    await meGeSaveFields(plan[0].shipment, plan[0].fields, token);
 
     const selLabel = selEl.options[selEl.selectedIndex]?.text || String(selectedId);
     document.getElementById('me-rs-save-status').innerHTML =
-      `<span style="color:var(--success);">✓ Kaydedildi → ${selLabel}</span>`;
+      `<span style="color:var(--success);">✓ Kaydedildi → ${escapeHtml(selLabel)}</span>`;
     const inp = document.getElementById('me-rs-input');
     if (inp) inp.value = '';
   } catch (saveErr) {
     const saveEl = document.getElementById('me-rs-save-status');
     if (saveEl) saveEl.innerHTML = `<span style="color:var(--error);">⚠ Kayıt hatası: ${escapeHtml(saveErr.message)}</span>`;
+    else resultEl.innerHTML += `<div style="color:var(--error);">⚠ ${escapeHtml(saveErr.message)}</div>`;
   }
 }
 
@@ -2341,7 +2451,7 @@ async function meHandleGePdf(file) {
 
     // Dağıtım gösterimi ve kayıt
     let detailHtml = '';
-    const savePromises = [];
+    const plan = [];
 
     if (data.tip === 'broker') {
       const toplam = data.eur.brokerage;
@@ -2357,7 +2467,7 @@ async function meHandleGePdf(file) {
 
       for (const p of paylar) {
         const pay = Math.round(toplam * p.oran * 100) / 100;
-        savePromises.push(meGeSaveField(p, 'brokerage_eur', pay, token));
+        plan.push({ shipment: p, fields: { brokerage_eur: pay } });
       }
 
     } else {
@@ -2394,17 +2504,16 @@ async function meHandleGePdf(file) {
         const kdvPay = Math.round(toplamKdv * p.oran * 100) / 100;
         const fields = { kdv_eur: kdvPay };
         if (p.id === vergiTarget.id) fields.gumruk_vergisi_eur = toplamVergi;
-        savePromises.push(meGeSaveFields(p, fields, token));
+        plan.push({ shipment: p, fields });
       }
       if (!paylar.some(p => p.id === vergiTarget.id)) {
-        savePromises.push(meGeSaveFields(vergiTarget, { gumruk_vergisi_eur: toplamVergi }, token));
+        plan.push({ shipment: vergiTarget, fields: { gumruk_vergisi_eur: toplamVergi } });
       }
     }
 
-    resultEl.innerHTML = detailHtml +
-      `<div id="me-ge-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    await Promise.all(savePromises);
+    const onayli = await meKontrolEt(resultEl, 'ge', detailHtml, plan);
+    if (!onayli) return;
+    await Promise.all(onayli.map(r => meGeSaveFields(r.shipment, r.fields, token)));
 
     document.getElementById('me-ge-save-status').innerHTML =
       `<span style="color:var(--success);">✓ Kaydedildi (${group.length} sevkiyat güncellendi)</span>`;
@@ -2574,16 +2683,15 @@ async function meHandleKoPdf(file) {
         `</div>`;
     }
 
-    const savePromises = paylar.map(p => meKoSaveFields(p, {
+    const plan = paylar.map(p => ({ shipment: p, fields: {
       gumruk_vergisi_eur: Math.round(toplamVergi * p.oran * 100) / 100,
       kdv_eur:            Math.round(toplamKdv * p.oran * 100) / 100,
       brokerage_eur:       KO_BROKERAGE_EUR,
-    }, token));
+    } }));
 
-    resultEl.innerHTML = detailHtml +
-      `<div id="me-ko-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    await Promise.all(savePromises);
+    const onayli = await meKontrolEt(resultEl, 'ko', detailHtml, plan);
+    if (!onayli) return;
+    await Promise.all(onayli.map(r => meKoSaveFields(r.shipment, r.fields, token)));
 
     document.getElementById('me-ko-save-status').innerHTML =
       `<span style="color:var(--success);">✓ Kaydedildi (${group.length} sevkiyat güncellendi)</span>`;
@@ -2823,13 +2931,14 @@ async function meHandleKzPdf(file) {
           `</div>`;
       }
 
-      resultEl.innerHTML = detailHtml +
-        `<div id="me-kz-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-      for (let i = 0; i < paylar.length; i++) {
-        await meKzSaveFields(paylar[i], { gumruk_vergisi_eur: vergiPays[i], kdv_eur: kdvPays[i] }, token);
+      const onayli = await meKontrolEt(resultEl, 'kz', detailHtml,
+        paylar.map((p, i) => ({ shipment: p, fields: { gumruk_vergisi_eur: vergiPays[i], kdv_eur: kdvPays[i] } })));
+      if (!onayli) return;
+      for (const r of onayli) {
+        await meKzSaveFields(r.shipment, r.fields, token);
       }
       document.getElementById('me-kz-save-status').innerHTML =
-        `<span style="color:var(--success);">✓ Kaydedildi (${paylar.length} sevkiyat güncellendi)</span>`;
+        `<span style="color:var(--success);">✓ Kaydedildi (${onayli.length} sevkiyat güncellendi)</span>`;
       const inp = document.getElementById('me-kz-input');
       if (inp) inp.value = '';
       return;
@@ -2922,15 +3031,15 @@ async function meHandleKzPdf(file) {
         `</div>`;
     }
 
-    resultEl.innerHTML = detailHtml +
-      `<div id="me-kz-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    for (let i = 0; i < paylar.length; i++) {
-      await meKzSaveFields(paylar[i], { brokerage_eur: brokerPays[i], other_costs_eur: otherPays[i] }, token);
+    const onayli = await meKontrolEt(resultEl, 'kz', detailHtml,
+      paylar.map((p, i) => ({ shipment: p, fields: { brokerage_eur: brokerPays[i], other_costs_eur: otherPays[i] } })));
+    if (!onayli) return;
+    for (const r of onayli) {
+      await meKzSaveFields(r.shipment, r.fields, token);
     }
 
     document.getElementById('me-kz-save-status').innerHTML =
-      `<span style="color:var(--success);">✓ Kaydedildi (${paylar.length} sevkiyat güncellendi)</span>`;
+      `<span style="color:var(--success);">✓ Kaydedildi (${onayli.length} sevkiyat güncellendi)</span>`;
     const inp = document.getElementById('me-kz-input');
     if (inp) inp.value = '';
 
@@ -3067,15 +3176,14 @@ async function meHandleDePdf(file) {
     if (!sData.success) throw new Error(sData.error);
     const s = sData.shipment;
 
-    resultEl.innerHTML = detailHtml +
-      `<div id="me-de-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    await meDeSaveFields(s, {
+    const onayli = await meKontrolEt(resultEl, 'de', detailHtml, [{ shipment: s, fields: {
       gumruk_vergisi_eur: gumrukV,
       kdv_eur:            kdv,
       brokerage_eur:      brokerage,
       other_costs_eur:    otherCosts,
-    }, token);
+    } }]);
+    if (!onayli) return;
+    await meDeSaveFields(onayli[0].shipment, onayli[0].fields, token);
 
     document.getElementById('me-de-save-status').innerHTML =
       `<span style="color:var(--success);">✓ Kaydedildi</span>`;
@@ -3211,13 +3319,12 @@ async function meHandleNlPdf(file) {
     if (!sData.success) throw new Error(sData.error);
     const s = sData.shipment;
 
-    resultEl.innerHTML = detailHtml +
-      `<div id="me-nl-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    await meNlSaveFields(s, {
+    const onayli = await meKontrolEt(resultEl, 'nl', detailHtml, [{ shipment: s, fields: {
       brokerage_eur:      brokerage,
       gumruk_vergisi_eur: vergi,
-    }, token);
+    } }]);
+    if (!onayli) return;
+    await meNlSaveFields(onayli[0].shipment, onayli[0].fields, token);
 
     document.getElementById('me-nl-save-status').innerHTML =
       `<span style="color:var(--success);">✓ Kaydedildi</span>`;
@@ -3369,14 +3476,14 @@ async function meHandleBePdf(file) {
     const ihrShip = group.find(x => (x.fatura_no || '').startsWith('IHR'));
     if (!antShip || !ihrShip) throw new Error('Grupta hem ANT hem IHR fatura numaralı bir sevkiyat bulunamadı.');
 
-    resultEl.innerHTML = detailHtml +
-      `<div style="margin-top:8px;font-size:11px;">Vergi → ANT: <b>${escapeHtml(antShip.fatura_no)}</b> · IHR: <b>${escapeHtml(ihrShip.fatura_no)}</b></div>` +
-      `<div id="me-be-save-status" style="margin-top:8px;font-size:12px;color:var(--text3);">⏳ Kaydediliyor...</div>`;
-
-    await Promise.all([
-      meBeSaveFields(antShip, { gumruk_vergisi_eur: invoerrechten, brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 }, token),
-      meBeSaveFields(ihrShip, { gumruk_vergisi_eur: bijkomende,    brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 }, token),
-    ]);
+    const onayli = await meKontrolEt(resultEl, 'be',
+      detailHtml + `<div style="margin-top:8px;font-size:11px;">Vergi → ANT: <b>${escapeHtml(antShip.fatura_no)}</b> · IHR: <b>${escapeHtml(ihrShip.fatura_no)}</b></div>`,
+      [
+        { shipment: antShip, fields: { gumruk_vergisi_eur: invoerrechten, brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 } },
+        { shipment: ihrShip, fields: { gumruk_vergisi_eur: bijkomende,    brokerage_eur: brokerFixedPerTaraf, kdv_eur: 0 } },
+      ]);
+    if (!onayli) return;
+    await Promise.all(onayli.map(r => meBeSaveFields(r.shipment, r.fields, token)));
 
     document.getElementById('me-be-save-status').innerHTML =
       `<span style="color:var(--success);">✓ Kaydedildi (2 sevkiyat güncellendi)</span>`;
@@ -3699,5 +3806,277 @@ async function meHandleAksuFile(file) {
   } finally {
     const input = document.getElementById('me-aksu-input');
     if (input) input.value = '';
+  }
+}
+
+// ── KONUM RAPORU → VARIŞ GÜMRÜK ──────────────────────────────────────────────
+// "Konum Raporu" butonu sürükle-bırak penceresini açar; Excel yüklenince varış
+// tarihi gelen sevkiyatlar listelenir. Yükleme HİÇBİR ŞEY YAZMAZ: hiçbir satır
+// işaretli gelmez, tarihler elle düzeltilebilir; yalnız kullanıcının işaretleyip
+// "Varış Gümrük Yap" ile onayladıkları yazılır.
+// Backend: api/shipments.py (konum_raporu_onizle, konum_raporu_uygula).
+let konumRaporuSonuc = null;
+function konumRaporuSec() {
+  konumYuklemeAc();
+}
+
+function konumExcelSec() {
+  const input = document.getElementById('konum-raporu-input');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function konumTarihGoster(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return `${d}.${m}.${y}`;
+}
+
+function konumModal(baslik, icerikHtml, altHtml = '') {
+  document.getElementById('konum-raporu-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'konum-raporu-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xl);
+                width:min(1040px,95vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+      <div style="padding:16px 22px;border-bottom:0.5px solid var(--border2);display:flex;align-items:center;gap:10px;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-right:auto;">${baslik}</div>
+        <button onclick="document.getElementById('konum-raporu-overlay')?.remove()"
+          style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--text3);">×</button>
+      </div>
+      <div id="konum-raporu-govde" style="padding:14px 22px;overflow:auto;flex:1;">${icerikHtml}</div>
+      ${altHtml ? `<div style="padding:12px 22px;border-top:0.5px solid var(--border2);display:flex;gap:10px;justify-content:flex-end;align-items:center;">${altHtml}</div>` : ''}
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Sürükle-bırak alanı (yalnız .xlsx). Modal çizildikten sonra konumDropzoneBagla() çağrılır.
+function konumDropzoneHtml(kucuk = false) {
+  return `<div class="drop-zone role-write-only" id="konum-dropzone" onclick="konumExcelSec()"
+      style="${kucuk ? 'padding:12px 16px;' : 'padding:22px 20px;'}margin-bottom:14px;">
+    ${kucuk ? '' : '<div class="drop-icon">📍</div>'}
+    <h3 style="${kucuk ? 'margin:0;' : ''}">Konum raporu Excel'lerini buraya sürükleyin</h3>
+    <div id="konum-dropzone-hata" style="display:none;margin-top:6px;font-size:12px;color:#B91C1C;"></div>
+  </div>`;
+}
+
+function konumDropzoneBagla() {
+  const dz = document.getElementById('konum-dropzone');
+  if (!dz) return;
+  const engelle = e => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { engelle(e); dz.classList.add('dragover'); }));
+  dz.addEventListener('dragleave', e => { engelle(e); if (!dz.contains(e.relatedTarget)) dz.classList.remove('dragover'); });
+  dz.addEventListener('drop', e => {
+    engelle(e);
+    dz.classList.remove('dragover');
+    const hepsi = [...(e.dataTransfer?.files || [])];
+    const excel = hepsi.filter(f => /\.xlsx$/i.test(f.name));
+    const hataEl = document.getElementById('konum-dropzone-hata');
+    if (!excel.length) {
+      if (hataEl) { hataEl.style.display = 'block'; hataEl.textContent = '⚠ Yalnızca .xlsx dosyası bırakın.'; }
+      return;
+    }
+    if (excel.length < hepsi.length && hataEl) {
+      hataEl.style.display = 'block';
+      hataEl.textContent = `⚠ ${hepsi.length - excel.length} dosya .xlsx olmadığı için atlandı.`;
+    }
+    konumRaporuYukle(excel);
+  });
+  // Modal dışına/yanına bırakılan dosya tarayıcıda açılmasın
+  const overlay = document.getElementById('konum-raporu-overlay');
+  ['dragover', 'drop'].forEach(ev => overlay?.addEventListener(ev, e => e.preventDefault()));
+}
+
+const KONUM_BTN = 'padding:8px 16px;border-radius:var(--radius-md);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;';
+const KONUM_BTN_GHOST = KONUM_BTN + 'background:transparent;color:var(--text2);border:0.5px solid var(--border2);';
+const KONUM_BTN_PRIMARY = KONUM_BTN + 'background:var(--accent);color:#fff;border:none;';
+const KONUM_TH = 'text-align:left;padding:6px 8px;font-size:11px;color:var(--text3);font-weight:600;border-bottom:0.5px solid var(--border2);white-space:nowrap;';
+const KONUM_TD = 'padding:6px 8px;font-size:12px;color:var(--text);border-bottom:0.5px solid var(--border);vertical-align:top;';
+const KONUM_MONO = 'font-family:var(--mono);';
+
+// ── Yük konumları paneli ─────────────────────────────────────────────────────
+// Yükleme penceresi: sürükle-bırak alanı (+ son işlemin sonucu). Hiçbir şey kaydetmez.
+function konumYuklemeAc(bilgi = '') {
+  const bilgiHtml = bilgi
+    ? `<div style="font-size:12.5px;padding:8px 12px;margin-bottom:12px;border-radius:var(--radius-md);background:#EAF3DE;color:#27500A;">${bilgi}</div>`
+    : '';
+  konumModal('📍 Konum Raporu', `${bilgiHtml}${konumDropzoneHtml()}`,
+    `<button onclick="document.getElementById('konum-raporu-overlay')?.remove()" style="${KONUM_BTN_GHOST}">Kapat</button>`);
+  konumDropzoneBagla();
+}
+
+// ── Excel yükleme → (gerekirse) varış onayı ──────────────────────────────────
+async function konumRaporuYukle(files) {
+  const liste = [...(files || [])];
+  if (!liste.length) return;
+  konumModal('📍 Konum Raporu', `<div style="padding:30px;text-align:center;color:var(--text2);font-size:13px;">
+    ⏳ ${liste.length} rapor okunuyor...</div>`);
+  try {
+    const excels = [];
+    for (const f of liste) excels.push({ ad: f.name, b64: await fileToBase64(f) });
+    const token = localStorage.getItem('fa_auth_token');
+    const resp = await fetch('/api/shipments/konum-raporu/onizle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ excels }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Rapor okunamadı');
+    konumRaporuSonuc = data;
+
+    const onayBekleyen = (data.guncellenecek || []).length + (data.belirsiz || []).length + (data.hatali || []).length;
+    if (!onayBekleyen) {
+      konumYuklemeAc('Raporda varış tarihi gelen yeni sevkiyat yok. Hiçbir şey değiştirilmedi.');
+      return;
+    }
+    konumRaporuOnizlemeCiz();
+  } catch (e) {
+    konumModal('📍 Konum Raporu', `<div style="padding:20px;color:#B91C1C;font-size:13px;">⚠ ${escapeHtml(e.message)}</div>`,
+      `<button onclick="konumYuklemeAc()" style="${KONUM_BTN_GHOST}">← Geri</button>`);
+  }
+}
+
+// Tek tablo: varış tarihi gelen sevkiyatlar. Hiçbiri işaretli gelmez; tarih düzenlenebilir.
+// Belirsiz / tarihi okunamayan satırlar da burada, tarihi boş ve kısa uyarıyla.
+function konumRaporuOnizlemeCiz() {
+  const d = konumRaporuSonuc || {};
+  const th = KONUM_TH, td = KONUM_TD;
+  const satirlar = [
+    // tahmin_notu: raporda varış tarihi yok, açıklamadan (Gümrükte/Boşaltıldı) çıkarıldı
+    ...(d.guncellenecek || []).map(s => ({ s, tarih: s.yeni_tarih, uyari: s.tahmin_notu || '' })),
+    ...(d.belirsiz || []).map(s => ({ s, tarih: '', uyari: 'Raporda birden fazla satır uyuyor, tarihi siz girin' })),
+    ...(d.hatali || []).map(s => ({ s, tarih: '', uyari: `Rapordaki tarih okunamadı: "${s.hatali_deger || ''}"` })),
+  ];
+
+  const satirHtml = ({ s, tarih, uyari }) => `<tr>
+    <td style="${td}"><input type="checkbox" class="konum-sec" data-id="${s.id}" data-sefer="${s.sefer_id || ''}" onchange="konumGrupSec(this)"></td>
+    <td style="${td}font-family:var(--mono);color:var(--accent);white-space:nowrap;">${escapeHtml(s.ihracat_dosya_no || '')}</td>
+    <td style="${td}">${escapeHtml(s.ulke || '')}</td>
+    <td style="${td}font-family:var(--mono);font-size:11px;">${escapeHtml(s.plaka || '')}</td>
+    <td style="${td}color:var(--text2);">${escapeHtml((s.satir || {}).aciklama || '')}</td>
+    <td style="${td}white-space:nowrap;">
+      <input type="date" class="konum-tarih" data-id="${s.id}" data-rapor="${escapeHtml(tarih || '')}"
+             data-yukleme="${escapeHtml(s.yukleme_tarihi || '')}" value="${escapeHtml(tarih || '')}"
+             oninput="konumTarihDegisti(this)"
+             style="height:30px;padding:0 6px;border-radius:var(--radius-md);border:0.5px solid var(--border2);
+                    background:var(--surface2);color:var(--text);font-family:var(--font);font-size:12.5px;">
+      <div class="konum-tarih-not" data-id="${s.id}" data-uyari="${escapeHtml(uyari)}"
+           style="font-size:11px;margin-top:2px;color:#B45309;">${escapeHtml(uyari)}</div>
+    </td></tr>`;
+
+  const html = `
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <th style="${th}"><input type="checkbox" title="Tümünü seç"
+          onclick="document.querySelectorAll('.konum-sec').forEach(c=>c.checked=this.checked);konumRaporuSecimSay();"></th>
+        <th style="${th}">Dosya No</th><th style="${th}">Ülke</th><th style="${th}">Plaka</th>
+        <th style="${th}">Konum</th><th style="${th}">Varış Tarihi</th>
+      </tr>
+      ${satirlar.map(satirHtml).join('')}
+    </table></div>`;
+
+  konumModal('📍 Varış Tarihi Gelenler', html, `
+    <span id="konum-raporu-secim" style="font-size:12px;color:var(--text2);margin-right:auto;"></span>
+    <button onclick="konumYuklemeAc()" style="${KONUM_BTN_GHOST}">Vazgeç</button>
+    <button id="konum-raporu-uygula" onclick="konumRaporuUygula()" style="${KONUM_BTN_PRIMARY}">Varış Gümrük Yap</button>`);
+  document.querySelectorAll('.konum-tarih').forEach(el => konumTarihKontrol(el));
+  konumRaporuSecimSay();
+}
+
+// Gruplu sevkiyatlar (aynı sefer_id) aynı araçtadır: biri seçilince/tarihi değişince eşleri de
+function konumGrupEsleri(cb) {
+  const sefer = cb?.dataset.sefer;
+  if (!sefer) return [];
+  return [...document.querySelectorAll(`.konum-sec[data-sefer="${sefer}"]`)].filter(x => x !== cb);
+}
+
+function konumGrupSec(cb) {
+  konumGrupEsleri(cb).forEach(x => { x.checked = cb.checked; });
+  konumRaporuSecimSay();
+}
+
+// Tarih hücresi değişince: raporla farkı işaretle, geçerliliği kontrol et, satırı seç
+function konumTarihDegisti(el) {
+  const cb = document.querySelector(`.konum-sec[data-id="${el.dataset.id}"]`);
+  const hedefler = [el, ...konumGrupEsleri(cb).map(x => document.querySelector(`.konum-tarih[data-id="${x.dataset.id}"]`)).filter(Boolean)];
+  hedefler.forEach(t => {
+    if (t !== el) t.value = el.value;
+    konumTarihKontrol(t);
+    const c = document.querySelector(`.konum-sec[data-id="${t.dataset.id}"]`);
+    if (c && t.value) c.checked = true;
+  });
+  konumRaporuSecimSay();
+}
+
+function konumTarihKontrol(el) {
+  const not = document.querySelector(`.konum-tarih-not[data-id="${el.dataset.id}"]`);
+  const hata = konumTarihHatasi(el);
+  el.style.borderColor = hata ? '#EF4444' : (el.value && el.value !== el.dataset.rapor ? '#B45309' : 'var(--border2)');
+  if (!not) return;
+  if (hata) { not.style.color = '#B91C1C'; not.textContent = hata; }
+  else if (el.value && el.dataset.rapor && el.value !== el.dataset.rapor) {
+    not.style.color = '#B45309'; not.textContent = `elle değiştirildi (rapor: ${konumTarihGoster(el.dataset.rapor)})`;
+  } else { not.style.color = '#B45309'; not.textContent = el.value && !el.dataset.rapor ? '' : (not.dataset.uyari || ''); }
+}
+
+function konumTarihHatasi(el) {
+  const v = el.value;
+  if (!v) return '';
+  if (v > bugunISO()) return 'bugünden ileri olamaz';
+  if (el.dataset.yukleme && v < el.dataset.yukleme) return 'yüklemeden önce olamaz';
+  return '';
+}
+
+function konumRaporuSecimSay() {
+  const n = document.querySelectorAll('.konum-sec:checked').length;
+  const el = document.getElementById('konum-raporu-secim');
+  if (el) el.textContent = document.querySelector('.konum-sec') ? `${n} kayıt seçili` : '';
+  const btn = document.getElementById('konum-raporu-uygula');
+  if (btn) { btn.disabled = !n; btn.style.opacity = n ? '1' : '0.5'; }
+}
+
+async function konumRaporuUygula() {
+  const secili = [...document.querySelectorAll('.konum-sec:checked')];
+  if (!secili.length) return;
+
+  // Seçili her satırda geçerli bir tarih olmalı; biri eksik/hatalıysa hiçbiri yazılmaz
+  const kalemler = [], sorunlu = [];
+  secili.forEach(cb => {
+    const inp = document.querySelector(`.konum-tarih[data-id="${cb.dataset.id}"]`);
+    const hata = inp ? (inp.value ? konumTarihHatasi(inp) : 'tarih boş') : 'tarih yok';
+    if (hata) { sorunlu.push(inp); if (inp) { inp.style.borderColor = '#EF4444'; } }
+    else kalemler.push({ id: Number(cb.dataset.id), tarih: inp.value });
+  });
+  if (sorunlu.length) {
+    sorunlu.forEach(inp => {
+      const not = inp && document.querySelector(`.konum-tarih-not[data-id="${inp.dataset.id}"]`);
+      if (not && !not.textContent) { not.style.color = '#B91C1C'; not.textContent = 'tarih gerekli'; }
+    });
+    sorunlu[0]?.scrollIntoView({ block: 'center' });
+    sorunlu[0]?.focus();
+    return;
+  }
+
+
+  const btn = document.getElementById('konum-raporu-uygula');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Güncelleniyor...'; }
+  try {
+    const token = localStorage.getItem('fa_auth_token');
+    const resp = await fetch('/api/shipments/konum-raporu/uygula', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ kalemler }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+    await yenileGorunumuKoruyarak();
+    const atlanan = data.atlanan || [];
+    konumYuklemeAc(`${data.guncellenen} sevkiyat güncellendi (Bosna/Sırbistan doğrudan Teslim Edildi).` + (atlanan.length
+      ? ` Yazılmayan: ${atlanan.map(a => `${escapeHtml(a.dosya_no || ('#' + a.id))} (${escapeHtml(a.neden)})`).join(', ')}` : ''));
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Varış Gümrük Yap'; }
+    showMiniModal('⚠️ Hata', escapeHtml(e.message), [{ label: 'Tamam', style: 'primary', action: null }]);
   }
 }

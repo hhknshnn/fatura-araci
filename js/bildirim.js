@@ -102,9 +102,10 @@ function bildirimSatir({ s, gun, durum, sinir, baz }) {
   return `
     <button type="button" class="bn-row" onclick="bildirimAc(${s.id})"
       title="${baz === 'gümrük' ? 'Gümrükten' : 'Yüklemeden'} ${gun} gün geçti (sınır ${sinir})">
-      <b>${s.ihracat_dosya_no || '—'}</b>
-      <span class="bn-ulke">${ulke}</span>
-      <span class="bn-durum">${durumAd}</span>
+      <span class="bn-row-main">
+        <b>${s.ihracat_dosya_no || '—'}</b>
+        <span class="bn-row-sub"><span class="bn-ulke">${ulke}</span><span class="bn-durum">${durumAd}</span></span>
+      </span>
       <span class="bn-gun">${asim > 0 ? `+${asim}` : gun} gün</span>
     </button>`;
 }
@@ -130,13 +131,19 @@ function bildirimPanelCiz() {
 
   const gorunen = bildirimSekme === 'tumu' ? doluKat : doluKat.filter(k => k.key === bildirimSekme);
   const liste = gorunen.map(k => `
-    <div class="bn-section">
-      ${bildirimSekme === 'tumu' ? `<div class="bn-section-head">${k.baslik}</div>` : ''}
+    <div class="bn-section bn-kat-${k.key}">
+      ${bildirimSekme === 'tumu' ? `<div class="bn-section-head">${k.baslik}<em>${bildirimVeri[k.key].length}</em></div>` : ''}
       ${bildirimVeri[k.key].map(bildirimSatir).join('')}
     </div>`).join('');
 
   panel.innerHTML = `
-    <div class="bn-head">Bildirimler</div>
+    <div class="bn-head">
+      <div>
+        <div class="bn-head-title">Bildirimler</div>
+        <div class="bn-head-sub">${toplam ? `${toplam} sevkiyat dikkat gerektiriyor` : 'Her şey yolunda'}</div>
+      </div>
+      <button type="button" class="bn-close" onclick="bildirimKapat()" title="Kapat">✕</button>
+    </div>
     ${sekmeler}
     <div class="bn-list">${liste || '<div class="bn-empty">Bildirim yok</div>'}</div>`;
 }
@@ -146,19 +153,39 @@ function toggleBildirimPanel(e) {
   const panel = document.getElementById('bildirim-panel');
   if (!panel) return;
   const acik = panel.classList.toggle('open');
+  bildirimOrtu().classList.toggle('open', acik);
   if (acik) bildirimPanelCiz();
 }
 
-function bildirimAc(id) {
+// Çekmece arkasındaki karartma; tıklanınca paneli kapatır (alttaki öğeye tıklama geçmez)
+function bildirimOrtu() {
+  let ortu = document.getElementById('bildirim-overlay');
+  if (!ortu) {
+    ortu = document.createElement('div');
+    ortu.id = 'bildirim-overlay';
+    ortu.onclick = bildirimKapat;
+    document.body.appendChild(ortu);
+  }
+  return ortu;
+}
+
+function bildirimKapat() {
   document.getElementById('bildirim-panel')?.classList.remove('open');
+  document.getElementById('bildirim-overlay')?.classList.remove('open');
+}
+
+function bildirimAc(id) {
+  bildirimKapat();
   if (typeof sidebarSelect === 'function') sidebarSelect('sevkiyatlar');
   if (id != null && typeof openShipmentDetail === 'function') openShipmentDetail(id);
 }
 
 document.addEventListener('click', e => {
-  if (!e.target.closest('#bildirim-wrap')) {
-    document.getElementById('bildirim-panel')?.classList.remove('open');
-  }
+  if (!e.target.closest('#bildirim-wrap')) bildirimKapat();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('bildirim-panel')?.classList.contains('open')) bildirimKapat();
 });
 
 // Açılışta bir kez yükle (Sevkiyatlar'a girilmese de zil dolsun)

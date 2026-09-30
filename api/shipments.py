@@ -1640,6 +1640,14 @@ DURUM_TARIH_KOLONU = {
     'TESLİM EDİLDİ': 'gumrukleme_bitis',
 }
 
+# Bu ülkelerde varış gümrüğü = teslim: Varış Gümrük yerine doğrudan TESLİM EDİLDİ
+# yazılır, varis_tarihi ve gumrukleme_bitis aynı tarihi alır.
+VARIS_TESLIM_ULKELER = ('BOSNA', 'SIRBISTAN')
+
+
+def _varis_teslim_ulkesi(ulke):
+    return _konum_katla(ulke).strip() in VARIS_TESLIM_ULKELER
+
 
 def durum_tarih_kolonu(durum):
     """Verilen durum icin tarihin yazilacagi kolon adi (yoksa None)."""
@@ -1660,14 +1668,29 @@ def bulk_update_durum(ids, durum, tarih=None):
     kolon  = DURUM_TARIH_KOLONU.get(durum)
     conn = get_conn()
     cur  = conn.cursor()
-    if tarih and kolon:
+    updated = 0
+    if durum == 'Varış Gümrük':
+        cur.execute('SELECT id, ulke FROM shipments WHERE id = ANY(%s)', (ids,))
+        teslim_ids = [r[0] for r in cur.fetchall() if _varis_teslim_ulkesi(r[1])]
+        if teslim_ids:
+            if tarih:
+                cur.execute(
+                    "UPDATE shipments SET durum = 'TESLİM EDİLDİ', varis_tarihi = %s, gumrukleme_bitis = %s WHERE id = ANY(%s)",
+                    (tarih, tarih, teslim_ids),
+                )
+            else:
+                cur.execute("UPDATE shipments SET durum = 'TESLİM EDİLDİ' WHERE id = ANY(%s)", (teslim_ids,))
+            updated += cur.rowcount
+            ids = [i for i in ids if i not in teslim_ids]
+    if ids and tarih and kolon:
         cur.execute(
             f'UPDATE shipments SET durum = %s, {kolon} = %s WHERE id = ANY(%s)',
             (durum, tarih, ids),
         )
-    else:
+        updated += cur.rowcount
+    elif ids:
         cur.execute('UPDATE shipments SET durum = %s WHERE id = ANY(%s)', (durum, ids))
-    updated = cur.rowcount
+        updated += cur.rowcount
     conn.commit()
     cur.close()
     conn.close()
@@ -2982,3 +3005,544 @@ def parse_fr_fatura_pdf(pdf_bytes):
         print(f'FR fatura PDF parse hatası: {e}')
 
     return result
+
+
+# ── KONUM RAPORU (nakliyeci Excel) → VARIŞ GÜMRÜK ────────────────────────────
+# Nakliyecinin gönderdiği konum raporlarını (Balkanlar, Kosova-Makedonya,
+# Kazakistan) okur; "Ülke Varış Tarihi" dolu satırların eşleştiği açık
+# sevkiyatları Varış Gümrük yapar ve tarihi varis_tarihi'ne yazar.
+# Akış iki adımlı: konum_raporu_onizle (DB'ye yazmaz) → konum_raporu_uygula.
+#
+# Eşleştirme (sevkiyat bazlı, karışmaması için):
+#   1) Excel'de dosya no (B sütunu, başlıksız) varsa önce onunla.
+#   2) Yoksa plaka + ülke; aynı plakanın birden çok seferi olabileceği için
+#      bizim yükleme tarihimize EN YAKIN Excel satırı seçilir ve fark
+#      KONUM_TARIH_TOLERANS_GUN'ü aşamaz (ağustos yüklemesi haziran satırını almaz).
+#   Başka bir dosya no taşıyan Excel satırı plaka ile başka kayda eşleşmez.
+#
+# Varış tarihi boş ama araç varmış görünen satırlar (tarih TAHMİN edilir, önizlemede
+# notla gösterilir, kullanıcı onaylamadan yazılmaz):
+#   - Açıklama "Boşaltıldı" / boşaltma tarihi dolu → boşaltma tarihi, yoksa Excel'in
+#     son kaydedilme tarihi.
+#   - Açıklama "Gümrükte", "Varış gümrük(te)" vb. (Türkiye çıkış gümrüğü/depo adları
+#     hariç) → Excel'in son kaydedilme tarihi. Yüklemeden bu yana ülkenin en kısa
+#     yol süresi (KONUM_MIN_YOL_GUN) geçmemişse çıkış gümrüğü olabilir: tarih boş gelir.
+#   - Boşaltma tarihi açıklamayla çelişiyorsa (hâlâ Kapıkule vb.), yüklemeden önce veya
+#     rapor tarihinden ileride ise tarih boş gelir.
+# Varış hücresinde "ETA 06.10" (Belçika) tahmindir: başka tarih (varış/boşaltma) yoksa
+# kayıt yolda kalır, açıklamadan da tahmin yapılmaz. Yılsız "06.07" gerçek tarih sayılır.
+
+KONUM_TARIH_TOLERANS_GUN = 7
+# Raporlardaki 2025+ geçmişe göre yükleme→varış en kısa süreler (Balkanlar 2-3, KZ 10 gün)
+KONUM_MIN_YOL_GUN        = {'KAZAKISTAN': 10, 'BELCIKA': 5}
+KONUM_MIN_YOL_GUN_VARSAYILAN = 3
+# "Gümrükte" yazan satır yüklemeden bu kadar gün (veya daha az) sonra kaydedilmişse
+# kesin çıkış gümrüğüdür: önizlemede hiç gösterilmez.
+KONUM_CIKIS_GUMRUK_GUN   = 2
+# Açıklamada varış gümrüğünü gösteren ifadeler (katlanmış metin üzerinde)
+_KONUM_VARIS_IFADE = re.compile(r'GUMRUKTE|GUMRUGUNDE|VARIS\s*GUMRUK|^\s*GUMRUK\s*$')
+# Bunlardan biri geçiyorsa Türkiye tarafıdır (çıkış gümrüğü/depo), varış sayılmaz
+_KONUM_TR_YERLER = ('ERENKOY', 'HALKALI', 'MURATBEY', 'KAPIKULE', 'IPSALA', 'HAMZABEYLI',
+                    'AMBARLI', 'GEBZE', 'DILOVASI', 'ISTANBUL', 'BURSA', 'MERSIN',
+                    'SARP', 'GURBULAK', 'HOROZ', 'CIKIS', 'TR GUMRU', 'TURKIYE',
+                    # Bulgaristan giriş kapısı: Belçika/Balkan yolunda transit, varış değil
+                    'ANDREEVO')
+_KONUM_ACIK_DURUMLAR     = ('YÜKLENECEK', 'YUKLENECEK', 'YOLDA')
+_KONUM_ILERI_DURUMLAR    = ('VARIŞ GÜMRÜK', 'VARIS GUMRUK', 'GÜMRÜKLEME', 'GUMRUKLEME')
+
+
+def _konum_katla(s):
+    """Türkçe/aksanlı harfleri düz Latin büyük harfe indirger (Č→C, İ→I)."""
+    import unicodedata
+    s = str(s or '').replace('İ', 'I').replace('ı', 'I')
+    s = unicodedata.normalize('NFKD', s)
+    return ''.join(c for c in s if not unicodedata.combining(c)).upper()
+
+
+def _konum_dosya_nolari(v):
+    """"2026-447 /448", "2026-409/410/411", "2026-252-253", "2025-243 - 2025-244"
+    gibi yazımları ["2026-447", "2026-448", ...] listesine çevirir."""
+    s = str(v or '')
+    out = []
+    for m in re.finditer(r'(20\d\d)\s*-\s*(\d{1,4})(?!\d)', s):
+        yil = m.group(1)
+        out.append(f'{yil}-{int(m.group(2)):03d}')
+        pos = m.end()
+        while True:
+            # Devam numarası; ardından "-sayı" geliyorsa o yeni bir yıl-no'dur, alma
+            c = re.match(r'\s*[/\-,]\s*(\d{1,4})(?!\d)(?!\s*-\s*\d)', s[pos:])
+            if not c:
+                break
+            out.append(f'{yil}-{int(c.group(1)):03d}')
+            pos += c.end()
+    return list(dict.fromkeys(out))
+
+
+def _konum_plaka(raw):
+    """Plakayı karşılaştırma için (parça listesi, tümü bitişik) olarak döner."""
+    norm = normalize_plaka(_konum_katla(raw))
+    parcalar = [re.sub(r'[^A-Z0-9]', '', p) for p in norm.split('-')]
+    # Kısa parçalar ("06", "GG") tek başına plaka değildir; tek başına eşleşme yaratmasın
+    parcalar = [p for p in parcalar
+                if len(p) >= 5 and re.search(r'[A-Z]', p) and re.search(r'\d', p)]
+    bitisik = re.sub(r'[^A-Z0-9]', '', norm)
+    return parcalar, bitisik
+
+
+def _konum_plaka_eslesir(a, b):
+    (pa, ba), (pb, bb) = a, b
+    if not ba or not bb:
+        return False
+    if ba == bb:
+        return True
+    return any(p in bb for p in pa) or any(p in ba for p in pb)
+
+
+def _konum_ulke_eslesir(a, b):
+    a, b = _konum_katla(a).strip(), _konum_katla(b).strip()
+    return bool(a and b) and (a == b or a in b or b in a)
+
+
+def _konum_tarih(v, yukleme=None, rapor=None):
+    """Excel hücresinden date döner; okunamazsa None. Yıl 2000–2100 dışıysa None.
+    Yılsız "06.07" ve iki haneli yıllı "06.07.26" de okunur: yılsız tarihin yılı
+    yüklemeden (varış yüklemeden önce olamaz → gerekirse sonraki yıl), yükleme
+    yoksa rapor tarihinden (varış rapordan çok ileride olamaz → gerekirse önceki yıl)
+    çıkarılır; ikisi de yoksa None."""
+    import datetime as _dt
+    if v is None or v == '':
+        return None
+    if isinstance(v, _dt.datetime):
+        d = v.date()
+    elif isinstance(v, _dt.date):
+        d = v
+    else:
+        s = str(v).strip()
+        m = re.match(r'^(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}|\d{2}))?$', s)
+        if m:
+            gun, ay, yil = int(m.group(1)), int(m.group(2)), m.group(3)
+            try:
+                if yil:
+                    d = _dt.date(int(yil) + (2000 if len(yil) == 2 else 0), ay, gun)
+                elif yukleme:
+                    d = _dt.date(yukleme.year, ay, gun)
+                    if d < yukleme - _dt.timedelta(days=KONUM_TARIH_TOLERANS_GUN):
+                        d = _dt.date(yukleme.year + 1, ay, gun)
+                elif rapor:
+                    d = _dt.date(rapor.year, ay, gun)
+                    if d > rapor + _dt.timedelta(days=30):
+                        d = _dt.date(rapor.year - 1, ay, gun)
+                else:
+                    return None
+            except ValueError:
+                return None
+        else:
+            m = re.match(r'^(\d{4})-(\d{2})-(\d{2})', s)
+            if not m:
+                return None
+            try:
+                d = _dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                return None
+    return d if 2000 <= d.year <= 2100 else None
+
+
+def _konum_eta(v, yukleme=None, rapor=None):
+    """Varış hücresi "ETA 06.10" gibi tahmini tarihse (True, date|None), değilse (False, None)."""
+    s = _konum_katla(v)
+    if not re.search(r'\bETA\b', s):
+        return False, None
+    m = re.search(r'\d{1,2}[./-]\d{1,2}(?:[./-](?:\d{4}|\d{2}))?', s)
+    return True, (_konum_tarih(m.group(0), yukleme, rapor) if m else None)
+
+
+def parse_konum_raporu(excel_bytes, dosya_adi=''):
+    """Konum raporu Excel'ini satır listesine çevirir.
+
+    Sütunlar başlık adından bulunur (Kazakistan raporunda araya ETA girdiği için
+    varış tarihi H değil I sütunundadır). Dosya no sütununun başlığı boş/yanlış
+    olduğundan "20xx-nnn" deseni en çok geçen sütun dosya no kabul edilir.
+    """
+    import openpyxl
+    import datetime as _dt
+    wb = openpyxl.load_workbook(io.BytesIO(excel_bytes), data_only=True, read_only=True)
+    # Excel'in son kaydedilme zamanı (dosya özelliklerinde UTC) → Türkiye tarihi
+    kayit_zamani = getattr(wb.properties, 'modified', None)
+    rapor_tarihi = (kayit_zamani + _dt.timedelta(hours=3)).date() if kayit_zamani else None
+    satirlar = []
+    for ws in wb.worksheets:
+        rows = list(ws.iter_rows(values_only=True))
+        # Başlık satırı: "PLAKA" ve "VARIŞ" içeren ilk satır (ilk 10 satırda aranır)
+        baslik_idx, kol = None, {}
+        for i, r in enumerate(rows[:10]):
+            hucreler = [_konum_katla(c).replace('\n', ' ') if c is not None else '' for c in r]
+            if any('PLAKA' in h for h in hucreler) and any('VARIS' in h for h in hucreler):
+                baslik_idx = i
+                for j, h in enumerate(hucreler):
+                    if 'PLAKA' in h and 'plaka' not in kol:
+                        kol['plaka'] = j
+                    elif 'VARIS' in h and 'ETA' not in h and 'varis' not in kol:
+                        kol['varis'] = j
+                    elif 'YUKLEME' in h and 'yukleme' not in kol:
+                        kol['yukleme'] = j
+                    elif 'BOSALTMA' in h and 'bosaltma' not in kol:
+                        kol['bosaltma'] = j
+                    elif 'ACIKLAMA' in h and 'aciklama' not in kol:
+                        kol['aciklama'] = j
+                    elif h.strip() == 'ULKE' and 'ulke' not in kol:
+                        kol['ulke'] = j
+                break
+        if baslik_idx is None or 'plaka' not in kol or 'varis' not in kol:
+            continue
+
+        veri = rows[baslik_idx + 1:]
+        # Dosya no sütunu: "20xx-nnn" deseninin en çok geçtiği sütun
+        sayac = {}
+        for r in veri:
+            for j, c in enumerate(r):
+                if c is not None and re.search(r'20\d\d\s*-\s*\d{3}', str(c)):
+                    sayac[j] = sayac.get(j, 0) + 1
+        dosya_kol = max(sayac, key=sayac.get) if sayac else None
+        ozel_kol  = {'dosya': dosya_kol}
+
+        def hucre(r, anahtar):
+            j = ozel_kol[anahtar] if anahtar in ozel_kol else kol.get(anahtar)
+            return r[j] if j is not None and j < len(r) else None
+
+        for i, r in enumerate(veri):
+            plaka_ham = hucre(r, 'plaka')
+            if plaka_ham is None or not str(plaka_ham).strip():
+                continue
+            yukleme   = _konum_tarih(hucre(r, 'yukleme'), rapor=rapor_tarihi)
+            varis_ham = hucre(r, 'varis')
+            # "ETA 06.10" (Belçika) tahmindir: varış sayılmaz, hatalı da sayılmaz
+            eta_var, eta = _konum_eta(varis_ham, yukleme, rapor_tarihi)
+            varis     = None if eta_var else _konum_tarih(varis_ham, yukleme, rapor_tarihi)
+            satirlar.append({
+                'dosya':      dosya_adi,
+                'sayfa':      ws.title,
+                'satir':      baslik_idx + 2 + i,
+                'ulke':       str(hucre(r, 'ulke') or '').strip(),
+                'dosya_no':   str(hucre(r, 'dosya') or '').strip(),
+                'dosyalar':   _konum_dosya_nolari(hucre(r, 'dosya')),
+                'plaka':      str(plaka_ham).replace('\xa0', ' ').strip(),
+                'plaka_k':    _konum_plaka(plaka_ham),
+                'yukleme':    yukleme,
+                'varis':      varis,
+                'eta_var':    eta_var,
+                'eta':        eta,
+                # Dolu ama tarih olarak okunamayan hücre (ör. "24.02.205")
+                'varis_hatali': str(varis_ham).strip() if (varis_ham not in (None, '') and not varis
+                                                           and not eta_var) else '',
+                'aciklama':   str(hucre(r, 'aciklama') or '').strip(),
+                'bosaltma':   _konum_tarih(hucre(r, 'bosaltma'), yukleme, rapor_tarihi),
+                'rapor_tarihi': rapor_tarihi,
+            })
+    wb.close()
+    return satirlar
+
+
+def _konum_tahmini_varis(x, ulke, yukleme):
+    """Varış hücresi boş satır için (tarih|None, not) döner; varış belirtisi yoksa None."""
+    ac = _konum_katla(x['aciklama'])
+    ac_duz = re.sub(r'[^A-Z0-9 ]', ' ', ac)
+    rt = x['rapor_tarihi']
+    rt_txt = f"Excel {rt.strftime('%d.%m.%Y')} tarihinde kaydedilmiş" if rt else 'Excel kayıt tarihi okunamadı'
+
+    tr_yerde = any(y in ac_duz for y in _KONUM_TR_YERLER)
+    if x['bosaltma']:
+        b = x['bosaltma']
+        b_txt = b.strftime('%d.%m.%Y')
+        # Boşaltma tarihi açıklamayla/tarihlerle çelişiyorsa tarih önerilmez
+        if tr_yerde:
+            return '', f'Boşaltma tarihi {b_txt} ama açıklama "{x["aciklama"]}" diyor; kontrol edin'
+        if yukleme and b < yukleme:
+            return '', f'Boşaltma tarihi {b_txt} yüklemeden önce; kontrol edin'
+        if rt and b > rt:
+            return '', f'Boşaltma tarihi {b_txt} rapor tarihinden ileride (tahmin olabilir); kontrol edin'
+        return b, f'Varış tarihi yazılmamış; boşaltma tarihi {b_txt} önerildi'
+
+    # ETA var, başka tarih yok → araç yolda sayılır (açıklamadan tahmin yapılmaz)
+    if x.get('eta_var'):
+        return None
+
+    if 'BOSALTILDI' in ac_duz.replace(' ', ''):
+        return rt, f'"{x["aciklama"]}" yazıyor, varış tarihi yok; {rt_txt}'
+
+    if not _KONUM_VARIS_IFADE.search(ac_duz) or tr_yerde:
+        return None
+    if not rt:
+        return '', f'"{x["aciklama"]}" yazıyor ama {rt_txt.lower()}; tarihi siz girin'
+    if yukleme and (rt - yukleme).days <= KONUM_CIKIS_GUMRUK_GUN:
+        return None
+    min_gun = KONUM_MIN_YOL_GUN.get(_konum_katla(ulke).strip(), KONUM_MIN_YOL_GUN_VARSAYILAN)
+    if yukleme and (rt - yukleme).days < min_gun:
+        return '', (f'"{x["aciklama"]}" yazıyor ama yüklemeden {(rt - yukleme).days} gün sonra '
+                    f'(en az {min_gun} gün sürer) — çıkış gümrüğü olabilir; kontrol edin')
+    return rt, f'"{x["aciklama"]}" yazıyor, varış tarihi yok; {rt_txt}'
+
+
+def konum_raporu_oku(excel_listesi):
+    """excel_listesi: [(dosya_adi, bytes), ...] → tüm raporların satır listesi."""
+    satirlar = []
+    for ad, b in excel_listesi:
+        satirlar.extend(parse_konum_raporu(b, ad))
+    return satirlar
+
+
+def konum_raporu_onizle(satirlar):
+    """konum_raporu_oku() satırlarını açık sevkiyatlarla eşleştirir.
+    Hiçbir tabloya YAZMAZ.
+
+    Dönen kategoriler:
+      guncellenecek – varış tarihi var (ya da açıklamadan tahmin edildi: tahmin_notu),
+                      kayıt Yüklenecek/YOLDA → onaylanırsa Varış Gümrük olacak
+                      (Bosna/Sırbistan: TESLİM EDİLDİ, varış = teslim tarihi)
+      varis_yok     – eşleşti ama raporda varış tarihi henüz yok (konum bilgisi)
+      zaten_guncel  – eşleşti, kayıt zaten Varış Gümrük/Gümrükleme
+      belirsiz      – eşit yakınlıkta birden fazla aday satır var; yazılmaz
+      eslesmedi     – rapordaki ülkelerin açık sevkiyatı, raporda bulunamadı
+      hatali        – varış hücresi dolu ama tarih okunamadı
+    """
+    rapor_ulkeleri = {_konum_katla(s['ulke']).strip() for s in satirlar if s['ulke']}
+
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute('''
+        SELECT id, ihracat_dosya_no, ulke, plaka, durum, yukleme_tarihi,
+               gumruk_tarihi, varis_tarihi, sefer_id
+        FROM shipments
+        WHERE upper(durum) = ANY(%s)
+        ORDER BY id
+    ''', (list(_KONUM_ACIK_DURUMLAR + _KONUM_ILERI_DURUMLAR),))
+    kayitlar = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    sonuc = {k: [] for k in ('guncellenecek', 'varis_yok', 'zaten_guncel',
+                             'belirsiz', 'eslesmedi', 'hatali')}
+
+    def satir_ozet(x):
+        return {
+            'kaynak':   f"{x['dosya']} · satır {x['satir']}",
+            'dosya_no': x['dosya_no'],
+            'ulke':     x['ulke'],
+            'plaka':    x['plaka'],
+            'yukleme':  x['yukleme'].isoformat() if x['yukleme'] else None,
+            'varis':    x['varis'].isoformat() if x['varis'] else None,
+            'aciklama': x['aciklama'],
+        }
+
+    for (sid, dosya_no, ulke, plaka, durum, yukleme, gumruk, varis_db, sefer_id) in kayitlar:
+        if not any(_konum_ulke_eslesir(ulke, u) for u in rapor_ulkeleri):
+            continue
+        dosya_k = (_konum_dosya_nolari(dosya_no) or [None])[0]
+        ref_tarih = yukleme or gumruk
+        kayit = {
+            'id': sid, 'ihracat_dosya_no': dosya_no, 'ulke': ulke, 'plaka': plaka,
+            'durum': durum, 'sefer_id': sefer_id,
+            'yukleme_tarihi': ref_tarih.isoformat() if ref_tarih else None,
+        }
+
+        def uzaklik(x):
+            return abs((x['yukleme'] - ref_tarih).days) if (x['yukleme'] and ref_tarih) else 10 ** 6
+
+        # 1) Dosya no ile
+        adaylar = [x for x in satirlar if dosya_k and dosya_k in x['dosyalar']]
+        yontem  = 'dosya no'
+        # 2) Plaka + ülke + yükleme tarihine en yakın
+        if not adaylar:
+            yontem = 'plaka + tarih'
+            if not ref_tarih:
+                adaylar = []
+            else:
+                pk = _konum_plaka(plaka)
+                adaylar = [
+                    x for x in satirlar
+                    if not x['dosyalar']              # başka dosyaya ait satırı alma
+                    and x['yukleme']
+                    and _konum_ulke_eslesir(ulke, x['ulke'])
+                    and _konum_plaka_eslesir(pk, x['plaka_k'])
+                    and uzaklik(x) <= KONUM_TARIH_TOLERANS_GUN
+                ]
+
+        if not adaylar:
+            if _normalize_durum(durum) in ('YOLDA', 'Yüklenecek'):
+                sonuc['eslesmedi'].append(kayit)
+            continue
+
+        adaylar.sort(key=uzaklik)
+        en_iyi = adaylar[0]
+        # Eşit yakınlıkta, farklı varış bilgisi taşıyan ikinci aday → belirsiz
+        ikinci = [x for x in adaylar[1:] if uzaklik(x) == uzaklik(en_iyi)
+                  and (x['varis'], x['plaka']) != (en_iyi['varis'], en_iyi['plaka'])]
+        kayit['yontem'] = yontem
+        kayit['satir']  = satir_ozet(en_iyi)
+        if ikinci:
+            kayit['adaylar'] = [satir_ozet(x) for x in [en_iyi] + ikinci]
+            sonuc['belirsiz'].append(kayit)
+            continue
+
+        if en_iyi['varis_hatali']:
+            kayit['hatali_deger'] = en_iyi['varis_hatali']
+            sonuc['hatali'].append(kayit)
+        elif _konum_katla(durum) in [_konum_katla(d) for d in _KONUM_ILERI_DURUMLAR]:
+            sonuc['zaten_guncel'].append(kayit)
+        elif not en_iyi['varis']:
+            tahmin = _konum_tahmini_varis(en_iyi, ulke, ref_tarih)
+            if tahmin is None:
+                sonuc['varis_yok'].append(kayit)
+            else:
+                tarih, not_ = tahmin
+                kayit['yeni_tarih'] = tarih.isoformat() if tarih else ''
+                kayit['tahmin_notu'] = not_
+                sonuc['guncellenecek'].append(kayit)
+        else:
+            kayit['yeni_tarih'] = en_iyi['varis'].isoformat()
+            sonuc['guncellenecek'].append(kayit)
+
+    _konum_grup_eslerini_ekle(sonuc)
+    sonuc['okunan_satir'] = len(satirlar)
+    return sonuc
+
+
+def _konum_grup_eslerini_ekle(sonuc):
+    """Gruplu sevkiyatlar (aynı sefer_id) aynı araçtadır, birlikte güncellenir.
+    Raporda yalnız birinin dosya no'su geçse de hâlâ Yüklenecek/YOLDA olan grup
+    eşleri aynı tarih ve kategoriyle listeye eklenir. Grup eşi zaten ilerlemişse
+    (Varış Gümrük/Gümrükleme/TESLİM) onun varış tarihiyle 'guncellenecek'e girer."""
+    kategoriler = ('guncellenecek', 'belirsiz', 'hatali')
+    listedeki = {k['id'] for kat in kategoriler for k in sonuc[kat]}
+    kaynak = {}
+    for kat in kategoriler:
+        for k in sonuc[kat]:
+            if k.get('sefer_id') and k['sefer_id'] not in kaynak:
+                kaynak[k['sefer_id']] = (kat, k)
+    aday_seferler = {k['sefer_id'] for kat in ('eslesmedi', 'varis_yok', 'zaten_guncel')
+                     for k in sonuc[kat] if k.get('sefer_id')} | set(kaynak)
+    if not aday_seferler:
+        return
+
+    conn = get_conn()
+    cur  = conn.cursor()
+    cur.execute('''
+        SELECT id, ihracat_dosya_no, ulke, plaka, durum, yukleme_tarihi,
+               gumruk_tarihi, varis_tarihi, sefer_id
+        FROM shipments WHERE sefer_id = ANY(%s) ORDER BY id
+    ''', (list(aday_seferler),))
+    grup = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    acik = [_konum_katla(d) for d in _KONUM_ACIK_DURUMLAR]
+    eklenen = set()
+    for (sid, dosya_no, ulke, plaka, durum, yukleme, gumruk, varis_db, sefer_id) in grup:
+        if sid in listedeki or _konum_katla(durum) not in acik:
+            continue
+        ref_tarih = yukleme or gumruk
+        kayit = {
+            'id': sid, 'ihracat_dosya_no': dosya_no, 'ulke': ulke, 'plaka': plaka,
+            'durum': durum, 'sefer_id': sefer_id,
+            'yukleme_tarihi': ref_tarih.isoformat() if ref_tarih else None,
+            'yontem': 'grup eşi',
+        }
+        if sefer_id in kaynak:
+            kat, esi = kaynak[sefer_id]
+            for alan in ('satir', 'adaylar', 'hatali_deger', 'yeni_tarih'):
+                if alan in esi:
+                    kayit[alan] = esi[alan]
+            kayit['tahmin_notu'] = f"Grup eşi {esi['ihracat_dosya_no']} ile aynı araç" + (
+                f" — {esi['tahmin_notu']}" if esi.get('tahmin_notu') else '')
+        else:
+            ileri = [r for r in grup if r[8] == sefer_id and r[0] != sid and r[7]
+                     and _konum_katla(r[4]) not in acik]
+            if not ileri:
+                continue
+            esi = ileri[0]
+            kat = 'guncellenecek'
+            kayit['yeni_tarih'] = esi[7].isoformat()
+            kayit['satir'] = {'aciklama': f'Grup eşi {esi[1]} zaten {esi[4]}'}
+            kayit['tahmin_notu'] = f"Grup eşi {esi[1]} ile aynı araç ({esi[4]})"
+        sonuc[kat].append(kayit)
+        listedeki.add(sid)
+        eklenen.add(sid)
+    for kat in ('eslesmedi', 'varis_yok'):
+        sonuc[kat] = [k for k in sonuc[kat] if k['id'] not in eklenen]
+
+
+def konum_raporu_uygula(kalemler):
+    """kalemler: [{'id': int, 'tarih': 'YYYY-MM-DD'}, ...] — önizlemede kullanıcının
+    işaretleyip (gerekirse elle düzelttiği) kayıtlar. Başka hiçbir yerden çağrılmaz.
+
+    Korumalar: tarih geçerli olmalı, bugünden ileri olamaz, kaydın yükleme
+    tarihinden önce olamaz; yalnızca durumu hâlâ Yüklenecek/YOLDA olan kayıt
+    güncellenir (önizleme ile onay arasında elle ilerletilmiş kayıt geri alınmaz).
+    """
+    import datetime as _dt
+    bugun = _dt.date.today()
+    acik  = [_konum_katla(d) for d in _KONUM_ACIK_DURUMLAR]
+    guncellenen, atlanan = [], []
+    conn = get_conn()
+    cur  = conn.cursor()
+    for k in kalemler or []:
+        try:
+            sid = int(k.get('id'))
+        except (TypeError, ValueError):
+            continue
+        tarih = _konum_tarih(_gecerli_tarih(k.get('tarih')))
+        if not tarih:
+            atlanan.append({'id': sid, 'neden': 'Tarih geçersiz'})
+            continue
+        if tarih > bugun:
+            atlanan.append({'id': sid, 'neden': 'Tarih bugünden ileri'})
+            continue
+        cur.execute('SELECT ihracat_dosya_no, durum, yukleme_tarihi, ulke FROM shipments WHERE id = %s', (sid,))
+        row = cur.fetchone()
+        if not row:
+            atlanan.append({'id': sid, 'neden': 'Kayıt bulunamadı'})
+            continue
+        dosya_no, durum, yukleme, ulke = row
+        if _konum_katla(durum) not in acik:
+            atlanan.append({'id': sid, 'dosya_no': dosya_no, 'neden': f'Durum artık {durum}'})
+            continue
+        if yukleme and tarih < yukleme:
+            atlanan.append({'id': sid, 'dosya_no': dosya_no, 'neden': 'Varış, yükleme tarihinden önce'})
+            continue
+        if _varis_teslim_ulkesi(ulke):
+            cur.execute('''
+                UPDATE shipments SET durum = 'TESLİM EDİLDİ', varis_tarihi = %s, gumrukleme_bitis = %s
+                WHERE id = %s AND upper(durum) = ANY(%s)
+            ''', (tarih, tarih, sid, list(_KONUM_ACIK_DURUMLAR)))
+        else:
+            cur.execute('''
+                UPDATE shipments SET durum = 'Varış Gümrük', varis_tarihi = %s
+                WHERE id = %s AND upper(durum) = ANY(%s)
+            ''', (tarih, sid, list(_KONUM_ACIK_DURUMLAR)))
+        if cur.rowcount:
+            guncellenen.append(sid)
+        # Aynı araçtaki (sefer_id) hâlâ açık grup eşleri de aynı tarihle güncellenir
+        cur.execute('''
+            SELECT id, ihracat_dosya_no, ulke, yukleme_tarihi FROM shipments
+            WHERE sefer_id = (SELECT sefer_id FROM shipments WHERE id = %s)
+              AND sefer_id IS NOT NULL AND id <> %s AND upper(durum) = ANY(%s)
+        ''', (sid, sid, list(_KONUM_ACIK_DURUMLAR)))
+        for es_id, es_dosya, es_ulke, es_yukleme in cur.fetchall():
+            if es_yukleme and tarih < es_yukleme:
+                atlanan.append({'id': es_id, 'dosya_no': es_dosya, 'neden': 'Varış, yükleme tarihinden önce (grup eşi)'})
+                continue
+            if _varis_teslim_ulkesi(es_ulke):
+                cur.execute('''
+                    UPDATE shipments SET durum = 'TESLİM EDİLDİ', varis_tarihi = %s, gumrukleme_bitis = %s
+                    WHERE id = %s AND upper(durum) = ANY(%s)
+                ''', (tarih, tarih, es_id, list(_KONUM_ACIK_DURUMLAR)))
+            else:
+                cur.execute('''
+                    UPDATE shipments SET durum = 'Varış Gümrük', varis_tarihi = %s
+                    WHERE id = %s AND upper(durum) = ANY(%s)
+                ''', (tarih, es_id, list(_KONUM_ACIK_DURUMLAR)))
+            if cur.rowcount:
+                guncellenen.append(es_id)
+    conn.commit()
+    cur.close()
+    conn.close()
+    return guncellenen, atlanan

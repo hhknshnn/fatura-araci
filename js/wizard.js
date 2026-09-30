@@ -207,15 +207,33 @@ function selectDepo(depo) {
   selectedDepo = depo;
   document.getElementById('mode-serbest').classList.toggle('active', depo === 'serbest');
   document.getElementById('mode-antrepo').classList.toggle('active', depo === 'antrepo');
+  // Taslak ile aynı: dosya yükleme alanı ülke + depo seçilince açılır
+  const dropZone = document.getElementById('dropZone');
+  if (dropZone && currentCountry && depo) dropZone.style.display = 'block';
   if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
+}
+
+// Depo seçimini boşa al (seçim zorunlu — varsayılan yok)
+function clearDepoSecimi() {
+  selectedDepo = null;
+  document.getElementById('mode-serbest')?.classList.remove('active');
+  document.getElementById('mode-antrepo')?.classList.remove('active');
 }
 // ── ADIM 3: ÜLKE SEÇ ──────────────────────────────────────────────────────────
 function selectCountry(c) {
+  // Sol listede başka ülkeye geçiş = eski "Ülke değiştir" akışı
+  if (currentCountry && currentCountry !== c) resetUlkeSecimi();
+  // Yeni ülke = depo tipi yeniden seçilir (taslak ekranıyla aynı)
+  if (currentCountry !== c) clearDepoSecimi();
   currentCountry = c;
 
   document.querySelectorAll('.country-btn, .country-row, .cc, .cc2').forEach(btn => btn.classList.remove('active'));
   const el = document.getElementById('country-' + c);
   if (el) el.classList.add('active');
+  if (typeof fuMdSecim === 'function') fuMdSecim('invplMd', el);
+  if (typeof fuUlkeAdresGuncelle === 'function') fuUlkeAdresGuncelle('invpl', c);
+  const depoSec = document.getElementById('invplDepoSection');
+  if (depoSec) depoSec.style.display = '';
   if (typeof updateTopbarBadges === 'function') updateTopbarBadges();
 
   // USD kur satırlarını gizle
@@ -252,12 +270,14 @@ function selectCountry(c) {
   const nakliyeEl = document.getElementById('nakliyeInput');
   if (nakliyeEl) nakliyeEl.value = DEFAULT_NAKLIYE[c] || '';
 
-  // ── DROPZONE: Ülke seçilince göster ──────────────────────────────────────
+  // ── DROPZONE: Ülke + depo seçilince göster (depo seçilince selectDepo açar) ──
   const backendUlkeler = ['rs', 'ba', 'ge', 'xk', 'mk', 'be', 'de', 'nl', 'kz', 'ru', 'uz', 'iq', 'ly', 'lr', 'lb', 'abh', 'jo', 'mu'];
   const dropZone = document.getElementById('dropZone');
-  if (dropZone) dropZone.style.display = 'block';
+  if (dropZone) dropZone.style.display = selectedDepo ? 'block' : 'none';
 
   // ── ÜLKE GRUPLARI: Seçilince diğerlerini gizle, "Değiştir" butonu ekle ──
+  // Fatura Üret sol liste düzeninde (fu-md) liste sabit kalır, gizleme yapılmaz.
+  const listeSabit = !!document.querySelector('#step2 .fu-md-rail');
   const grupIds = ['cc2-kurumsal', 'cc2-franchise', 'cc2-toptan'];
   const grupMap = {
     rs: 'cc2-kurumsal', ba: 'cc2-kurumsal', ge: 'cc2-kurumsal',
@@ -269,7 +289,7 @@ function selectCountry(c) {
     abh: 'cc2-toptan', mu: 'cc2-toptan',
   };
   const aktifGrup = grupMap[c];
-  grupIds.forEach(gid => {
+  if (!listeSabit) grupIds.forEach(gid => {
     const gel = document.getElementById(gid);
     if (!gel) return;
     if (gid === aktifGrup) {
@@ -307,7 +327,7 @@ function selectCountry(c) {
 
   // Arama kutusunu gizle
   const searchCompact = document.querySelector('#step2 .search-compact');
-  if (searchCompact) searchCompact.style.display = 'none';
+  if (searchCompact && !listeSabit) searchCompact.style.display = 'none';
 
   // Kıbrıs özel: çoklu dosya modunda da dropZone görünür
   // pdfDropZone eski uyumluluk için gizli kalır — asıl dropZone her şeyi alır
@@ -325,6 +345,10 @@ function selectCountry(c) {
 // ── ÜLKE SEÇİMİ SIFIRLA ──────────────────────────────────────────────────────
 function resetUlkeSecimi() {
   currentCountry = null;
+  if (typeof fuMdSecim === 'function') fuMdSecim('invplMd', null);
+  if (typeof fuUlkeAdresGuncelle === 'function') fuUlkeAdresGuncelle('invpl', null);
+  const depoSec = document.getElementById('invplDepoSection');
+  if (depoSec) depoSec.style.display = 'none';
 
   // Tüm grupları göster, tüm kartları geri getir
   ['cc2-kurumsal', 'cc2-franchise', 'cc2-toptan'].forEach(gid => {
@@ -357,7 +381,7 @@ function resetUlkeSecimi() {
 
 function resetSonrasiWizard() {
   // State sıfırla
-  selectedDepo  = 'serbest';
+  selectedDepo  = null;
   lastFileData  = null;
   lastPdfData   = null;
   masterRows    = null;
@@ -373,11 +397,8 @@ function resetSonrasiWizard() {
   // Ülke + dropzone sıfırla (zaten var olan fonksiyon)
   resetUlkeSecimi();
 
-  // Depo butonlarını default (serbest) yap
-  const btnSerbest = document.getElementById('mode-serbest');
-  const btnAntrepo = document.getElementById('mode-antrepo');
-  if (btnSerbest) btnSerbest.classList.add('active');
-  if (btnAntrepo) btnAntrepo.classList.remove('active');
+  // Depo butonlarını boşa al — kullanıcı seçmeli
+  clearDepoSecimi();
 
   // Dosya rozet/pill'lerini temizle
   const fn = document.getElementById('fileName');
@@ -804,6 +825,10 @@ async function downloadRS() {
         usdKuru: getUsdRate() || 1.0,
         koFreight: parseNum(document.getElementById('koFreightInput')?.value || '0'),
         koInsurance: parseNum(document.getElementById('koInsuranceInput')?.value || '0'),
+        // KZ sigorta bildirim formu için
+        ihracatDosyaNo: document.getElementById('ihracatDosyaNo')?.value?.trim() ? '2026-' + document.getElementById('ihracatDosyaNo').value.trim() : '',
+        plaka: _plakaVal(),
+        yuklemeTarihi: document.getElementById('yuklemeTarihiInput')?.value || '',
       })
     });
 
@@ -824,6 +849,10 @@ async function downloadRS() {
 
     // Price List (KZ)
     if (data.priceList) _downloadBlob(data.priceList, `Price List - ${data.faturaNo}.pdf`, 'application/pdf');
+
+    // Sigorta poliçe talimatı (KZ)
+    if (data.sigortaTalimat) _downloadBlob(data.sigortaTalimat, `sigorta poliçe talimatı-Kazakistan - ${data.sigortaRef || data.faturaNo}.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
     // Mill Test (BE)
     if (data.millTest) _downloadBlob(data.millTest, `MILL TEST - ${data.faturaNo}.pdf`, 'application/pdf');
@@ -851,6 +880,7 @@ async function downloadRS() {
           pdf: pdfB64 || '',
           master: data.master || '',
           priceList: data.priceList || '',
+          sigortaTalimat: data.sigortaTalimat || '',
           millTest: data.millTest || '',
         })
       });

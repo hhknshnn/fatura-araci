@@ -11,9 +11,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260928-bildirim-sade">
+  <link rel="stylesheet" href="css/style.css?v=20260930-kompakt2">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/tabler-icons.min.css">
 
@@ -1196,6 +1196,10 @@
                 <button onclick="openImportModal()" class="role-admin-only"
                   style="display:none!important;height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#7C3AED;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
                   <i class="ti ti-upload" aria-hidden="true"></i>İçe Aktar</button>
+                <button onclick="konumRaporuSec()" title="Nakliyeci konum raporundan varış tarihlerini al"
+                  style="height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#1668B8;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+                  <i class="ti ti-map-pin" aria-hidden="true"></i>Konum Raporu</button>
+                <input type="file" id="konum-raporu-input" accept=".xlsx" multiple style="display:none" onchange="konumRaporuYukle(this.files)">
                 <button onclick="downloadMaliyetRaporu()"
                   style="height:32px;padding:0 9px;border-radius:var(--radius-md);border:none;background:#185FA5;color:#fff;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
                   <i class="ti ti-download" aria-hidden="true"></i>Maliyet Raporu</button>
@@ -1403,319 +1407,325 @@
 
         <!-- Adım 2: Ülke & Dosyalar -->
         <div class="panel" id="step2" style="display:none;">
+          <div class="fu-md" id="invplMd">
+            <aside class="fu-md-rail">
+              <!-- Ülke Arama -->
+              <div class="search-compact">
+                <i class="ti ti-search" aria-hidden="true"></i>
+                <input type="text" id="countrySearchInput" placeholder="Ülke ara..." oninput="filterCountryList()">
+              </div>
 
-          <!-- Depo Tipi -->
-          <div class="depo-segment">
-            <button class="depo-segment-btn active" id="mode-serbest" onclick="selectDepo('serbest')">
-              <div class="depo-segment-icon"><i class="ti ti-building" aria-hidden="true"></i></div>
-              <div>
-                <div class="depo-segment-label">Serbest depo</div>
+              <!-- Kurumsal -->
+              <div class="cc2-section" id="cc2-kurumsal">
+                <div class="cc2-header">
+                  <span class="cc2-label" id="cc-lbl-kurumsal">Kurumsal</span>
+                  <span class="cc2-count">9</span>
+                </div>
+                <div class="cc2-grid" id="cc-grid-kurumsal">
+                  <div class="cc2" id="country-rs" data-name="sırbistan" onclick="selectCountry('rs')">
+                    <img src="https://flagcdn.com/40x30/rs.png" alt="Sırbistan">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Sırbistan</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-ba" data-name="bosna" onclick="selectCountry('ba')">
+                    <img src="https://flagcdn.com/40x30/ba.png" alt="Bosna">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Bosna</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-ge" data-name="gürcistan" onclick="selectCountry('ge')">
+                    <img src="https://flagcdn.com/40x30/ge.png" alt="Gürcistan">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Gürcistan</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-xk" data-name="kosova" onclick="selectCountry('xk')">
+                    <img src="https://flagcdn.com/40x30/xk.png" alt="Kosova">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Kosova</div>
+                      <div class="cc2-cur">EUR</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-mk" data-name="makedonya" onclick="selectCountry('mk')">
+                    <img src="https://flagcdn.com/40x30/mk.png" alt="Makedonya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Makedonya</div>
+                      <div class="cc2-cur">EUR</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-be" data-name="belçika" onclick="selectCountry('be')">
+                    <img src="https://flagcdn.com/40x30/be.png" alt="Belçika">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Belçika</div>
+                      <div class="cc2-cur">EUR</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-de" data-name="almanya" onclick="selectCountry('de')">
+                    <img src="https://flagcdn.com/40x30/de.png" alt="Almanya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Almanya</div>
+                      <div class="cc2-cur">EUR</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-nl" data-name="hollanda" onclick="selectCountry('nl')">
+                    <img src="https://flagcdn.com/40x30/nl.png" alt="Hollanda">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Hollanda</div>
+                      <div class="cc2-cur">EUR</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-kz" data-name="kazakistan" onclick="selectCountry('kz')">
+                    <img src="https://flagcdn.com/40x30/kz.png" alt="Kazakistan">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Kazakistan</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </button>
-            <button class="depo-segment-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
-              <div class="depo-segment-icon"><i class="ti ti-building-warehouse" aria-hidden="true"></i></div>
-              <div>
-                <div class="depo-segment-label">Antrepo</div>
-              </div>
-            </button>
-          </div>
 
-          <!-- Ülke Arama -->
-          <div class="search-compact">
-            <i class="ti ti-search" aria-hidden="true"></i>
-            <input type="text" id="countrySearchInput" placeholder="Ülke ara..." oninput="filterCountryList()">
-          </div>
+              <!-- Franchise -->
+              <div class="cc2-section" id="cc2-franchise">
+                <div class="cc2-header">
+                  <span class="cc2-label" id="cc-lbl-franchise">Franchise</span>
+                  <span class="cc2-count">8</span>
+                </div>
+                <div class="cc2-grid" id="cc-grid-franchise">
+                  <div class="cc2" id="country-cy" data-name="kıbrıs" onclick="selectCountry('cy')">
+                    <img src="https://flagcdn.com/40x30/cy.png" alt="Kıbrıs">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Kıbrıs</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-iq" data-name="irak" onclick="selectCountry('iq')">
+                    <img src="https://flagcdn.com/40x30/iq.png" alt="Irak">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Irak</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-ly" data-name="libya" onclick="selectCountry('ly')">
+                    <img src="https://flagcdn.com/40x30/ly.png" alt="Libya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Libya</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-lr" data-name="liberya" onclick="selectCountry('lr')">
+                    <img src="https://flagcdn.com/40x30/lr.png" alt="Liberya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Liberya</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-lb" data-name="lübnan" onclick="selectCountry('lb')">
+                    <img src="https://flagcdn.com/40x30/lb.png" alt="Lübnan">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Lübnan</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-uz" data-name="özbekistan" onclick="selectCountry('uz')">
+                    <img src="https://flagcdn.com/40x30/uz.png" alt="Özbekistan">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Özbekistan</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-ru" data-name="rusya" onclick="selectCountry('ru')">
+                    <img src="https://flagcdn.com/40x30/ru.png" alt="Rusya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Rusya</div>
+                      <div class="cc2-cur">TRY</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-jo" data-name="ürdün" onclick="selectCountry('jo')">
+                    <img src="https://flagcdn.com/40x30/jo.png" alt="Ürdün">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Ürdün</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          <!-- Kurumsal -->
-          <div class="cc2-section" id="cc2-kurumsal">
-            <div class="cc2-header">
-              <span class="cc2-label" id="cc-lbl-kurumsal">Kurumsal</span>
-              <span class="cc2-count">9</span>
-            </div>
-            <div class="cc2-grid" id="cc-grid-kurumsal">
-              <div class="cc2" id="country-rs" data-name="sırbistan" onclick="selectCountry('rs')">
-                <img src="https://flagcdn.com/40x30/rs.png" alt="Sırbistan">
-                <div class="cc2-info">
-                  <div class="cc2-name">Sırbistan</div>
-                  <div class="cc2-cur">TRY</div>
+              <!-- Toptan -->
+              <div class="cc2-section" id="cc2-toptan">
+                <div class="cc2-header">
+                  <span class="cc2-label" id="cc-lbl-toptan">Toptan</span>
+                  <span class="cc2-count">2</span>
+                </div>
+                <div class="cc2-grid" id="cc-grid-toptan">
+                  <div class="cc2" id="country-abh" data-name="abhazya" onclick="selectCountry('abh')">
+                    <img src="https://flagcdn.com/40x30/un.png" alt="Abhazya">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Abhazya</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
+                  <div class="cc2" id="country-mu" data-name="mauritius" onclick="selectCountry('mu')">
+                    <img src="https://flagcdn.com/40x30/mu.png" alt="Mauritius">
+                    <div class="cc2-info">
+                      <div class="cc2-name">Mauritius</div>
+                      <div class="cc2-cur">USD</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="cc2" id="country-ba" data-name="bosna" onclick="selectCountry('ba')">
-                <img src="https://flagcdn.com/40x30/ba.png" alt="Bosna">
-                <div class="cc2-info">
-                  <div class="cc2-name">Bosna</div>
-                  <div class="cc2-cur">TRY</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-ge" data-name="gürcistan" onclick="selectCountry('ge')">
-                <img src="https://flagcdn.com/40x30/ge.png" alt="Gürcistan">
-                <div class="cc2-info">
-                  <div class="cc2-name">Gürcistan</div>
-                  <div class="cc2-cur">TRY</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-xk" data-name="kosova" onclick="selectCountry('xk')">
-                <img src="https://flagcdn.com/40x30/xk.png" alt="Kosova">
-                <div class="cc2-info">
-                  <div class="cc2-name">Kosova</div>
-                  <div class="cc2-cur">EUR</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-mk" data-name="makedonya" onclick="selectCountry('mk')">
-                <img src="https://flagcdn.com/40x30/mk.png" alt="Makedonya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Makedonya</div>
-                  <div class="cc2-cur">EUR</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-be" data-name="belçika" onclick="selectCountry('be')">
-                <img src="https://flagcdn.com/40x30/be.png" alt="Belçika">
-                <div class="cc2-info">
-                  <div class="cc2-name">Belçika</div>
-                  <div class="cc2-cur">EUR</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-de" data-name="almanya" onclick="selectCountry('de')">
-                <img src="https://flagcdn.com/40x30/de.png" alt="Almanya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Almanya</div>
-                  <div class="cc2-cur">EUR</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-nl" data-name="hollanda" onclick="selectCountry('nl')">
-                <img src="https://flagcdn.com/40x30/nl.png" alt="Hollanda">
-                <div class="cc2-info">
-                  <div class="cc2-name">Hollanda</div>
-                  <div class="cc2-cur">EUR</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-kz" data-name="kazakistan" onclick="selectCountry('kz')">
-                <img src="https://flagcdn.com/40x30/kz.png" alt="Kazakistan">
-                <div class="cc2-info">
-                  <div class="cc2-name">Kazakistan</div>
-                  <div class="cc2-cur">TRY</div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Franchise -->
-          <div class="cc2-section" id="cc2-franchise">
-            <div class="cc2-header">
-              <span class="cc2-label" id="cc-lbl-franchise">Franchise</span>
-              <span class="cc2-count">8</span>
-            </div>
-            <div class="cc2-grid" id="cc-grid-franchise">
-              <div class="cc2" id="country-cy" data-name="kıbrıs" onclick="selectCountry('cy')">
-                <img src="https://flagcdn.com/40x30/cy.png" alt="Kıbrıs">
-                <div class="cc2-info">
-                  <div class="cc2-name">Kıbrıs</div>
-                  <div class="cc2-cur">TRY</div>
+              <div id="countryNoResults"
+                style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
+              </div>
+            </aside>
+            <section class="fu-md-main">
+              <div class="fu-md-head" hidden></div>
+              <!-- Depo Tipi (taslak ile aynı sıra: önce ülke, sonra depo) -->
+              <div class="depo-segment" id="invplDepoSection" style="display:none;">
+                <button class="depo-segment-btn" id="mode-serbest" onclick="selectDepo('serbest')">
+                  <div class="depo-segment-icon"><i class="ti ti-building" aria-hidden="true"></i></div>
+                  <div>
+                    <div class="depo-segment-label">Serbest depo</div>
+                  </div>
+                </button>
+                <button class="depo-segment-btn" id="mode-antrepo" onclick="selectDepo('antrepo')">
+                  <div class="depo-segment-icon"><i class="ti ti-building-warehouse" aria-hidden="true"></i></div>
+                  <div>
+                    <div class="depo-segment-label">Antrepo</div>
+                  </div>
+                </button>
+              </div>
+              <div class="fu-md-empty">
+                <i class="ti ti-file-invoice" aria-hidden="true"></i>
+                <strong>Başlamak için ülke seçin</strong>
+              </div>
+              <!-- Kazakistan mod -->
+              <div id="kzModeSection" style="display:none;">
+                <div class="section-lbl">Çıktı Türü</div>
+                <div class="mode-options">
+                  <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
+                    <div class="mode-icon">🗜️</div>
+                    <div>
+                      <div class="mode-title">Gruplandır</div>
+                      <div class="mode-desc">SKU bazında birleştir</div>
+                    </div>
+                  </div>
+                  <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
+                    <div class="mode-icon">📋</div>
+                    <div>
+                      <div class="mode-title">Ham Veri</div>
+                      <div class="mode-desc">Tüm satırlar</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="cc2" id="country-iq" data-name="irak" onclick="selectCountry('iq')">
-                <img src="https://flagcdn.com/40x30/iq.png" alt="Irak">
-                <div class="cc2-info">
-                  <div class="cc2-name">Irak</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-ly" data-name="libya" onclick="selectCountry('ly')">
-                <img src="https://flagcdn.com/40x30/ly.png" alt="Libya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Libya</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-lr" data-name="liberya" onclick="selectCountry('lr')">
-                <img src="https://flagcdn.com/40x30/lr.png" alt="Liberya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Liberya</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-lb" data-name="lübnan" onclick="selectCountry('lb')">
-                <img src="https://flagcdn.com/40x30/lb.png" alt="Lübnan">
-                <div class="cc2-info">
-                  <div class="cc2-name">Lübnan</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-uz" data-name="özbekistan" onclick="selectCountry('uz')">
-                <img src="https://flagcdn.com/40x30/uz.png" alt="Özbekistan">
-                <div class="cc2-info">
-                  <div class="cc2-name">Özbekistan</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-ru" data-name="rusya" onclick="selectCountry('ru')">
-                <img src="https://flagcdn.com/40x30/ru.png" alt="Rusya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Rusya</div>
-                  <div class="cc2-cur">TRY</div>
-                </div>
-              </div>
-              <div class="cc2" id="country-jo" data-name="ürdün" onclick="selectCountry('jo')">
-                <img src="https://flagcdn.com/40x30/jo.png" alt="Ürdün">
-                <div class="cc2-info">
-                  <div class="cc2-name">Ürdün</div>
-                  <div class="cc2-cur">USD</div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Toptan -->
-          <div class="cc2-section" id="cc2-toptan">
-            <div class="cc2-header">
-              <span class="cc2-label" id="cc-lbl-toptan">Toptan</span>
-              <span class="cc2-count">2</span>
-            </div>
-            <div class="cc2-grid" id="cc-grid-toptan">
-              <div class="cc2" id="country-abh" data-name="abhazya" onclick="selectCountry('abh')">
-                <img src="https://flagcdn.com/40x30/un.png" alt="Abhazya">
-                <div class="cc2-info">
-                  <div class="cc2-name">Abhazya</div>
-                  <div class="cc2-cur">USD</div>
+              <!-- Dropzone -->
+              <div id="dropZone" class="drop-zone" style="display:none;"
+                onclick="document.getElementById('fileInput').click()"
+                ondragover="event.preventDefault();this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')"
+                ondrop="event.preventDefault();this.classList.remove('dragover');handleMultiFile(event.dataTransfer.files)">
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf" multiple onchange="handleMultiFile(this.files)" style="display:none;">
+                <div class="drop-icon"><i class="ti ti-file-upload"></i></div>
+                <h3>Dosyaları sürükleyin veya seçin</h3>
+                <p>Excel · PDF</p>
+                <div class="drop-pills">
+                  <span class="drop-pill" id="fileName" style="display:none;"></span>
+                  <span class="drop-pill" id="pdfFileName" style="display:none;"></span>
                 </div>
               </div>
-              <div class="cc2" id="country-mu" data-name="mauritius" onclick="selectCountry('mu')">
-                <img src="https://flagcdn.com/40x30/mu.png" alt="Mauritius">
-                <div class="cc2-info">
-                  <div class="cc2-name">Mauritius</div>
-                  <div class="cc2-cur">USD</div>
+
+              <!-- Bilgi alanları -->
+              <div id="dosyaNoSection" style="display:none;">
+                <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:auto auto;gap:10px;align-items:end;">
+                  <div class="form-field" style="grid-column:1;">
+                    <label>İhracat Dosya No</label>
+                    <div style="display:flex;align-items:center;gap:6px;height:36px;">
+                      <select id="yilSecici1" onchange="localStorage.setItem('app_yil',this.value)"
+                        style="width:70px;height:36px;padding:0 8px;border:0.5px solid var(--border2);border-radius:7px;font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--surface);outline:none;flex-shrink:0;">
+                        <option selected>2026</option>
+                        <option>2027</option>
+                        <option>2028</option>
+                      </select>
+                      <span style="font-family:var(--mono);font-size:13px;color:var(--text3);flex-shrink:0;">-</span>
+                      <input class="target-input" id="ihracatDosyaNo" type="text" inputmode="numeric" placeholder="örn: 226"
+                        style="flex:1;height:36px;min-width:0;">
+                    </div>
+                  </div>
+                  <div class="form-field" id="plakaSection" style="display:none;grid-column:2;">
+                    <label>Plaka</label>
+                    <input class="target-input" id="plakaInput" type="text" placeholder="34ABC123" style="height:36px;" onblur="this.value = normalizePlaka(this.value)">
+                  </div>
+                  <div class="form-field" id="nakliyeSection" style="display:none;grid-column:3;">
+                    <label>Nakliye Firması</label>
+                    <input class="target-input" id="nakliyeInput" type="text" placeholder="örn: RAPID" style="height:36px;">
+                  </div>
+                  <div class="form-field" id="yuklemeTarihiSection" style="display:none;grid-column:1;grid-row:2;">
+                    <label>Yükleme Tarihi</label>
+                    <input class="target-input" id="yuklemeTarihiInput" type="date" style="height:36px;">
+                  </div>
+                  <div class="form-field" id="gumrukTarihiSection" style="display:none;grid-column:2;grid-row:2;">
+                    <label>Gümrük Tarihi</label>
+                    <input class="target-input" id="gumrukTarihiInput" type="date" style="height:36px;">
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div id="countryNoResults"
-            style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
-          </div>
+              <div id="pdfDropZone" style="display:none;"><input type="file" id="pdfInput" accept=".pdf"
+                  onchange="handlePdf(this.files[0])"></div>
 
-          <!-- Kazakistan mod -->
-          <div id="kzModeSection" style="display:none;">
-            <div class="section-lbl">Çıktı Türü</div>
-            <div class="mode-options">
-              <div class="mode-btn active" id="modeGrouped" onclick="setMode('grouped')">
-                <div class="mode-icon">🗜️</div>
-                <div>
-                  <div class="mode-title">Gruplandır</div>
-                  <div class="mode-desc">SKU bazında birleştir</div>
+              <div class="pdf-info" id="pdfInfo">
+                <div class="pdf-row"><span class="pdf-key">📦 PACKAGES</span><span class="pdf-val" id="pdfKap">—</span>
+                </div>
+                <div class="pdf-row"><span class="pdf-key">🚢 FREIGHT</span><span class="pdf-val" id="pdfNavlun">—</span>
+                </div>
+                <div class="pdf-row"><span class="pdf-key">🛡 INSURANCE</span><span class="pdf-val" id="pdfSigorta">—</span>
                 </div>
               </div>
-              <div class="mode-btn" id="modeRaw" onclick="setMode('raw')">
-                <div class="mode-icon">📋</div>
-                <div>
-                  <div class="mode-title">Ham Veri</div>
-                  <div class="mode-desc">Tüm satırlar</div>
+
+              <div class="eur-section" id="eurSection">
+                <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                  <input class="target-input" id="eurRateInput" type="text" inputmode="decimal" placeholder="örn: 36,50"
+                    oninput="onEurRateChanged()" style="flex:1;">
+                  <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
+                </div>
+                <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
+                <div id="usdRateRow" style="display:none;gap:8px;align-items:center;margin-bottom:10px;">
+                  <input class="target-input" id="usdRateInput" type="text" inputmode="decimal" placeholder="örn: 34,00"
+                    style="flex:1;">
+                  <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
+                </div>
+                <div id="koFreightSection" style="display:none;">
+                  <div class="eur-label">Freight (EUR)</div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                    <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
+                      placeholder="örn: 1200,00" style="flex:1;">
+                    <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+                  </div>
+                  <div class="eur-label">Insurance (EUR)</div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                    <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
+                      placeholder="örn: 300,00" style="flex:1;">
+                    <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Dropzone -->
-          <div id="dropZone" class="drop-zone" style="display:none;"
-            onclick="document.getElementById('fileInput').click()"
-            ondragover="event.preventDefault();this.classList.add('dragover')"
-            ondragleave="this.classList.remove('dragover')"
-            ondrop="event.preventDefault();this.classList.remove('dragover');handleMultiFile(event.dataTransfer.files)">
-            <input type="file" id="fileInput" accept=".xlsx,.xls,.pdf" multiple onchange="handleMultiFile(this.files)" style="display:none;">
-            <div class="drop-icon"><i class="ti ti-file-upload" style="font-size:22px;color:var(--accent);"></i></div>
-            <h3>Excel ve PDF yükleyin</h3>
-            <p>Sürükleyin veya tıklayarak seçin · aynı anda ikisi de yüklenebilir</p>
-            <div class="drop-pills">
-              <span class="drop-pill">.xlsx</span>
-              <span class="drop-pill">.pdf</span>
-              <span class="drop-pill" id="fileName" style="display:none;"></span>
-              <span class="drop-pill" id="pdfFileName" style="display:none;"></span>
-            </div>
-          </div>
-
-          <!-- Bilgi alanları -->
-          <div id="dosyaNoSection" style="display:none;">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:auto auto;gap:10px;align-items:end;">
-              <div class="form-field" style="grid-column:1;">
-                <label>İhracat Dosya No</label>
-                <div style="display:flex;align-items:center;gap:6px;height:36px;">
-                  <select id="yilSecici1" onchange="localStorage.setItem('app_yil',this.value)"
-                    style="width:70px;height:36px;padding:0 8px;border:0.5px solid var(--border2);border-radius:7px;font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--surface);outline:none;flex-shrink:0;">
-                    <option selected>2026</option>
-                    <option>2027</option>
-                    <option>2028</option>
-                  </select>
-                  <span style="font-family:var(--mono);font-size:13px;color:var(--text3);flex-shrink:0;">-</span>
-                  <input class="target-input" id="ihracatDosyaNo" type="text" inputmode="numeric" placeholder="örn: 226"
-                    style="flex:1;height:36px;min-width:0;">
-                </div>
+              <div class="nav-row">
+                <div></div>
+                <button class="btn-secondary" id="step2Next" onclick="checkDosyaNoAndProceed()" style="display:none;">Devam
+                  →</button>
               </div>
-              <div class="form-field" id="plakaSection" style="display:none;grid-column:2;">
-                <label>Plaka</label>
-                <input class="target-input" id="plakaInput" type="text" placeholder="34ABC123" style="height:36px;" onblur="this.value = normalizePlaka(this.value)">
-              </div>
-              <div class="form-field" id="nakliyeSection" style="display:none;grid-column:3;">
-                <label>Nakliye Firması</label>
-                <input class="target-input" id="nakliyeInput" type="text" placeholder="örn: RAPID" style="height:36px;">
-              </div>
-              <div class="form-field" id="yuklemeTarihiSection" style="display:none;grid-column:1;grid-row:2;">
-                <label>Yükleme Tarihi</label>
-                <input class="target-input" id="yuklemeTarihiInput" type="date" style="height:36px;">
-              </div>
-              <div class="form-field" id="gumrukTarihiSection" style="display:none;grid-column:2;grid-row:2;">
-                <label>Gümrük Tarihi</label>
-                <input class="target-input" id="gumrukTarihiInput" type="date" style="height:36px;">
-              </div>
-            </div>
-          </div>
-
-          <div id="pdfDropZone" style="display:none;"><input type="file" id="pdfInput" accept=".pdf"
-              onchange="handlePdf(this.files[0])"></div>
-
-          <div class="pdf-info" id="pdfInfo">
-            <div class="pdf-row"><span class="pdf-key">📦 PACKAGES</span><span class="pdf-val" id="pdfKap">—</span>
-            </div>
-            <div class="pdf-row"><span class="pdf-key">🚢 FREIGHT</span><span class="pdf-val" id="pdfNavlun">—</span>
-            </div>
-            <div class="pdf-row"><span class="pdf-key">🛡 INSURANCE</span><span class="pdf-val" id="pdfSigorta">—</span>
-            </div>
-          </div>
-
-          <div class="eur-section" id="eurSection">
-            <div class="eur-label" id="eurLabel">Euro Kur (TRY/EUR)</div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-              <input class="target-input" id="eurRateInput" type="text" inputmode="decimal" placeholder="örn: 36,50"
-                oninput="onEurRateChanged()" style="flex:1;">
-              <span id="eurUnit" style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / EUR</span>
-            </div>
-            <div class="eur-label" id="usdLabel" style="display:none;">USD Kur (TRY/USD)</div>
-            <div id="usdRateRow" style="display:none;gap:8px;align-items:center;margin-bottom:10px;">
-              <input class="target-input" id="usdRateInput" type="text" inputmode="decimal" placeholder="örn: 34,00"
-                style="flex:1;">
-              <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">TRY / USD</span>
-            </div>
-            <div id="koFreightSection" style="display:none;">
-              <div class="eur-label">Freight (EUR)</div>
-              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-                <input class="target-input" id="koFreightInput" type="text" inputmode="decimal"
-                  placeholder="örn: 1200,00" style="flex:1;">
-                <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-              </div>
-              <div class="eur-label">Insurance (EUR)</div>
-              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-                <input class="target-input" id="koInsuranceInput" type="text" inputmode="decimal"
-                  placeholder="örn: 300,00" style="flex:1;">
-                <span style="font-family:var(--mono);font-size:12px;color:var(--text3);">EUR</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="nav-row">
-            <div></div>
-            <button class="btn-secondary" id="step2Next" onclick="checkDosyaNoAndProceed()" style="display:none;">Devam
-              →</button>
+            </section>
           </div>
         </div>
-        <!-- Adım 3: KG Hesaplama -->
+
         <div class="panel" id="step3" style="display:none;">
           
           <div class="status-box" id="statusBox"></div>
@@ -1772,6 +1782,8 @@
           </div>
           <div id="menseTaslakSection" style="display:none;">
             <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Taslağa Menşe Ekle</div>
+            <!-- Ülke + Referans No seçili kayıtlı taslaktan gelir (indirMenseTaslak) — tekrar sorulmaz -->
+            <div id="menseUlkeRefAlani" style="display:none;">
             <div class="section-lbl">ÜLKE</div>
             <div class="country-grid" id="menseUlkeGrid" style="margin-bottom:12px;"></div>
             <div style="font-size:13px;font-weight:500;margin-bottom:5px;">Referans No</div>
@@ -1783,6 +1795,7 @@
                 <option>2028</option>
               </select><span style="font-family:var(--mono);font-size:13px;color:var(--text3);">-</span>
               <input class="target-input" id="menseRefNo" placeholder="örn: 100" style="flex:1;">
+            </div>
             </div>
             <div id="menseTaslakListe" style="margin-bottom:10px;">
               <div
@@ -1825,92 +1838,100 @@
 
         <!-- ── TASLAK DOLDUR ───────────────────────────────────────────────── -->
         <div class="panel" id="stepTaslak" style="display:none;">
-          <div class="status-box" id="taslakStatus"></div>
-          <div id="taslakKayitliSection" style="display:none;margin-bottom:18px;">
-            <div class="section-lbl">Kayıtlı Taslaklar</div>
-            <div id="taslakKayitliListe"></div>
-          </div>
-          <div>
-            <div class="country-search-row">
-              <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
-                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
-                <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-              <input type="text" id="taslakCountrySearch" class="country-search-input" placeholder="Ülke ara..."
-                oninput="filterTaslakCountryList()">
-            </div>
-            <div class="country-groups-wrapper">
-              <div class="country-group" id="tcgroup-kurumsal">
-                <div class="country-group-header" onclick="toggleTaslakCountryGroup('kurumsal')">
-                  <span class="country-group-label">Kurumsal</span>
-                  <div class="country-group-meta"><span class="country-group-count" id="tccount-kurumsal">9</span><span
-                      class="country-group-chevron open" id="tcchevron-kurumsal">▼</span></div>
-                </div>
-                <div class="country-group-body open" id="tcbody-kurumsal"></div>
+          <div class="fu-md" id="taslakMd">
+            <aside class="fu-md-rail">
+              <div class="country-search-row">
+                <svg class="country-search-icon" viewBox="0 0 16 16" fill="none">
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <input type="text" id="taslakCountrySearch" class="country-search-input" placeholder="Ülke ara..."
+                  oninput="filterTaslakCountryList()">
               </div>
-              <div class="country-group" id="tcgroup-franchise">
-                <div class="country-group-header" onclick="toggleTaslakCountryGroup('franchise')">
-                  <span class="country-group-label">Franchise</span>
-                  <div class="country-group-meta"><span class="country-group-count" id="tccount-franchise">8</span><span
-                      class="country-group-chevron open" id="tcchevron-franchise">▼</span></div>
+              <div class="country-groups-wrapper">
+                <div class="country-group" id="tcgroup-kurumsal">
+                  <div class="country-group-header" onclick="toggleTaslakCountryGroup('kurumsal')">
+                    <span class="country-group-label">Kurumsal</span>
+                    <div class="country-group-meta"><span class="country-group-count" id="tccount-kurumsal">9</span><span
+                        class="country-group-chevron open" id="tcchevron-kurumsal">▼</span></div>
+                  </div>
+                  <div class="country-group-body open" id="tcbody-kurumsal"></div>
                 </div>
-                <div class="country-group-body open" id="tcbody-franchise"></div>
-              </div>
-              <div class="country-group" id="tcgroup-toptan">
-                <div class="country-group-header" onclick="toggleTaslakCountryGroup('toptan')">
-                  <span class="country-group-label">Toptan</span>
-                  <div class="country-group-meta"><span class="country-group-count" id="tccount-toptan">2</span><span
-                      class="country-group-chevron open" id="tcchevron-toptan">▼</span></div>
+                <div class="country-group" id="tcgroup-franchise">
+                  <div class="country-group-header" onclick="toggleTaslakCountryGroup('franchise')">
+                    <span class="country-group-label">Franchise</span>
+                    <div class="country-group-meta"><span class="country-group-count" id="tccount-franchise">8</span><span
+                        class="country-group-chevron open" id="tcchevron-franchise">▼</span></div>
+                  </div>
+                  <div class="country-group-body open" id="tcbody-franchise"></div>
                 </div>
-                <div class="country-group-body open" id="tcbody-toptan"></div>
-              </div>
-              <div class="country-group" id="tcgroup-devir">
-                <div class="country-group-header" onclick="toggleTaslakCountryGroup('devir')">
-                  <span class="country-group-label">Devir</span>
-                  <div class="country-group-meta"><span class="country-group-count" id="tccount-devir">1</span><span
-                      class="country-group-chevron open" id="tcchevron-devir">▼</span></div>
+                <div class="country-group" id="tcgroup-toptan">
+                  <div class="country-group-header" onclick="toggleTaslakCountryGroup('toptan')">
+                    <span class="country-group-label">Toptan</span>
+                    <div class="country-group-meta"><span class="country-group-count" id="tccount-toptan">2</span><span
+                        class="country-group-chevron open" id="tcchevron-toptan">▼</span></div>
+                  </div>
+                  <div class="country-group-body open" id="tcbody-toptan"></div>
                 </div>
-                <div class="country-group-body open" id="tcbody-devir"></div>
-              </div>
-            </div>
-            <div id="taslakCountryNoResults"
-              style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
-            </div>
-          </div>
-          <div id="taslakDepoSection" style="display:none;">
-            <div class="section-lbl">Depo Tipi</div>
-            <div class="mode-options" style="margin-bottom:16px;">
-              <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
-                <div class="mode-icon">🏭</div>
-                <div>
-                  <div class="mode-title">Serbest Depo</div>
+                <div class="country-group" id="tcgroup-devir">
+                  <div class="country-group-header" onclick="toggleTaslakCountryGroup('devir')">
+                    <span class="country-group-label">Devir</span>
+                    <div class="country-group-meta"><span class="country-group-count" id="tccount-devir">1</span><span
+                        class="country-group-chevron open" id="tcchevron-devir">▼</span></div>
+                  </div>
+                  <div class="country-group-body open" id="tcbody-devir"></div>
                 </div>
               </div>
-              <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
-                <div class="mode-icon">🏗️</div>
-                <div>
-                  <div class="mode-title">Antrepo</div>
+              <div id="taslakCountryNoResults"
+                style="display:none;padding:14px;font-size:13px;color:var(--text3);text-align:center;">Sonuç bulunamadı
+              </div>
+            </aside>
+            <section class="fu-md-main">
+              <div class="fu-md-head" hidden></div>
+            <div class="status-box" id="taslakStatus"></div>
+              <div class="fu-md-empty">
+                <i class="ti ti-file-description" aria-hidden="true"></i>
+                <strong>Başlamak için ülke seçin</strong>
+              </div>
+            <div id="taslakKayitliSection" style="display:none;margin-bottom:18px;">
+              <div class="section-lbl">Kayıtlı Taslaklar</div>
+              <div id="taslakKayitliListe"></div>
+            </div>
+            <div id="taslakDepoSection" style="display:none;">
+              <div class="section-lbl">Depo Tipi</div>
+              <div class="mode-options" style="margin-bottom:16px;">
+                <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
+                  <div class="mode-icon"><i class="ti ti-building" aria-hidden="true"></i></div>
+                  <div>
+                    <div class="mode-title">Serbest Depo</div>
+                  </div>
+                </div>
+                <div class="mode-btn" id="taslak-depo-antrepo" onclick="selectTaslakDepo('antrepo')">
+                  <div class="mode-icon"><i class="ti ti-building-warehouse" aria-hidden="true"></i></div>
+                  <div>
+                    <div class="mode-title">Antrepo</div>
+                  </div>
                 </div>
               </div>
+              <div id="taslakKompleWrap" style="display:none;margin-bottom:16px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;padding:11px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);">
+                  <input type="checkbox" id="taslakKomple" onchange="taslakKompleDegisti()">
+                  <span>📦 <span id="taslakKompleLabel">Komple Depo</span></span>
+                </label>
+              </div>
             </div>
-            <div id="taslakKompleWrap" style="display:none;margin-bottom:16px;">
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;padding:11px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);">
-                <input type="checkbox" id="taslakKomple" onchange="taslakKompleDegisti()">
-                <span>📦 <span id="taslakKompleLabel">Komple Depo</span></span>
-                <span style="font-size:11px;color:var(--text3);font-weight:400;">— navlun ve sigortanın tamamı</span>
-              </label>
+            <div id="taslakFormSection" style="display:none;">
+              <div class="section-lbl">Bilgileri Girin</div>
+              <div id="taslakFormAlanlari"></div>
+              <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
+              <div style="display:flex;gap:10px;margin-top:14px;">
+                <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()"
+                  style="display:none;width:auto;flex:1;">⬇ Taslak İndir</button>
+                <button class="btn-secondary" id="taslakKaydet" onclick="kaydetTaslakDraft()"
+                  style="display:none;flex:0 0 auto;">💾 Kaydet</button>
+              </div>
             </div>
-          </div>
-          <div id="taslakFormSection" style="display:none;">
-            <div class="section-lbl">Bilgileri Girin</div>
-            <div id="taslakFormAlanlari"></div>
-            <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
-            <div style="display:flex;gap:10px;margin-top:14px;">
-              <button class="btn-primary visible" id="taslakIndir" onclick="indirTaslak()"
-                style="display:none;width:auto;flex:1;">⬇ Taslak İndir</button>
-              <button class="btn-secondary" id="taslakKaydet" onclick="kaydetTaslakDraft()"
-                style="display:none;flex:0 0 auto;">💾 Kaydet</button>
-            </div>
+            </section>
           </div>
         </div>
 
@@ -1993,13 +2014,9 @@
           <div class="status-box" id="gtipResultBox"></div>
           <div class="drop-zone" id="gtipDropZone">
             <input type="file" accept=".xlsx,.xls,.pdf" multiple onchange="handleGtipMultiFile(this.files)">
-            <div class="drop-icon">🔎</div>
-            <h3>Master Excel ve PDF yükleyin</h3>
-            <p>Excel zorunlu · PDF varsa menşe taslağına aktarılır</p>
-            <div class="drop-pills">
-              <span class="drop-pill">.xlsx</span>
-              <span class="drop-pill">.pdf</span>
-            </div>
+            <div class="drop-icon"><i class="ti ti-file-search" aria-hidden="true"></i></div>
+            <h3>Dosyaları sürükleyin veya seçin</h3>
+            <p>Master Excel · PDF (opsiyonel)</p>
             <div class="file-badge" id="gtipFileName" style="display:none;"></div>
             <div class="file-badge" id="gtipPdfName" style="display:none;margin-top:6px;"></div>
           </div>
@@ -2032,58 +2049,19 @@
         <!-- ── MALİYET EVRAK ─────────────────────────────────────────────── -->
         <div class="panel me-shell" id="stepMaliyetEvrak" style="display:none;">
 
-          <div class="me-header">
-            <div class="me-heading">
-              <div class="me-kicker">Maliyet operasyonları</div>
+          <div class="fu-bar">
+            <div class="fu-tabs me-tabs" role="tablist" aria-label="Maliyet evrak bölümleri">
+              <button class="fu-tab active" id="me-tab-btn-ulkeler" onclick="switchMaliyetEvrakTab('ulkeler')" type="button">
+                <i class="ti ti-world" aria-hidden="true"></i><span>Ülke Evrakları</span>
+              </button>
+              <button class="fu-tab" id="me-tab-btn-aksu" onclick="switchMaliyetEvrakTab('aksu')" type="button">
+                <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Aksu Beyanname</span>
+              </button>
             </div>
-            <div class="me-header-metrics" aria-label="Maliyet evrak özeti">
-              <div class="me-metric">
-                <i class="ti ti-file-upload" aria-hidden="true"></i>
-                <div>
-                  <span>6</span>
-                  <small>PDF akışı</small>
-                </div>
-              </div>
-              <div class="me-metric">
-                <i class="ti ti-keyboard" aria-hidden="true"></i>
-                <div>
-                  <span>2</span>
-                  <small>Elle giriş</small>
-                </div>
-              </div>
-              <div class="me-metric">
-                <i class="ti ti-world" aria-hidden="true"></i>
-                <div>
-                  <span>8</span>
-                  <small>Ülke</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="fu-tabs me-tabs" role="tablist" aria-label="Maliyet evrak bölümleri">
-            <button class="fu-tab active" id="me-tab-btn-ulkeler" onclick="switchMaliyetEvrakTab('ulkeler')" type="button">
-              <i class="ti ti-world" aria-hidden="true"></i><span>Ülke Evrakları</span>
-            </button>
-            <button class="fu-tab" id="me-tab-btn-aksu" onclick="switchMaliyetEvrakTab('aksu')" type="button">
-              <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Aksu Beyanname</span>
-            </button>
           </div>
 
           <div id="me-tab-aksu" class="me-tab-panel" style="display:none;">
             <div class="me-aksu-card">
-              <div class="me-aksu-head">
-                <div>
-                  <div class="me-card-title">Aksu İhracat Beyanname</div>
-                  <div class="me-card-sub">PDF faturası veya maliyet Excel'i — referans / fatura no ile eşleşir, TL yazılır, EUR ve USD sevkiyat kuru ile hesaplanır.</div>
-                </div>
-                <span class="me-pill me-pill-pdf">PDF + Excel</span>
-              </div>
-              <div class="me-card-desc">
-                Aksu Gümrük PDF'i veya Sevkiyatlar maliyet raporundaki gibi doldurulmuş Excel'i yükleyin.
-                Satırlar fatura no veya ihracat dosya no ile eşleşir; İhracat Beyanname TL alanına yazılır.
-                Sevkiyattaki EUR / USD kuru doluysa karşılıkları da hesaplanır.
-              </div>
               <div id="me-aksu-drop" class="me-dropzone me-aksu-drop"
                 ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
                 ondragleave="this.classList.remove('vergi-drag-over')"
@@ -2093,8 +2071,8 @@
                   onchange="meHandleAksuFile(this.files[0])">
                 <div class="me-dz-icon"><i class="ti ti-cloud-upload"></i></div>
                 <div class="me-dz-body">
-                  <div id="me-aksu-status" class="me-dz-status">PDF veya Excel'i buraya sürükleyin veya tıklayın</div>
-                  <div class="me-aksu-hint">Çok sayfalı PDF ve Maliyet Raporu Excel (.xlsx) desteklenir</div>
+                  <div id="me-aksu-status" class="me-dz-status">Dosyayı sürükleyin veya seçin</div>
+                  <div class="me-aksu-hint">PDF · Excel</div>
                 </div>
               </div>
               <div id="me-aksu-result" class="me-result" style="display:none;"></div>
@@ -2102,6 +2080,13 @@
           </div>
 
           <div id="me-tab-ulkeler" class="me-tab-panel">
+          <div class="fu-md" id="meMd">
+          <aside class="fu-md-rail"><div id="meRailListe" class="me-rail-liste"></div></aside>
+          <section class="fu-md-main">
+          <div class="fu-md-empty">
+            <i class="ti ti-file-dollar" aria-hidden="true"></i>
+            <strong>Başlamak için ülke seçin</strong>
+          </div>
           <div class="me-grid">
 
             <!-- Sırbistan Bölümü -->
@@ -2114,7 +2099,7 @@
                 </div>
                 <span class="me-pill me-pill-pdf">PDF</span>
               </div>
-              <div class="me-card-desc">Önce sevkiyatı seçin, PDF'i yükleyin — değerler otomatik yazılır.</div>
+              <div class="me-card-desc">Önce sevkiyatı seçin, PDF'i yükleyin — okunan değerleri kontrol edip Kaydet'e basın.</div>
               <div class="me-select-row">
                 <select id="me-rs-select" class="me-select">
                   <option value="">— Sırbistan sevkiyatı seçin —</option>
@@ -2434,6 +2419,8 @@
             </div>
 
           </div>
+          </section>
+          </div>
           </div>
         </div>
 
@@ -2474,23 +2461,23 @@
   <script src="js/countries.js"></script>
   <script src="js/processor.js?v=20260922-pdfkg-reset"></script>
   <script src="js/sku.js"></script>
-  <script src="js/wizard.js?v=20260922-grupkilo-sync"></script>
-  <script src="js/taslak.js?v=20260916-mensei-fix"></script>
+  <script src="js/wizard.js?v=20260930-kz-sigorta"></script>
+  <script src="js/taslak.js?v=20260928-ulke-adres"></script>
   <script src="js/gtip.js?v=20260916-mensei-fix"></script>
   <script src="js/evrak.js"></script>
-  <script src="js/t1ayrimi.js?v=20260729-be-baslik"></script>
-  <script src="js/mense.js?v=20260922-grupkilo-sync"></script>
-  <script src="js/nebim-delivery.js?v=20260710-start-dashboard"></script>
-  <script src="js/shell.js?v=20260917-secim-bar"></script>
-  <script src="js/gecmis.js"></script>
+  <script src="js/t1ayrimi.js?v=20260928-sade-drop"></script>
+  <script src="js/mense.js?v=20260930-tekrar3"></script>
+  <script src="js/nebim-delivery.js?v=20260928-sade"></script>
+  <script src="js/shell.js?v=20260928-maliyet-ikon"></script>
+  <script src="js/gecmis.js?v=20260930-kz-sigorta"></script>
   <script src="js/auth.js?v=20260710-login-refresh"></script>
   <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
   <script src="js/users.js?v=20260710-admin-portal"></script>
   <script src="js/audit-log.js"></script>
-  <script src="js/dashboard.js?v=20260710-ulke-donut-2"></script>
-  <script src="js/shipments.js?v=20260928-ozet-bildirim"></script>
-  <script src="js/bildirim.js?v=20260928-grup-tarih2"></script>
-  <script src="js/landed-cost.js?v=20260914-lc-nav-all"></script>
+  <script src="js/dashboard.js?v=20260928-geri"></script>
+  <script src="js/shipments.js?v=20260930-sevk-drawer"></script>
+  <script src="js/bildirim.js?v=20260930-drawer"></script>
+  <script src="js/landed-cost.js?v=20260928-sade4"></script>
   <script src="js/vendor/chart.umd.js"></script>
   <script src="js/maliyet2.js?v=20260909-lt-heat"></script>
   <script src="js/kur.js?v=20260911-para-tabs"></script>

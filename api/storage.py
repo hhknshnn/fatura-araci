@@ -29,7 +29,8 @@ def _safe_key_part(value):
 
 # ── KAYDET ────────────────────────────────────────────────────────────────────
 def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None,
-                master_bytes=None, price_list_bytes=None, mill_test_bytes=None):
+                master_bytes=None, price_list_bytes=None, mill_test_bytes=None,
+                sigorta_bytes=None):
     ensure_storage_dir()
     timestamp = int(time.time())
     ulke_s      = _safe_key_part(ulke)
@@ -47,6 +48,7 @@ def save_record(ulke, fatura_no, dosya_turu, excel_bytes=None, pdf_bytes=None,
         'master':     (master_bytes,     f'{key_base}_master.xlsx'),
         'priceList':  (price_list_bytes, f'{key_base}_pricelist.pdf'),
         'millTest':   (mill_test_bytes,  f'{key_base}_milltest.pdf'),
+        'sigortaTalimat': (sigorta_bytes, f'{key_base}_sigorta.xlsx'),
     }
 
     for dosya_turu_key, (data, filename) in dosyalar.items():
@@ -168,10 +170,11 @@ def storage_post():
     master_bytes     = base64.b64decode(body['master'])     if body.get('master')     else None
     price_list_bytes = base64.b64decode(body['priceList'])  if body.get('priceList')  else None
     mill_test_bytes  = base64.b64decode(body['millTest'])   if body.get('millTest')   else None
+    sigorta_bytes    = base64.b64decode(body['sigortaTalimat']) if body.get('sigortaTalimat') else None
 
     key = save_record(ulke, fatura_no, dosya_turu,
                       excel_bytes, pdf_bytes, master_bytes,
-                      price_list_bytes, mill_test_bytes)
+                      price_list_bytes, mill_test_bytes, sigorta_bytes)
     return jsonify({'success': True, 'key': key})
 
 def storage_delete():

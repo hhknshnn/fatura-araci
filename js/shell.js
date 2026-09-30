@@ -137,6 +137,10 @@ let _meCurrentTab = 'ulkeler';
 let _fuPendingTab = null;
 let _mePendingTab = null;
 let _fuInvplOpened = false;
+// Fatura Üret'te ülke seçimi adreste tutulan sekmeler: /fatura-uret/taslak/rs, /fatura-uret/invpl/rs
+const FATURA_URET_ULKE_TABS = ['taslak', 'invpl'];
+const _fuUlke = { taslak: null, invpl: null };
+let _fuPendingUlke = null;
 
 function normalizeAppPathname(pathname) {
   const raw = String(pathname || '/').split('?')[0].split('#')[0];
@@ -159,7 +163,8 @@ function fallbackModule(mod) {
 function buildAppPath(mod, tab) {
   if (mod === 'fatura-uret') {
     const t = FATURA_URET_TABS.includes(tab) ? tab : (_fuCurrentTab || 'taslak');
-    return '/fatura-uret/' + t;
+    const ulke = FATURA_URET_ULKE_TABS.includes(t) ? _fuUlke[t] : null;
+    return '/fatura-uret/' + t + (ulke ? '/' + ulke : '');
   }
   if (mod === 'maliyet-evrak') {
     const t = MALIYET_EVRAK_TABS.includes(tab) ? tab : (_meCurrentTab || 'ulkeler');
@@ -185,12 +190,14 @@ function parseAppRoute(pathname) {
   }
 
   let tab = null;
+  let ulke = null;
   if (mod === 'fatura-uret') {
     tab = FATURA_URET_TABS.includes(parts[1]) ? parts[1] : 'taslak';
+    if (FATURA_URET_ULKE_TABS.includes(tab) && /^[a-z]{2,3}$/.test(parts[2] || '')) ulke = parts[2];
   } else if (mod === 'maliyet-evrak') {
     tab = MALIYET_EVRAK_TABS.includes(parts[1]) ? parts[1] : 'ulkeler';
   }
-  return { mod, tab, path: buildAppPath(mod, tab) };
+  return { mod, tab, ulke, path: buildAppPath(mod, tab) };
 }
 
 function syncAppUrl(mod, tab) {
@@ -200,12 +207,22 @@ function syncAppUrl(mod, tab) {
   history.pushState(null, '', newPath);
 }
 
+// Taslak / INV+PL'de ülke seçilince (ya da kaldırılınca) adresi günceller.
+// Geçmişe kayıt EKLEMEZ: yenileme ülkeyi korur, geri tuşu ülkeler arasında dolaşmaz.
+function fuUlkeAdresGuncelle(tab, kod) {
+  if (!FATURA_URET_ULKE_TABS.includes(tab)) return;
+  _fuUlke[tab] = kod || null;
+  if (_currentMod !== 'fatura-uret' || _fuCurrentTab !== tab) return;
+  const yeni = buildAppPath('fatura-uret', tab);
+  if (normalizeAppPathname(location.pathname) !== yeni) history.replaceState(null, '', yeni);
+}
+
 function applyRoute(route) {
   let mod = fallbackModule(route.mod);
   let tab = (mod === route.mod) ? route.tab : null;
   _routeSyncing = true;
   try {
-    if (mod === 'fatura-uret') _fuPendingTab = tab || 'taslak';
+    if (mod === 'fatura-uret') { _fuPendingTab = tab || 'taslak'; _fuPendingUlke = route.ulke || null; }
     if (mod === 'maliyet-evrak') _mePendingTab = tab || 'ulkeler';
     sidebarSelect(mod);
   } finally {
@@ -342,57 +359,36 @@ function sidebarSelect(mod) {
     document.getElementById('contentArea').classList.add('ops-content-area');
     // Hub'a başka modülden girişte INV+PL sekmesi ilk açılışında bir kez sıfırlansın
     if (_currentMod !== 'fatura-uret') _fuInvplOpened = false;
-    // Fatura Üret — sekme yapısı (Taslak, GTİP & Menşe, INV+PL, Ek Evrak)
+    // Fatura Üret — sekme yapısı: 3 sıralı adım (Taslak → GTİP & Menşe → INV/PL) + Belçika T1
     let panel = document.getElementById('stepFaturaUret');
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'stepFaturaUret';
       panel.className = 'panel fu-shell';
       panel.innerHTML = `
-        <div class="fu-header">
-          <div class="fu-heading">
-            <div class="fu-kicker">Fatura operasyonları</div>
+        <div class="fu-bar">
+          <div class="fu-tabs" role="tablist" aria-label="Fatura üret bölümleri">
+            <button class="fu-tab active" id="fu-tab-taslak" onclick="switchFaturaUretTab('taslak')" type="button">
+              <i class="fu-adim" aria-hidden="true">1</i><span>Fatura Taslağı</span>
+            </button>
+            <i class="ti ti-chevron-right fu-tab-ok" aria-hidden="true"></i>
+            <button class="fu-tab" id="fu-tab-gtip" onclick="switchFaturaUretTab('gtip')" type="button">
+              <i class="fu-adim" aria-hidden="true">2</i><span>GTİP &amp; Menşe Kontrolü</span>
+            </button>
+            <i class="ti ti-chevron-right fu-tab-ok" aria-hidden="true"></i>
+            <button class="fu-tab" id="fu-tab-invpl" onclick="switchFaturaUretTab('invpl')" type="button">
+              <i class="fu-adim" aria-hidden="true">3</i><span>INV / PL Üretimi</span>
+            </button>
+            <!-- <button class="fu-tab" id="fu-tab-evrak" onclick="switchFaturaUretTab('evrak')" type="button">
+              <i class="ti ti-paperclip" aria-hidden="true"></i><span>Ek Evrak</span>
+            </button> -->
           </div>
-          <div class="fu-header-metrics" aria-label="Fatura üret özeti">
-            <div class="fu-metric">
-              <i class="ti ti-files" aria-hidden="true"></i>
-              <div>
-                <span>3</span>
-                <small>Aktif modül</small>
-              </div>
-            </div>
-            <div class="fu-metric">
-              <i class="ti ti-route" aria-hidden="true"></i>
-              <div>
-                <span>Tek akış</span>
-                <small>Uçtan uca üretim</small>
-              </div>
-            </div>
-            <div class="fu-metric">
-              <i class="ti ti-shield-check" aria-hidden="true"></i>
-              <div>
-                <span>Kontrollü</span>
-                <small>GTİP + menşe</small>
-              </div>
-            </div>
+          <!-- Belçika T1 sıralı akışın parçası değil: ayrı araç olarak sağda -->
+          <div class="fu-tabs fu-tabs-yan" role="tablist" aria-label="Ek işlemler">
+            <button class="fu-tab" id="fu-tab-t1" onclick="switchFaturaUretTab('t1')" type="button">
+              <i class="ti ti-truck-delivery" aria-hidden="true"></i><span>T1 Ayrımı · Belçika</span>
+            </button>
           </div>
-        </div>
-        <div class="fu-tabs" role="tablist" aria-label="Fatura üret bölümleri">
-          <button class="fu-tab active" id="fu-tab-taslak" onclick="switchFaturaUretTab('taslak')" type="button">
-            <i class="ti ti-file-description" aria-hidden="true"></i><span>Taslak</span>
-          </button>
-          <button class="fu-tab" id="fu-tab-gtip" onclick="switchFaturaUretTab('gtip')" type="button">
-            <i class="ti ti-search" aria-hidden="true"></i><span>GTİP &amp; Menşe</span>
-          </button>
-          <button class="fu-tab" id="fu-tab-invpl" onclick="switchFaturaUretTab('invpl')" type="button">
-            <i class="ti ti-file-invoice" aria-hidden="true"></i><span>INV + PL</span>
-          </button>
-          <button class="fu-tab" id="fu-tab-t1" onclick="switchFaturaUretTab('t1')" type="button">
-            <i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Belçika T1 Ayrımı</span>
-          </button>
-          <!-- <button class="fu-tab" id="fu-tab-evrak" onclick="switchFaturaUretTab('evrak')" type="button">
-            <i class="ti ti-paperclip" aria-hidden="true"></i><span>Ek Evrak</span>
-          </button> -->
         </div>
         <div class="fu-workspace">
           <div id="fu-content-taslak" class="fu-tab-panel"></div>
@@ -577,31 +573,57 @@ function sidebarSelect(mod) {
   syncAppUrl(mod, tab);
 }
 
+// Maliyet Evrak > Ülke Evrakları: sol ülke listesi + sağda seçili ülkenin kartı.
+// Liste mevcut .me-card'lardan üretilir (bayrak, ad, PDF/Elle Giriş); kartların
+// form/yükleme içeriğine dokunulmaz — görünürlüğü is-open sınıfı yönetir.
+// (Ad eski akordeon sürümünden kalma; sidebar açılışı bu adı çağırıyor.)
 function initMaliyetEvrakAccordion(panel) {
   if (!panel || panel.dataset.accordionReady === '1') return;
   panel.dataset.accordionReady = '1';
 
-  const ulkePanel = panel.querySelector('#me-tab-ulkeler') || panel;
+  const liste = panel.querySelector('#meRailListe');
+  const kartlar = [...panel.querySelectorAll('#me-tab-ulkeler .me-card')];
+  if (!liste) return;
 
-  ulkePanel.querySelectorAll('.me-card-head').forEach(head => {
-    head.setAttribute('role', 'button');
-    head.setAttribute('tabindex', '0');
-    head.setAttribute('aria-expanded', 'false');
-  });
+  kartlar.forEach((kart, i) => {
+    const bayrak = kart.querySelector('.me-flag');
+    const ad = kart.querySelector('.me-card-title')?.textContent.trim() || '';
+    const elle = !!kart.querySelector('.me-pill-manual');
+    kart.dataset.meIndex = String(i);
 
-  ulkePanel.addEventListener('click', event => {
-    const head = event.target.closest('.me-card-head');
-    if (!head || !ulkePanel.contains(head)) return;
-    toggleMaliyetEvrakCard(head.closest('.me-card'));
+    const satir = document.createElement('button');
+    satir.type = 'button';
+    satir.className = 'me-rail-satir';
+    satir.dataset.meIndex = String(i);
+    if (bayrak) {
+      const img = document.createElement('img');
+      img.src = bayrak.src; img.alt = '';
+      satir.appendChild(img);
+    }
+    const adEl = document.createElement('span');
+    adEl.className = 'me-rail-ad';
+    adEl.textContent = ad;
+    // Evrak tipi: metin yerine küçük ikon (PDF yükleme / elle giriş), üzerine gelince açıklama
+    const tip = document.createElement('i');
+    tip.className = 'me-rail-tip ti ' + (elle ? 'ti-pencil' : 'ti-file-type-pdf');
+    tip.title = elle ? 'Elle giriş' : 'PDF yükleme';
+    tip.setAttribute('aria-label', tip.title);
+    satir.append(adEl, tip);
+    satir.addEventListener('click', () => maliyetEvrakUlkeSec(panel, i));
+    liste.appendChild(satir);
   });
+}
 
-  ulkePanel.addEventListener('keydown', event => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    const head = event.target.closest('.me-card-head');
-    if (!head || !ulkePanel.contains(head)) return;
-    event.preventDefault();
-    toggleMaliyetEvrakCard(head.closest('.me-card'));
+function maliyetEvrakUlkeSec(panel, index) {
+  panel.querySelectorAll('#me-tab-ulkeler .me-card').forEach(kart => {
+    const secili = kart.dataset.meIndex === String(index);
+    kart.classList.toggle('is-open', secili);
+    kart.classList.toggle('me-secili', secili);
   });
+  panel.querySelectorAll('.me-rail-satir').forEach(satir =>
+    satir.classList.toggle('active', satir.dataset.meIndex === String(index)));
+  const bos = panel.querySelector('#meMd .fu-md-empty');
+  if (bos) bos.hidden = true;
 }
 
 function switchMaliyetEvrakTab(tab, opts) {
@@ -625,28 +647,13 @@ function switchMaliyetEvrakTab(tab, opts) {
   }
 }
 
-function toggleMaliyetEvrakCard(card) {
-  if (!card) return;
-  const panel = card.closest('#stepMaliyetEvrak');
-  const willOpen = !card.classList.contains('is-open');
-
-  panel.querySelectorAll('.me-card.is-open').forEach(openCard => {
-    openCard.classList.remove('is-open');
-    openCard.querySelector('.me-card-head')?.setAttribute('aria-expanded', 'false');
-  });
-
-  if (willOpen) {
-    card.classList.add('is-open');
-    card.querySelector('.me-card-head')?.setAttribute('aria-expanded', 'true');
-  }
-}
-
 // Tarayıcı geri/ileri düğmesi
 window.addEventListener('popstate', () => {
   const route = parseAppRoute(location.pathname);
   const mod = fallbackModule(route.mod);
   const tab = (mod === route.mod) ? route.tab : null;
   if (_currentMod === 'fatura-uret' && mod === 'fatura-uret') {
+    _fuPendingUlke = route.ulke || null;
     switchFaturaUretTab(tab || 'taslak', { skipHistory: true });
     return;
   }
@@ -754,6 +761,35 @@ function filterCountryList() {
 
 // ── FATURA ÜRET — SEKME GEÇİŞİ ───────────────────────────────────────────────
 // Orijinal panelleri taşır — innerHTML kopyası değil, gerçek DOM elemanları
+// Fatura Üret sol liste + sağ çalışma alanı: sağ başlığı seçili kartın
+// bayrak/ad/para biriminden kurar; kart yoksa boş durumu gösterir.
+function fuMdSecim(kokId, kart) {
+  const kok = document.getElementById(kokId);
+  if (!kok) return;
+  const head = kok.querySelector('.fu-md-head');
+  const bos = kok.querySelector('.fu-md-empty');
+  if (!kart) {
+    if (head) { head.hidden = true; head.innerHTML = ''; }
+    if (bos) bos.hidden = false;
+    return;
+  }
+  if (bos) bos.hidden = true;
+  if (!head) return;
+  const img = kart.querySelector('img');
+  const ad = kart.querySelector('.cc-name, .cc2-name')?.textContent.trim() || '';
+  head.innerHTML = '';
+  if (img) {
+    const bayrak = document.createElement('img');
+    bayrak.src = img.src; bayrak.alt = '';
+    head.appendChild(bayrak);
+  }
+  const baslik = document.createElement('div');
+  baslik.className = 'fu-md-title';
+  baslik.textContent = ad;
+  head.appendChild(baslik);
+  head.hidden = false;
+}
+
 function switchFaturaUretTab(tab, opts) {
   if (!FATURA_URET_TABS.includes(tab)) tab = 'taslak';
   _fuCurrentTab = tab;
@@ -800,14 +836,38 @@ function switchFaturaUretTab(tab, opts) {
     else                       el.style.display = 'block';
   });
 
+  // INV/PL 2. adımı (KG & Hesap) da sekmenin içinde dursun; aksi halde goStep(2)
+  // onu sayfadaki eski yerinde (Fatura Üret kabuğunun üstünde) açar.
+  // Görünürlüğüne dokunulmaz — onu goStep yönetir.
+  if (tab === 'invpl') {
+    const adim2 = document.getElementById('step3');
+    if (adim2 && adim2.parentNode !== container) container.appendChild(adim2);
+  }
+
+  // Adresten gelen ülke (yenileme / paylaşılan link / geri tuşu) init'ten sonra seçilir
+  const bekleyenUlke = _fuPendingUlke;
+  _fuPendingUlke = null;
+
   // Init fonksiyonlarını çağır
   if (tab === 'taslak' && typeof initTaslakPanel === 'function') {
-    setTimeout(initTaslakPanel, 0);
+    setTimeout(() => {
+      initTaslakPanel();
+      if (bekleyenUlke && typeof TASLAK_ULKELER !== 'undefined' && TASLAK_ULKELER[bekleyenUlke]) {
+        selectTaslakUlke(bekleyenUlke);
+      }
+    }, 0);
   } else if (tab === 'gtip' && typeof initGtipPanel === 'function') {
     setTimeout(initGtipPanel, 0);
-  } else if (tab === 'invpl' && !_fuInvplOpened && typeof resetSonrasiWizard === 'function') {
-    _fuInvplOpened = true;
-    setTimeout(resetSonrasiWizard, 0);
+  } else if (tab === 'invpl') {
+    const ilkAcilis = !_fuInvplOpened && typeof resetSonrasiWizard === 'function';
+    if (ilkAcilis) _fuInvplOpened = true;
+    setTimeout(() => {
+      if (ilkAcilis) resetSonrasiWizard();
+      if (bekleyenUlke && bekleyenUlke !== currentCountry
+          && document.getElementById('country-' + bekleyenUlke) && typeof selectCountry === 'function') {
+        selectCountry(bekleyenUlke);
+      }
+    }, 0);
   } else if (tab === 't1' && typeof initT1AyrimiPanel === 'function') {
     setTimeout(initT1AyrimiPanel, 0);
   }

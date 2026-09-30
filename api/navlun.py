@@ -9,6 +9,7 @@
 
 import math
 
+import psycopg2
 from flask import jsonify, request, g
 
 from api.db import get_conn
@@ -682,6 +683,271 @@ def navlun_tahsis_kullan():
         ''', (dosya_no,))
         conn.commit()
         return jsonify({'success': True, 'guncellenen': cur.rowcount})
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# GRUPLU SEVK: ANT önce "gruplu" işaretlenir, İHR sonra listeden eşleşir
+# (tablo: navlun_gruplu_ant — migration navlun_tanim_004.sql)
+# ══════════════════════════════════════════════════════════════════════════
+
+def _num(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def navlun_gruplu_ant_yaz():
+    """POST /api/navlun/gruplu-ant — ANT taslağı indirilince çağrılır.
+    gruplu=true → kayıt eklenir/güncellenir (eşleşmişse eşleşme korunur).
+    gruplu=false → varsa eşleşmemiş kayıt silinir (sonradan gruplu kaldırıldıysa)."""
+    body = request.get_json(silent=True) or {}
+    ulke = str(body.get('ulkeKodu') or '').strip().lower()
+    dosya_no = str(body.get('dosyaNo') or '').strip()
+    if not ulke or not dosya_no:
+        return jsonify({'success': False, 'error': 'Ülke ve dosya no zorunlu'}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if body.get('gruplu'):
+            cur.execute('''
+                INSERT INTO navlun_gruplu_ant (dosya_no, ulke_kodu, navlun, sigorta, kap)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (dosya_no) DO UPDATE SET
+                    ulke_kodu = EXCLUDED.ulke_kodu,
+                    navlun = EXCLUDED.navlun,
+                    sigorta = EXCLUDED.sigorta,
+                    kap = EXCLUDED.kap
+            ''', (dosya_no, ulke, _num(body.get('navlun')), _num(body.get('sigorta')),
+                  str(body.get('kap') or '').strip()))
+        else:
+            cur.execute('''
+                DELETE FROM navlun_gruplu_ant
+                WHERE dosya_no = %s AND eslesen_dosya_no IS NULL
+            ''', (dosya_no,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _gruplu_kalan(row, ant_navlun, ant_sigorta):
+    """İHR payı = toplam (navlun_ant_ihr / sigorta_baz) − ANT'ın nihai değeri."""
+    if not row:
+        return 0.0, 0.0, None
+    return (max(0.0, float(row['navlun_ant_ihr']) - ant_navlun),
+            max(0.0, float(row['sigorta_baz']) - ant_sigorta),
+            row['para_birimi'])
+
+
+import re as _re
+
+# Kamyonun tamamını dolduran ANT (komple) gruplanmaz; parantezdeki palet
+# sayısı bu eşiğin üstündeyse ya da "FTL/KOMPLE" yazıyorsa komple sayılır.
+KOMPLE_PALET_ESIGI = 30
+
+
+def _komple_ant_mi(palet_metni):
+    metin = str(palet_metni or '').upper()
+    if 'FTL' in metin or 'KOMPLE' in metin:
+        return True
+    m = _re.search(r'\((\d+)\)', metin)
+    return bool(m) and int(m.group(1)) >= KOMPLE_PALET_ESIGI
+
+
+def _ulke_adi_norm(ad):
+    """'Gürcistan' ↔ 'GÜRCİSTAN' karşılaştırması için Türkçe i/İ normalizasyonu."""
+    return str(ad or '').strip().replace('İ', 'I').replace('ı', 'i').upper()
+
+
+def _sevkiyat_ant_adaylari(cur, ulke_adi):
+    """Sevkiyatlar'da grubu (sefer_id) boş, teslim edilmemiş, komple olmayan ANT
+    faturaları (yeni akış tablosunda olanlar hariç). Eski akışta partneri elle
+    girilmiş ama partner İHR henüz oluşmamış olanlar da gelir; 'ayrilan' alanı
+    partneri, 'tahsis' alanı o zaman saklanan İHR payını taşır."""
+    hedef = _ulke_adi_norm(ulke_adi)
+    if not hedef:
+        return []
+    cur.execute('''
+        SELECT s.ihracat_dosya_no, s.ulke, s.palet, s.durum,
+               COALESCE(s.navlun_eur, 0), COALESCE(s.navlun_usd, 0),
+               COALESCE(s.sigorta_eur, 0), COALESCE(s.sigorta_usd, 0), s.created_at,
+               t.dosya_no, t.navlun, t.sigorta
+        FROM shipments s
+        LEFT JOIN LATERAL (
+            SELECT dosya_no, navlun, sigorta FROM navlun_bekleyen_tahsis
+            WHERE kaynak_dosya_no = s.ihracat_dosya_no AND kullanildi = FALSE
+            ORDER BY created_at DESC LIMIT 1
+        ) t ON TRUE
+        WHERE UPPER(COALESCE(s.fatura_no, '')) LIKE 'ANT%%'
+          AND s.sefer_id IS NULL
+          AND COALESCE(s.ihracat_dosya_no, '') <> ''
+          AND NOT EXISTS (SELECT 1 FROM navlun_gruplu_ant a WHERE a.dosya_no = s.ihracat_dosya_no)
+        ORDER BY s.created_at DESC
+    ''')
+    teslim = {'TESLİM EDİLDİ', 'TESLIM EDILDI'}
+    adaylar = []
+    for r in cur.fetchall():
+        if _ulke_adi_norm(r[1]) != hedef:
+            continue
+        if str(r[3] or '').strip().upper() in teslim or _komple_ant_mi(r[2]):
+            continue
+        adaylar.append({
+            'dosya_no': r[0], 'palet': r[2] or '',
+            'navlun_eur': float(r[4]), 'navlun_usd': float(r[5]),
+            'sigorta_eur': float(r[6]), 'sigorta_usd': float(r[7]),
+            'created_at': r[8],
+            'ayrilan': r[9],
+            'tahsis': (float(r[10]), float(r[11])) if r[9] else None,
+        })
+    return adaylar
+
+
+def _aday_tutar(aday, para):
+    """Sevkiyat kaydındaki ANT navlun/sigortası, ülkenin para birimi kolonundan."""
+    if para == 'USD':
+        return aday['navlun_usd'], aday['sigorta_usd']
+    return aday['navlun_eur'], aday['sigorta_eur']
+
+
+def _tarih_metni(v):
+    import datetime
+    if isinstance(v, (int, float)):
+        return datetime.datetime.fromtimestamp(v).strftime('%d.%m.%Y')
+    return v.strftime('%d.%m.%Y') if v else ''
+
+
+def navlun_gruplu_ant_liste():
+    """GET /api/navlun/gruplu-ant?ulke=rs — ülkenin eşleşmemiş gruplu ANT
+    taslakları; navlun ülkelerinde İHR'ye düşecek kalan navlun/sigorta ile."""
+    ulke = str(request.args.get('ulke') or '').strip().lower()
+    if not ulke:
+        return jsonify({'success': False, 'error': 'Ülke zorunlu'}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        row = _tanim_getir(cur, ulke) if ulke in KURUMSAL_ULKELER else None
+        try:
+            cur.execute('''
+                SELECT dosya_no, navlun, sigorta, kap, created_at
+                FROM navlun_gruplu_ant
+                WHERE ulke_kodu = %s AND eslesen_dosya_no IS NULL
+                ORDER BY created_at DESC
+            ''', (ulke,))
+        except psycopg2.errors.UndefinedTable:
+            # Tablo henüz yoksa (init_db çalışmadan) hiç gruplu ANT yok demektir
+            conn.rollback()
+            return jsonify({'success': True, 'kayitlar': [], 'navlunVar': row is not None})
+        kayitlar = []
+        for r in cur.fetchall():
+            kalan_n, kalan_s, para = _gruplu_kalan(row, float(r[1]), float(r[2]))
+            kayitlar.append({
+                'dosyaNo': r[0],
+                'kap': r[3],
+                'tarih': r[4].strftime('%d.%m.%Y') if r[4] else '',
+                'kalanNavlun': kalan_n,
+                'kalanSigorta': kalan_s,
+                'paraBirimi': para,
+                'kaynak': 'taslak',
+            })
+        # Sevkiyatlar'da grubu boş (komple olmayan, teslim edilmemiş) ANT faturaları
+        for a in _sevkiyat_ant_adaylari(cur, request.args.get('ulkeAdi') or KURUMSAL_ULKELER.get(ulke)):
+            ant_n, ant_s = _aday_tutar(a, row['para_birimi'] if row else None)
+            kalan_n, kalan_s, para = _gruplu_kalan(row, ant_n, ant_s)
+            if a['tahsis'] and row:
+                # Eski akışta hesaplanıp saklanan İHR payı önceliklidir
+                kalan_n, kalan_s = a['tahsis']
+            kayitlar.append({
+                'ayrilan': a['ayrilan'],
+                'dosyaNo': a['dosya_no'],
+                'kap': a['palet'],
+                'tarih': _tarih_metni(a['created_at']),
+                'kalanNavlun': kalan_n,
+                'kalanSigorta': kalan_s,
+                'paraBirimi': para,
+                'kaynak': 'sevkiyat',
+            })
+        return jsonify({'success': True, 'kayitlar': kayitlar, 'navlunVar': row is not None})
+    finally:
+        cur.close()
+        conn.close()
+
+
+def navlun_gruplu_eslestir():
+    """POST /api/navlun/gruplu-eslestir — İHR taslağı seçili ANT ile indirilince.
+    ANT kaydını eşleşti işaretler ve mevcut gruplama anahtarını besler:
+    navlun_bekleyen_tahsis (dosya=İHR, kaynak=ANT, kullanildi=TRUE) → _otomatik_grupla."""
+    body = request.get_json(silent=True) or {}
+    ulke = str(body.get('ulkeKodu') or '').strip().lower()
+    ant = str(body.get('antDosyaNo') or '').strip()
+    ihr = str(body.get('ihrDosyaNo') or '').strip()
+    if not ant or not ihr:
+        return jsonify({'success': False, 'error': 'ANT ve İHR dosya no zorunlu'}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute('''
+            SELECT navlun, sigorta, eslesen_dosya_no FROM navlun_gruplu_ant
+            WHERE dosya_no = %s
+        ''', (ant,))
+        a = cur.fetchone()
+        row = _tanim_getir(cur, ulke) if ulke in KURUMSAL_ULKELER else None
+        if not a:
+            # Sevkiyatlar'dan gelen (grubu boş) ANT: kaydı tabloya alıp eşleştir
+            aday = next((x for x in _sevkiyat_ant_adaylari(
+                cur, body.get('ulkeAdi') or KURUMSAL_ULKELER.get(ulke)) if x['dosya_no'] == ant), None)
+            if not aday:
+                return jsonify({'success': False, 'error': f'Gruplu ANT kaydı bulunamadı: {ant}'}), 404
+            ant_n, ant_s = _aday_tutar(aday, row['para_birimi'] if row else None)
+            if aday['tahsis'] and row:
+                # Saklı İHR payından ANT'ın değerini geri türet (kalan aynı çıksın)
+                ant_n = max(0.0, float(row['navlun_ant_ihr']) - aday['tahsis'][0])
+                ant_s = max(0.0, float(row['sigorta_baz']) - aday['tahsis'][1])
+            cur.execute('''
+                INSERT INTO navlun_gruplu_ant (dosya_no, ulke_kodu, navlun, sigorta, kap)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (ant, ulke, ant_n, ant_s, aday['palet']))
+            a = (ant_n, ant_s, None)
+        if a[2] and a[2] != ihr:
+            return jsonify({'success': False, 'error': f'{ant} zaten {a[2]} ile eşleşmiş'}), 409
+
+        kalan_n, kalan_s, para = _gruplu_kalan(row, float(a[0]), float(a[1]))
+
+        # Eski akışta başka (henüz oluşmamış) İHR'ye ayrılmışsa o ayırmayı kaldır:
+        # aksi halde _partner_dosyalari üçlü grup kurar.
+        cur.execute('''
+            DELETE FROM navlun_bekleyen_tahsis
+            WHERE kaynak_dosya_no = %s AND dosya_no <> %s AND kullanildi = FALSE
+        ''', (ant, ihr))
+
+        cur.execute('''
+            UPDATE navlun_gruplu_ant SET eslesen_dosya_no = %s, eslesme_tarihi = now()
+            WHERE dosya_no = %s
+        ''', (ihr, ant))
+        cur.execute('''
+            INSERT INTO navlun_bekleyen_tahsis
+                (dosya_no, yil, navlun, sigorta, para_birimi, kaynak_dosya_no, kullanildi)
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            ON CONFLICT (dosya_no, yil) DO UPDATE SET
+                navlun = EXCLUDED.navlun,
+                sigorta = EXCLUDED.sigorta,
+                para_birimi = EXCLUDED.para_birimi,
+                kaynak_dosya_no = EXCLUDED.kaynak_dosya_no,
+                kullanildi = TRUE,
+                created_at = now()
+        ''', (ihr, _yil_ayikla(ihr), kalan_n, kalan_s, para or 'EUR', ant))
+        sefer_id = _otomatik_grupla(cur, ihr)
+        conn.commit()
+        log_action(getattr(g, 'user', None), 'navlun_gruplu_eslestir',
+                   f'Gruplu eşleşme: ANT {ant} ↔ İHR {ihr} (sefer_id={sefer_id})')
+        return jsonify({'success': True, 'seferId': sefer_id})
     finally:
         cur.close()
         conn.close()

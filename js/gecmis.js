@@ -117,6 +117,11 @@ async function indirGecmisKayit(key, faturaNo, dosyaTuru) {
       _downloadB64(files.priceList, `Price List - ${faturaNo}.pdf`, 'application/pdf');
       count++;
     }
+    if (files.sigortaTalimat) {
+      _downloadB64(files.sigortaTalimat, `sigorta poliçe talimatı-Kazakistan - ${faturaNo}.xlsx`,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      count++;
+    }
     if (files.millTest) {
       _downloadB64(files.millTest, `MILL TEST - ${faturaNo}.pdf`, 'application/pdf');
       count++;

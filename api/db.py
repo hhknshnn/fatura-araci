@@ -104,6 +104,41 @@ def init_db():
         )
     ''')
 
+    # Gruplu sevk: eşleşme bekleyen ANT taslakları (migration navlun_tanim_004.sql ile aynı)
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS navlun_gruplu_ant (
+            dosya_no          TEXT PRIMARY KEY,
+            ulke_kodu         TEXT NOT NULL,
+            navlun            NUMERIC(12,2) NOT NULL DEFAULT 0,
+            sigorta           NUMERIC(12,2) NOT NULL DEFAULT 0,
+            kap               TEXT NOT NULL DEFAULT '',
+            eslesen_dosya_no  TEXT,
+            eslesme_tarihi    TIMESTAMPTZ,
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    ''')
+    cur.execute('''
+        CREATE INDEX IF NOT EXISTS ix_navlun_gruplu_ant_bekleyen
+        ON navlun_gruplu_ant (ulke_kodu) WHERE eslesen_dosya_no IS NULL
+    ''')
+
+    # KZ sigorta bildirim formu: fatura bazlı bilgi (migration kz_sigorta_001.sql ile aynı)
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS kz_sigorta_bilgi (
+            fatura_no       TEXT PRIMARY KEY,
+            dosya_no        TEXT,
+            depo_tipi       TEXT NOT NULL DEFAULT 'serbest',
+            kap             INTEGER NOT NULL DEFAULT 0,
+            brut_kg         NUMERIC(14,2) NOT NULL DEFAULT 0,
+            fatura_tl       NUMERIC(16,2) NOT NULL DEFAULT 0,
+            urun_gruplari   TEXT NOT NULL DEFAULT '',
+            plaka           TEXT,
+            yukleme_tarihi  DATE,
+            guncelleme      TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    ''')
+    cur.execute('CREATE INDEX IF NOT EXISTS ix_kz_sigorta_bilgi_dosya ON kz_sigorta_bilgi (dosya_no)')
+
     # NOT: `shipments` ve `taslak_dosyalar` tabloları burada CREATE EDİLMEZ —
     # mevcut prod veritabanında zaten var ve şeması (kolon sayısı/tipleri) bu
     # dosyanın dışında yönetiliyor. Sıfırdan bir ortam kurulacaksa bu iki tablo

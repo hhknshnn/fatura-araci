@@ -361,9 +361,8 @@ function showMenseResult() {
   const uyari = (trRows.length === 0 || otherRows.length === 0)
     ? `<div class="stat" style="color:var(--gold);">⚠ Tüm satırlar tek grupta — MENŞEİ Açıklama değerleri: ${escapeHtml(menseiDegerOzeti(menseWorkingRows))}</div>`
     : '';
-  showMenseStatus('success',
-    `<div class="stat">✓ Menşe ayrımı tamamlandı</div>
-     <div class="stat">TR: <span>${fmt(trBrut)} kg</span> &nbsp;|&nbsp; Yabancı: <span>${fmt(otherBrut)} kg</span></div>${uyari}`);
+  // TR/Yabancı kilolar zaten menseResultBox'ta — status'ta tekrarlanmaz
+  showMenseStatus('success', `<div class="stat">✓ Menşe ayrımı tamamlandı</div>${uyari}`);
 
   // wizard.js'in triggerMenseTaslak() fonksiyonu workingRows'u kullanır — senkronize et
   workingRows = menseWorkingRows;
@@ -399,7 +398,17 @@ async function loadMenseTaslakListe() {
       return;
     }
 
-    container.innerHTML = data.taslaklar.map(t => `
+    // Aynı taslak her indirmede yeniden kaydediliyor — liste yeniden eskiye geldiği için
+    // aynı referans+ülke+depo için yalnız en yeni kayıt gösterilir.
+    const gorulen = new Set();
+    const taslaklar = data.taslaklar.filter(t => {
+      const anahtar = [t.referansNo, t.ulkeKodu, t.depoTipi === 'antrepo' ? 'antrepo' : 'serbest'].join('|');
+      if (gorulen.has(anahtar)) return false;
+      gorulen.add(anahtar);
+      return true;
+    });
+
+    container.innerHTML = taslaklar.map(t => `
       <div class="mense-taslak-item ${secilenMenseTaslakId === t.id ? 'active' : ''}"
            id="mense-taslak-${t.id}"
            onclick="selectMenseTaslak(${t.id})"

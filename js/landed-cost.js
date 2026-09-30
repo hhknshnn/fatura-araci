@@ -2,7 +2,7 @@
 // Kurumsal ülkeler için KDV hariç landed cost analizi ve raporu
 
 const LC_COUNTRIES = ['ALMANYA', 'BELÇİKA', 'BOSNA', 'GÜRCİSTAN', 'HOLLANDA', 'KAZAKİSTAN', 'KOSOVA', 'MAKEDONYA', 'SIRBİSTAN'];
-let landedCostState = { data: null, pendingExpanded: false, navlunYeni: null, senaryoDepo: 'all', view: 'ozet' };
+let landedCostState = { data: null, pendingExpanded: false, pendingOpen: false, navlunYeni: null, senaryoDepo: 'all', view: 'ozet' };
 const LC_COUNTRY_COLORS = {
   'ALMANYA': '#2563EB',
   'BELÇİKA': '#F59E0B',
@@ -474,7 +474,7 @@ function renderLcNavlunEditor(tanimlar, yeniMap) {
        oninput="lcNavlunTutarInput('${kod}','${alan}',this.value,this)">`;
   box.innerHTML = `
     <div class="lc-tanim-head">
-      <div class="lc-tanim-legend">Yalnız seçili ülkenin kayıtlı tarifesi. Yeni tutarı yazınca landed cost yeniden hesaplanır.</div>
+      <div class="lc-tanim-legend"></div>
       <div class="lc-tanim-actions">
         <button type="button" class="lc-btn secondary" onclick="lcNavlunSenaryoSifirla()">Kayıtlıya dön</button>
         <button type="button" class="lc-btn" onclick="downloadLcNavlunSenaryo()">Senaryo Excel</button>
@@ -515,6 +515,12 @@ function renderLcNavlunEditor(tanimlar, yeniMap) {
   box.dataset.built = '1';
 }
 
+// Değişmeyen oranı tek değer, değişeni "eski → yeni" gösterir (tablodaki ok gürültüsünü azaltır)
+function lcOkluPct(eski, yeni) {
+  const a = lcFormatPct(eski), b = lcFormatPct(yeni);
+  return a === b ? b : `${a} → ${b}`;
+}
+
 function renderLcNavlunScenario(data, opts) {
   const kpis = document.getElementById('lc-scenario-kpis');
   const table = document.getElementById('lc-scenario-table');
@@ -541,11 +547,6 @@ function renderLcNavlunScenario(data, opts) {
       <b>${lcFormatEur(s.yeniNavlun)}</b>
       <small>${lcFormatEur(s.navlun)} → ${lcFormatDeltaEur(s.delta, true)} · navlun ${lcFormatPct(s.navlunDegisimPct)}</small>
     </div>
-    <div class="lc-scenario-kpi">
-      <span>Navlun payı (LC içi)</span>
-      <b>${lcFormatPct(s.yeniNavlunPay)}</b>
-      <small>${lcFormatPct(s.navlunPay)} → ${lcFormatPct(s.yeniNavlunPay)}</small>
-    </div>
     <div class="lc-scenario-kpi ${tone}">
       <span>LC değişimi</span>
       <b>${lcFormatPct(s.lcDegisimPct)}</b>
@@ -563,33 +564,12 @@ function renderLcNavlunScenario(data, opts) {
           <span class="lc-depo-tag">${ad}</span>
           <b class="lc-delta ${lcDeltaClass(m.lcPct)}">${lcFormatPct(m.lcPct)}</b>
         </div>
-        <small>${m.n} fatura · ${m.komple} komple / ${m.gruplu} gruplu · LC payı ${lcFormatPct(agirlik)}</small>
-        <div class="lc-depo-line">${lcFormatDeltaEur(d, true)} navlun · pay ${lcFormatPct(m.navlunPay)} → ${lcFormatPct(m.yeniNavlunPay)}</div>
-        <div class="lc-depo-line">Landed Cost ${lcFormatPct(m.oran)} → ${lcFormatPct(m.yeniOran)} (${lcFormatPp(m.oranDelta)})</div>
+        <div class="lc-depo-line">${m.n} fatura · Landed Cost ${lcOkluPct(m.oran, m.yeniOran)}</div>
       </div>`;
     };
     mixEl.innerHTML = `
       <div class="lc-depo-grid">${depoCard(ihr, 'Serbest (IHR)')}${depoCard(ant, 'Antrepo (ANT)')}</div>
-      <div class="lc-depo-avg">Navlun <b>${lcFormatPct(s.navlunDegisimPct)}</b> artınca LC yalnız <b>${lcFormatPct(s.lcDegisimPct)}</b> artar,
-        çünkü kayıtlı LC’nin ${lcFormatPct(s.navlunPay)}’i navlun; geri kalan (operasyon, vergi, sigorta) sabit.
-        Landed Cost (LC / fatura) ${lcFormatPct(s.oran)} → ${lcFormatPct(s.yeniOran)} ·
-        IHR ${lcFormatPct(ihr.oran)} → ${lcFormatPct(ihr.yeniOran)} ·
-        ANT ${lcFormatPct(ant.oran)} → ${lcFormatPct(ant.yeniOran)}.</div>
-      <div class="lc-scenario-mix">${[
-        ['IHR komple', s.satirlar.filter(r => r.depo === 'IHR' && r.senaryo !== 'gruplu')],
-        ['IHR gruplu', s.satirlar.filter(r => r.depo === 'IHR' && r.senaryo === 'gruplu')],
-        ['ANT komple', s.satirlar.filter(r => r.depo === 'ANT' && r.senaryo !== 'gruplu')],
-        ['ANT gruplu', s.satirlar.filter(r => r.depo === 'ANT' && r.senaryo === 'gruplu')],
-      ].map(([ad, rows]) => {
-        const n = rows.length;
-        const oldLc = rows.reduce((a, r) => a + r.oldLc, 0);
-        const delta = rows.reduce((a, r) => a + (r.newEur - r.oldEur), 0);
-        const lcPct = oldLc > 0.005 ? (delta / oldLc) * 100 : 0;
-        return `<div class="lc-scenario-mix-item">
-          <span>${ad} · ${n} fatura</span>
-          <b class="lc-delta ${lcDeltaClass(delta)}">${lcFormatDeltaEur(delta, true)} · LC ${lcFormatPct(lcPct)}</b>
-        </div>`;
-      }).join('')}</div>`;
+`;
   }
   const rows = s.countries.filter(c => Number(c.navlun_eur || 0) > 0.005 || Number(c.landed_cost_eur || 0) > 0.005);
   if (!rows.length) {
@@ -620,7 +600,7 @@ function renderLcNavlunScenario(data, opts) {
                 <td>${c.komple || 0} / ${c.gruplu || 0}</td>
                 <td>${lcFormatFullEur(c.landed_cost_eur)}</td>
                 <td>${lcFormatFullEur(c.yeni_landed_cost_eur)}</td>
-                <td>${lcFormatPct(c.navlun_pay)} → ${lcFormatPct(c.yeni_navlun_pay)}</td>
+                <td>${lcOkluPct(c.navlun_pay, c.yeni_navlun_pay)}</td>
                 <td><span class="lc-delta ${lcDeltaClass(c.navlun_delta_eur)}">${lcFormatDeltaEur(c.navlun_delta_eur)}</span></td>
                 <td><span class="lc-delta ${lcDeltaClass(c.lc_degisim_pct)}">${lcFormatPct(c.lc_degisim_pct)}</span></td>
               </tr>
@@ -759,7 +739,7 @@ function renderLcNavlunShipments(s) {
               <td>${lcSenaryoEtiket(r.senaryo)}</td>
               <td>${lcFormatFullEur(r.oldLc)}</td>
               <td>${lcFormatFullEur(r.newLc)}</td>
-              <td>${lcFormatPct(r.navlunPay)} → ${lcFormatPct(r.yeniNavlunPay)}</td>
+              <td>${lcOkluPct(r.navlunPay, r.yeniNavlunPay)}</td>
               <td><span class="lc-delta ${lcDeltaClass(r.newEur - r.oldEur)}">${lcFormatDeltaEur(r.newEur - r.oldEur)}</span></td>
               <td><span class="lc-delta ${lcDeltaClass(r.lcPct)}">${lcFormatPct(r.lcPct)}</span></td>
             </tr>
@@ -927,10 +907,10 @@ function initLandedCostPanel() {
     panel.innerHTML = `
       <style>
         #stepLandedCost.panel { gap:0; flex:1; min-height:0; height:100%; }
-        .lc { --lc:#0F766E; --lc-ink:#1A1916; --lc-muted:#6F6B64; --lc-line:#E8E4DC;
-          height:100%; min-height:0; padding:0; color:var(--lc-ink); background:#FAF9F6;
+        .lc { --lc:#2563EB; --lc-ink:#0F172A; --lc-muted:#64748B; --lc-line:#E2E8F0;
+          height:100%; min-height:0; padding:0; color:var(--lc-ink); background:#F8FAFC;
           font-family:var(--font); display:flex; align-items:stretch; }
-        .lc-side { width:200px; flex-shrink:0; background:linear-gradient(180deg,#fff 0%,#FBF9F5 100%);
+        .lc-side { width:200px; flex-shrink:0; background:linear-gradient(180deg,#fff 0%,#FFFFFF 100%);
           border-right:1px solid var(--lc-line); display:flex; flex-direction:column; height:100%; min-height:0;
           box-sizing:border-box; overflow:hidden; }
         .lc-side-h { font:700 13px/1 var(--font); letter-spacing:.02em; color:var(--lc-muted);
@@ -943,42 +923,42 @@ function initLandedCostPanel() {
           transition:background .12s ease, color .12s ease, box-shadow .12s ease; }
         .lc-nav-item span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .lc-nav-item b { font:600 12px/1 var(--font); color:var(--lc-muted); font-variant-numeric:tabular-nums; flex-shrink:0; }
-        .lc-nav-item:hover { background:#F7F4EE; }
-        .lc-nav-item.active { background:#F0FDFA; color:#115E59; box-shadow:inset 3px 0 0 var(--lc); }
-        .lc-nav-item.active b { color:#0F766E; }
+        .lc-nav-item:hover { background:#F1F5F9; }
+        .lc-nav-item.active { background:#EFF6FF; color:#1D4ED8; box-shadow:inset 3px 0 0 var(--lc); }
+        .lc-nav-item.active b { color:#2563EB; }
         .lc-nav-dot { width:8px; height:8px; border-radius:50%; background:var(--country-color,#94A3B8); flex-shrink:0; }
         .lc-main { flex:1; min-width:0; height:100%; overflow:auto; padding:16px 20px 28px; box-sizing:border-box;
-          background:linear-gradient(180deg,#F7F5F1 0%,#FAF9F6 120px); }
+          background:linear-gradient(180deg,#F8FAFC 0%,#F8FAFC 120px); }
         .lc-views { display:flex; gap:4px; padding:4px; width:fit-content; margin:0 0 12px;
           background:rgba(255,255,255,.72); border:1px solid var(--lc-line); border-radius:14px; }
         .lc-view { border:0; background:transparent; color:var(--lc-muted); padding:8px 14px; border-radius:11px;
           font:750 12.5px var(--font); cursor:pointer; user-select:none; -webkit-user-select:none; }
-        .lc-view.active { background:#1A1916; color:#F7F4EE; }
+        .lc-view.active { background:#0F172A; color:#F1F5F9; }
         .lc-period { display:flex; gap:8px; align-items:end; flex-wrap:wrap; margin:0 0 14px;
-          padding:12px 14px; background:#fff; border:1px solid rgba(232,228,220,.9); border-radius:16px;
-          box-shadow:0 10px 28px rgba(26,25,22,.045); }
+          padding:12px 14px; background:#fff; border:1px solid rgba(226,232,240,.9); border-radius:16px;
+          box-shadow:0 10px 28px rgba(15,23,42,.045); }
         .lc-field { display:flex; flex-direction:column; gap:5px; }
         .lc-field-label { font-size:10.5px; font-weight:700; letter-spacing:.02em; color:var(--lc-muted); }
-        .lc-input, .lc-select { height:38px; border:1px solid transparent; border-radius:12px; background:#F7F4EE;
+        .lc-input, .lc-select { height:38px; border:1px solid transparent; border-radius:12px; background:#F1F5F9;
           padding:0 12px; font:600 13px var(--font); color:var(--lc-ink);
-          box-shadow:inset 0 0 0 1px rgba(26,25,22,.06); transition:background .12s ease, box-shadow .12s ease; }
+          box-shadow:inset 0 0 0 1px rgba(15,23,42,.06); transition:background .12s ease, box-shadow .12s ease; }
         .lc-input:hover, .lc-select:hover { background:#fff; }
-        .lc-input:focus, .lc-select:focus { outline:none; background:#fff; box-shadow:0 0 0 3px rgba(15,118,110,.16), inset 0 0 0 1px var(--lc); }
+        .lc-input:focus, .lc-select:focus { outline:none; background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.16), inset 0 0 0 1px var(--lc); }
         #stepLandedCost .lc-btn { height:38px; border:0; border-radius:999px; background:var(--lc); color:#fff; padding:0 16px;
           font:650 13px var(--font); cursor:pointer; display:inline-flex; align-items:center; gap:7px;
-          box-shadow:0 8px 18px rgba(15,118,110,.22); }
-        #stepLandedCost .lc-btn:hover { background:#0D9488; }
-        #stepLandedCost .lc-btn.secondary { background:#F7F4EE; color:var(--lc-ink); box-shadow:none; }
-        #stepLandedCost .lc-btn.secondary:hover { background:#fff; color:#115E59; }
+          box-shadow:0 8px 18px rgba(37,99,235,.22); }
+        #stepLandedCost .lc-btn:hover { background:#1D4ED8; }
+        #stepLandedCost .lc-btn.secondary { background:#F1F5F9; color:var(--lc-ink); box-shadow:none; }
+        #stepLandedCost .lc-btn.secondary:hover { background:#fff; color:#1D4ED8; }
         .lc-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:0 0 12px; }
-        #stepLandedCost .lc-kpi { position:relative; overflow:hidden; border:1px solid rgba(232,228,220,.85); border-radius:14px;
-          background:#fff; padding:14px 15px; min-height:78px; box-shadow:0 10px 28px rgba(26,25,22,.04); }
+        #stepLandedCost .lc-kpi { position:relative; overflow:hidden; border:1px solid rgba(226,232,240,.85); border-radius:14px;
+          background:#fff; padding:14px 15px; min-height:78px; box-shadow:0 10px 28px rgba(15,23,42,.04); }
         #stepLandedCost .lc-kpi::before { display:none; }
         .lc-kpi-label { font-size:11px; color:var(--lc-muted); margin-bottom:6px; font-weight:650; }
         .lc-kpi-value { font-size:18px; font-weight:750; color:var(--lc-ink); line-height:1.1; letter-spacing:-.02em; }
         .lc-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:12px; margin-bottom:12px; }
-        #stepLandedCost .lc-card { border:1px solid rgba(232,228,220,.85); border-radius:14px; background:#fff;
-          padding:16px; min-height:0; box-shadow:0 10px 28px rgba(26,25,22,.04); }
+        #stepLandedCost .lc-card { border:1px solid rgba(226,232,240,.85); border-radius:14px; background:#fff;
+          padding:16px; min-height:0; box-shadow:0 10px 28px rgba(15,23,42,.04); }
         .lc-card-title { font-size:14px; font-weight:750; color:var(--lc-ink); margin-bottom:2px; }
         .lc-card-sub { font-size:12px; color:var(--lc-muted); margin-bottom:12px; }
         .lc-pending-card { border:1px solid #FDE68A; border-radius:14px; background:#FFFBEB; padding:14px 16px; margin-bottom:12px; }
@@ -992,48 +972,48 @@ function initLandedCostPanel() {
         .lc-status-pill { border:1px solid #FDBA74; border-radius:999px; background:#fff; color:#9A3412; padding:4px 9px; font-size:11px; font-weight:650; }
         .lc-chart-row { display:grid; grid-template-columns:96px minmax(0,1fr) 72px; gap:8px; align-items:center; margin-bottom:9px; }
         .lc-chart-label { font-size:12px; color:#475569; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .lc-track { height:9px; border-radius:999px; background:#F0EBE3; overflow:hidden; }
+        .lc-track { height:9px; border-radius:999px; background:#EEF2F6; overflow:hidden; }
         .lc-fill { height:100%; border-radius:999px; }
         .lc-chart-val { font-size:11px; color:var(--lc-muted); font-weight:700; text-align:right; }
         .lc-country-mix { border-top:1px solid var(--lc-line); margin-top:14px; padding-top:12px; }
         .lc-country-mix-title { font-size:11px; font-weight:750; color:var(--lc-muted); margin-bottom:10px; }
         .lc-country-mix-row { display:grid; grid-template-columns:92px minmax(0,1fr) 58px; gap:8px; align-items:center; margin-bottom:8px; }
-        .lc-stacked { height:14px; border-radius:999px; background:#F7F4EE; overflow:hidden; display:flex; }
+        .lc-stacked { height:14px; border-radius:999px; background:#F1F5F9; overflow:hidden; display:flex; }
         .lc-stacked-part { height:100%; min-width:3px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; font-weight:800; }
         .lc-stacked-part.light { color:#1F2937; }
         .lc-table-wrap { overflow-x:auto; border:1px solid var(--lc-line); border-radius:12px; background:#fff; }
         .lc-table { width:100%; border-collapse:collapse; font-size:12px; }
-        .lc-table th { text-align:left; color:var(--lc-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:9px 10px; border-bottom:1px solid var(--lc-line); background:#F7F4EE; }
-        .lc-table td { padding:9px 10px; border-bottom:1px solid #F0EBE3; color:#334155; background:#fff; }
-        .lc-table tbody tr:nth-child(even) td { background:#FAF9F6; }
-        .lc-table tbody tr:hover td { background:#F0FDFA; }
+        .lc-table th { text-align:left; color:var(--lc-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:9px 10px; border-bottom:1px solid var(--lc-line); background:#F1F5F9; }
+        .lc-table td { padding:9px 10px; border-bottom:1px solid #EEF2F6; color:#334155; background:#fff; }
+        .lc-table tbody tr:nth-child(even) td { background:#F8FAFC; }
+        .lc-table tbody tr:hover td { background:#EFF6FF; }
         .lc-country-cell { display:flex; align-items:center; gap:8px; font-weight:750; color:var(--lc-ink); }
         .lc-country-dot { width:8px; height:8px; border-radius:999px; background:var(--country-color); }
         .lc-scenario { margin-bottom:12px; }
         .lc-scope { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap;
           padding:12px 14px; border-radius:12px; margin:8px 0 12px; }
-        .lc-scope-on { background:#F0FDFA; border:1px solid #99F6E4; }
+        .lc-scope-on { background:#EFF6FF; border:1px solid #99F6E4; }
         .lc-scope-warn { background:#FFFBEB; border:1px solid #FDE68A; }
         .lc-scope-off { display:none; }
-        .lc-scope-kicker { font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#0F766E; margin-bottom:4px; }
+        .lc-scope-kicker { font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#2563EB; margin-bottom:4px; }
         .lc-scope-warn .lc-scope-kicker { color:#B45309; }
         .lc-scope h4 { margin:0 0 6px; font-size:14px; font-weight:750; }
         .lc-scope p { margin:0; font-size:12.5px; color:#334155; line-height:1.5; max-width:720px; }
         .lc-scope-meta { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
-        .lc-ref-chip { display:inline-flex; border-radius:999px; background:#0F766E; color:#fff; padding:4px 10px; font-size:11px; font-weight:750; }
+        .lc-ref-chip { display:inline-flex; border-radius:999px; background:#2563EB; color:#fff; padding:4px 10px; font-size:11px; font-weight:750; }
         .lc-scope-warn .lc-ref-chip { background:#B45309; }
-        .lc-scope-count { font-size:11.5px; font-weight:700; color:#0F766E; }
+        .lc-scope-count { font-size:11.5px; font-weight:700; color:#2563EB; }
         .lc-scenario-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:12px 0; }
-        .lc-scenario-kpi { border:1px solid var(--lc-line); border-radius:12px; padding:12px 14px; background:#FAF9F6; }
+        .lc-scenario-kpi { border:1px solid var(--lc-line); border-radius:12px; padding:12px 14px; background:#F8FAFC; }
         .lc-scenario-kpi span { display:block; font-size:10.5px; font-weight:750; color:var(--lc-muted); margin-bottom:6px; }
         .lc-scenario-kpi b { display:block; font-size:17px; font-weight:750; color:var(--lc-ink); line-height:1.1; }
         .lc-scenario-kpi small { display:block; margin-top:5px; font-size:11px; color:var(--lc-muted); }
         .lc-scenario-kpi.up { background:#FFF7ED; border-color:#FED7AA; }
         .lc-scenario-kpi.up b { color:#9A3412; }
-        .lc-scenario-kpi.down { background:#F0FDFA; border-color:#99F6E4; }
-        .lc-scenario-kpi.down b { color:#0F766E; }
+        .lc-scenario-kpi.down { background:#EFF6FF; border-color:#99F6E4; }
+        .lc-scenario-kpi.down b { color:#2563EB; }
         .lc-delta.up { color:#B45309; font-weight:750; }
-        .lc-delta.down { color:#0F766E; font-weight:750; }
+        .lc-delta.down { color:#2563EB; font-weight:750; }
         .lc-delta.flat { color:#94A3B8; font-weight:650; }
         .lc-scenario-note { margin-top:12px; font-size:12px; color:var(--lc-muted); line-height:1.45; }
         .lc-tanim-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin:4px 0 10px; }
@@ -1050,7 +1030,7 @@ function initLandedCostPanel() {
         .lc-depo-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 8px; }
         .lc-depo-card { border:1px solid var(--lc-line); border-radius:12px; padding:12px 14px; background:#fff; }
         .lc-depo-card.up { background:#FFF7ED; border-color:#FED7AA; }
-        .lc-depo-card.down { background:#F0FDFA; border-color:#99F6E4; }
+        .lc-depo-card.down { background:#EFF6FF; border-color:#99F6E4; }
         .lc-depo-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
         .lc-depo-tag { font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--lc-muted); }
         .lc-depo-card b { font-size:20px; }
@@ -1062,11 +1042,11 @@ function initLandedCostPanel() {
         .lc-ship-filters { display:flex; gap:6px; }
         .lc-ship-chip { border:1px solid var(--lc-line); background:#fff; color:#475569; border-radius:999px;
           padding:5px 10px; font-size:11px; font-weight:750; cursor:pointer; }
-        .lc-ship-chip.active { background:#1A1916; color:#fff; border-color:#1A1916; }
+        .lc-ship-chip.active { background:#0F172A; color:#fff; border-color:#0F172A; }
         .lc-ship-wrap { max-height:440px; overflow:auto; }
         .lc-ship-sub { display:block; margin-top:3px; font-size:10.5px; color:var(--lc-muted); }
-        .lc-table tbody tr.lc-ship-anchor td { background:#ECFEFF; }
-        .lc-anchor-flag { display:inline-block; margin-left:6px; border-radius:999px; background:#0F766E; color:#fff; padding:2px 7px; font-size:10px; font-weight:750; }
+        .lc-table tbody tr.lc-ship-anchor td { background:#EFF6FF; }
+        .lc-anchor-flag { display:inline-block; margin-left:6px; border-radius:999px; background:#2563EB; color:#fff; padding:2px 7px; font-size:10px; font-weight:750; }
         @media (max-width: 1100px) {
           .lc-scenario-kpis, .lc-scenario-mix { grid-template-columns:1fr 1fr; }
           .lc-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -1084,6 +1064,54 @@ function initLandedCostPanel() {
           .lc-period { flex-direction:column; align-items:stretch; }
           .lc-chart-row { grid-template-columns:86px minmax(0,1fr) 66px; }
         }
+        /* ── Sadeleştirme (2026-09) ─────────────────────────────────────────── */
+        .lc-grid.lc-grid-esit { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+        .lc-pending-bar { display:flex; align-items:center; gap:10px; width:100%; margin:0 0 12px; padding:9px 14px;
+          border:1px solid #FDE68A; border-radius:10px; background:#FFFBEB; color:#92400E; font:12.5px var(--font);
+          text-align:left; cursor:pointer; }
+        .lc-pending-bar i { font-size:15px; color:#D97706; }
+        .lc-pending-bar b { font-weight:650; }
+        .lc-pending-bar em { margin-left:auto; font-style:normal; font-weight:600; color:#B45309; white-space:nowrap; }
+        .lc-pending-bar:hover { border-color:#FCD34D; }
+        .lc-scenario-kpis { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+        .lc-tanim-legend:empty { display:none; }
+        .lc-tanim-head:has(.lc-tanim-legend:empty) { justify-content:flex-end; }
+        .lc-tanim-table td:not(.dirty) small { display:none; }
+        #lc-scenario-note { display:none; }
+        /* ── Fatura Üret / Maliyet Evrak ile aynı dil (2026-09) ─────────────── */
+        .lc-side { background:#FFFFFF; }
+        .lc-side-h { height:40px; font-size:10.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:#94A3B8; }
+        .lc-nav-item { height:32px; padding:0 10px; border-radius:6px; font-size:12.5px; font-weight:500; color:#334155; }
+        .lc-nav-item b { font-size:10.5px; font-weight:500; color:#94A3B8; font-family:var(--mono); }
+        .lc-nav-item:hover { background:#F1F5F9; }
+        .lc-nav-item.active { position:relative; background:#FFFFFF; color:#0F172A; font-weight:600;
+          box-shadow:0 0 0 1px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.06); }
+        .lc-nav-item.active::before { content:""; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:var(--lc); }
+        .lc-nav-item.active b { color:#64748B; }
+        .lc-main { padding:14px 20px 24px; background:#F8FAFC; }
+        .lc-views { gap:2px; padding:3px; background:#F1F5F9; border:1px solid rgba(15,23,42,.06); border-radius:10px; }
+        .lc-view { height:32px; padding:0 14px; border-radius:8px; font-size:12.5px; font-weight:500; color:#64748B; }
+        .lc-view:hover { color:#0F172A; background:rgba(255,255,255,.55); }
+        .lc-view.active { background:#FFFFFF; color:#0F172A; font-weight:600;
+          box-shadow:0 1px 2px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.04); }
+        .lc-period { padding:10px 12px; border-radius:10px; box-shadow:0 1px 2px rgba(15,23,42,.04); align-items:flex-end; }
+        .lc-field-label { font-size:10.5px; font-weight:600; color:#64748B; }
+        .lc-input, .lc-select { height:34px; border-radius:8px; background:#FFFFFF; font-weight:500; font-size:12.5px;
+          box-shadow:inset 0 0 0 1px rgba(15,23,42,.12); }
+        .lc-input:hover, .lc-select:hover { box-shadow:inset 0 0 0 1px rgba(15,23,42,.22); }
+        .lc-input:focus, .lc-select:focus { box-shadow:0 0 0 3px rgba(37,99,235,.12), inset 0 0 0 1px var(--lc); }
+        #stepLandedCost .lc-btn { height:34px; border-radius:8px; padding:0 14px; font-size:12.5px; font-weight:600; box-shadow:none; }
+        #stepLandedCost .lc-btn.secondary { background:#FFFFFF; color:#334155; box-shadow:inset 0 0 0 1px rgba(15,23,42,.12); }
+        #stepLandedCost .lc-btn.secondary:hover { background:#F8FAFC; color:#0F172A; }
+        #stepLandedCost .lc-kpi { border-radius:10px; min-height:0; padding:12px 14px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+        .lc-kpi-label { font-weight:500; }
+        .lc-kpi-value { font-size:17px; font-weight:700; }
+        #stepLandedCost .lc-card { border-radius:10px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+        .lc-card-title { font-size:13.5px; font-weight:650; }
+        .lc-pending-card { border-radius:10px; }
+        .lc-pending-badge, .lc-pending-toggle, .lc-status-pill, .lc-ship-chip { border-radius:6px; }
+        .lc-table-wrap { border-radius:8px; }
+        .lc-table th { background:#FAFBFC; font-weight:600; }
       </style>
       <div class="lc">
         <aside class="lc-side">
@@ -1123,36 +1151,26 @@ function initLandedCostPanel() {
             <button class="lc-btn secondary" onclick="clearLandedCostFilters()">Temizle</button>
             <button class="lc-btn secondary" onclick="applyLcKzTarifeDonemi()">KZ · 2 Nisan 2026+</button>
             <button class="lc-btn" onclick="loadLandedCost()">Uygula</button>
-            <button class="lc-btn" onclick="downloadLandedCostReport()">Excel</button>
+            <button class="lc-btn secondary" onclick="downloadLandedCostReport()"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
           </div>
           <div id="lc-view-ozet">
           <div class="lc-kpis" id="lc-kpis"></div>
           <div id="lc-pending-panel"></div>
-          <div class="lc-grid">
-            <div class="lc-card">
-              <div class="lc-card-title">Ülkelere göre landed cost</div>
-              <div class="lc-card-sub">KDV hariç toplam maliyet</div>
-              <div id="lc-country-chart"></div>
-            </div>
+          <div class="lc-grid lc-grid-esit">
             <div class="lc-card">
               <div class="lc-card-title">Maliyet kalemi dağılımı</div>
               <div class="lc-card-sub">Operasyon, navlun, vergi, sigorta</div>
               <div id="lc-cost-mix"></div>
-              <div id="lc-country-mix"></div>
+              <div id="lc-country-mix" hidden></div>
             </div>
-          </div>
-          <div class="lc-grid">
             <div class="lc-card">
               <div class="lc-card-title">Aylık trend</div>
               <div class="lc-card-sub">Yükleme tarihine göre</div>
               <div id="lc-month-chart"></div>
             </div>
-            <div class="lc-card">
-              <div class="lc-card-title">Ülke performansı</div>
-              <div class="lc-card-sub">Fatura toplamına göre maliyet oranı</div>
-              <div id="lc-ratio-chart"></div>
-            </div>
           </div>
+          <!-- Ülke grafikleri alttaki detay tablosunu tekrarladığı için gösterilmiyor -->
+          <div hidden><div id="lc-country-chart"></div><div id="lc-ratio-chart"></div></div>
           <div class="lc-card">
             <div class="lc-card-title">Ülke bazlı detay</div>
             <div class="lc-card-sub">Seçili filtrelere göre kurumsal ülkeler</div>
@@ -1319,6 +1337,7 @@ function renderLandedCost(data) {
   })));
   renderLcMix(costItems);
   renderLcCountryTable(countries);
+  landedCostState.pending = pending;
   renderLcPending(pending);
   renderLcNavlunScenario(data);
   renderLandedCostCountryNav();
@@ -1441,6 +1460,11 @@ function renderLcCountryTable(countries) {
   `;
 }
 
+function toggleLcPendingPanel() {
+  landedCostState.pendingOpen = !landedCostState.pendingOpen;
+  renderLcPending(landedCostState.pending);
+}
+
 function renderLcPending(pending) {
   const el = document.getElementById('lc-pending-panel');
   if (!el) return;
@@ -1463,6 +1487,19 @@ function renderLcPending(pending) {
   const summary = pending.summary || {};
   const rows = pending.detail || [];
   const count = summary.fatura_sayisi || 0;
+  if (!count) {
+    el.innerHTML = '';
+    return;
+  }
+  if (!landedCostState.pendingOpen) {
+    el.innerHTML = `
+      <button type="button" class="lc-pending-bar" onclick="toggleLcPendingPanel()">
+        <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+        <span><b>${count} fatura</b> (${summary.sefer_sayisi || 0} sefer) hesaba dahil değil — Brokerage / Other Costs EUR eksik</span>
+        <em>Listeyi göster</em>
+      </button>`;
+    return;
+  }
   if (!count) {
     el.innerHTML = `
       <div class="lc-pending-card" style="border-color:#BBF7D0;background:#F0FDF4;">
@@ -1501,7 +1538,7 @@ function renderLcPending(pending) {
           <div class="lc-pending-title">Landed Cost hesabına dahil edilmeyenler</div>
           <div class="lc-pending-sub">Brokerage Fee & Other Costs EUR boş ya da 0 olduğu için bu kurumsal sevkiyatlar ana hesaplardan çıkarıldı.</div>
         </div>
-        <div class="lc-pending-badge">${count} fatura / ${summary.sefer_sayisi || 0} sefer</div>
+        <button type="button" class="lc-pending-toggle" onclick="toggleLcPendingPanel()">Gizle</button>
       </div>
       <div class="lc-status-pills">${statusPills}</div>
       <div class="lc-table-wrap">

@@ -204,8 +204,13 @@ Taslak ekraninda navlun/sigorta, palet/kap oranina gore otomatik hesaplanir.
 - Formul (33 = kamyon palet kapasitesi): IHR carpan = ham kap; ANT carpan = ceil(kap/30) palet.
   navlun = ceil((ulke_navlun/33)*carpan/100)*100; sigorta = ceil((sigorta_baz/33)*carpan).
 - Navlun senaryosu: gruplu → navlun_ant_ihr (iki taslak da), degilse ANT→navlun_ant, IHR→navlun_ihr.
-- Gruplu kalan: ilk taslak KAYDEDILIRKEN kalan (toplam − nihai override deger) partner dosya no'ya
-  `navlun_bekleyen_tahsis` olarak yazilir; partner taslagi acilinca alanlar oradan dolar (formul calismaz).
+- Gruplu akis (2026-09): ANT taslaginda sadece "Gruplu Sevkiyat" isaretlenir, partner SORULMAZ; indirince
+  `navlun_gruplu_ant` tablosuna (nihai navlun/sigorta) yazilir (tabloyu `init_db()` olusturur; ayrica `navlun_tanim_004.sql`).
+  IHR taslaginda "Gruplu Sevkiyat" acilinca ayni ulkenin eslesmemis gruplu ANT'lari listelenir
+  (`GET /api/navlun/gruplu-ant?ulke=xx`); secilen ANT'in kalani (toplam − ANT nihai) forma dolar (formul kilitli).
+  IHR indirilince `POST /api/navlun/gruplu-eslestir` ANT'i eslesti isaretler ve `navlun_bekleyen_tahsis`
+  satirini (dosya=IHR, kaynak=ANT, kullanildi=TRUE) yazar → mevcut `_otomatik_grupla` sefer_id atar.
+  Eski akis (partner dosya no elle) UI'dan kalkti; eski bekleyen tahsis satirlari ref no blur'unda hala okunur.
 - Backend: `api/navlun.py` + `/api/navlun/*` route'lari. Tablolar: `ulke_navlun`, `navlun_bekleyen_tahsis`
   (migration: `migrations/navlun_tanim_001.sql`). Admin ekrani: `js/navlun.js` → sidebar "Navlun Tanimlari".
 - Tum otomatik doldurmalar override edilebilir (alanlar kilitlenmez).
@@ -234,6 +239,44 @@ Taslak ekraninda navlun/sigorta, palet/kap oranina gore otomatik hesaplanir.
 - `GET /api/navlun/gecmis?ulke=xx` arsiv + guncel satiri tarih artan sirada, ardisik versiyonlar arasi
   yuzde degisim (navlun_ant_ihr baz) ile doner. `js/navlun.js` bunu Chart.js line chart olarak cizer
   (3 senaryo serisi) + son revizyon degisim oranini ozetler. Chart.js `js/vendor/chart.umd.js`'ten gelir.
+
+## Konum Raporu → Varis Gumruk (2026-09)
+
+- Sevkiyatlar "Konum Raporu" butonu → surukle-birak penceresi → nakliyeci Excel(ler)i (Balkanlar,
+  Kosova-Makedonya, Kazakistan) → `POST /api/shipments/konum-raporu/onizle` (HICBIR SEY YAZMAZ) →
+  kullanicinin isaretledikleri `POST /api/shipments/konum-raporu/uygula` ile yazilir.
+- KURAL: Kendiliginden yazma YOK. Onizlemede hic satir isaretli gelmez; tarih elle duzeltilebilir
+  (belirsiz/okunamayan satirlar tarihi bos gelir). `uygula`: `durum='Varış Gümrük'`, `varis_tarihi`.
+  Tarih bugunden ileri veya yuklemeden once olamaz; yalniz hala Yuklenecek/YOLDA olan kayit guncellenir.
+- Bosna/Sirbistan (`VARIS_TESLIM_ULKELER`): varis gumruk = teslim. `uygula` ve toplu durum 'Varış Gümrük'
+  bu ulkelerde dogrudan `TESLİM EDİLDİ` yazar; `varis_tarihi` = `gumrukleme_bitis` (ayni tarih).
+- Konum gecmisi/hafizasi tutulmaz (denendi, kullanici istemedi).
+- Varis hucresi bos ama arac varmis gorunuyorsa tarih TAHMIN edilir (`_konum_tahmini_varis`, onizlemede notla):
+  "Boşaltıldı"/bosaltma tarihi → bosaltma tarihi, yoksa Excel'in son kaydedilme tarihi (`wb.properties.modified`,
+  UTC+3). "Gümrükte"/"Varış gümrük(te)" (TR gumruk/depo adlari haric, `_KONUM_TR_YERLER`) → Excel kayit tarihi;
+  yuklemeden bu yana `KONUM_MIN_YOL_GUN` (Balkan 3, KZ 10) gecmediyse cikis gumrugu olabilir → tarih bos gelir.
+  Yuklemeden en fazla `KONUM_CIKIS_GUMRUK_GUN` (2) gun sonraysa kesin cikis gumrugu → onizlemede HIC gosterilmez.
+- Belcika raporu: varis hucresinde "ETA 06.10" tahmindir → varis/hatali SAYILMAZ; baska tarih (varis/bosaltma)
+  yoksa kayit yolda kalir, aciklamadan da tahmin yapilmaz. Yilsiz "06.07" gercek tarih sayilir (yil yuklemeden,
+  yoksa rapor tarihinden). Bosaltma tarihi aciklama TR yer diyorsa / yuklemeden once / rapordan ileride ise tarih
+  bos gelir (kontrol notu). `KONUM_MIN_YOL_GUN` Belcika 5.
+- Gruplu sevkiyat (ayni `sefer_id`) ayni aractir: onizleme acik grup eslerini ayni tarihle ekler (grup esi zaten
+  ilerlemisse onun varis tarihiyle), UI eslerini birlikte isaretler, `uygula` acik grup eslerini de gunceller.
+- Sutunlar baslik adindan bulunur (Kazakistan'da ETA yuzunden varis I sutununda). Dosya no sutunu
+  basliksiz oldugu icin "20xx-nnn" deseninin en cok gectigi sutun secilir.
+- Eslestirme: once dosya no; yoksa plaka + ulke, bizdeki yukleme tarihine EN YAKIN satir (±7 gun,
+  `KONUM_TARIH_TOLERANS_GUN`). Baska dosya no tasiyan satir plaka ile eslesmez. Esit yakin aday → belirsiz.
+- Kod: `api/shipments.py` (`parse_konum_raporu`, `konum_raporu_onizle`, `konum_raporu_uygula`), UI `js/shipments.js`.
+
+## Kazakistan Sigorta Police Talimati (2026-09)
+
+- KZ INV+PL uretiminde Price List gibi ek evrak olarak `sigorta poliçe talimatı-Kazakistan - {ref}.xlsx` iner
+  (ref = dosya no'lar, ANT once). Sablon `templates/sigorta_kz.xlsx`, kod `api/kz_sigorta.py`, cagri `app.py::api_generate`.
+- Doldurulan: C14 urun gruplari (`Ürün Ara Grubu - EN` tekil), C20 "Bonded Warehouse/Warehouse N packages X BRÜT KG",
+  E20 hareket = en gec yukleme tarihi, I24 plaka, C28 "fatura // dosya no", I32 sigorta bedeli = fatura TL toplami.
+- Her fatura bilgisi `kz_sigorta_bilgi` tablosuna yazilir (`init_db()` + `migrations/kz_sigorta_001.sql`).
+  Gruplu sevkte partner (`navlun_bekleyen_tahsis` veya ayni `sefer_id`) ayni forma eklenir; partner tabloda yoksa
+  shipments'tan kap/fatura TL okunur (brut/grup bos kalir).
 
 ## Dokunurken Dikkat
 

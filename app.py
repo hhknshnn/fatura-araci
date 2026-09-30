@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 import pandas as pd
 from flask import Flask, jsonify, request, send_file, send_from_directory, g
-from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, bulk_update_durum, durum_tarih_kolonu, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
+from api.shipments import shipments_get, shipments_post, shipments_put, shipments_delete, shipments_export, bulk_import_shipments, bulk_update_shipments, bulk_delete_shipments, bulk_update_durum, durum_tarih_kolonu, konum_raporu_oku, konum_raporu_onizle, konum_raporu_uygula, parse_kz_avr_pdf, parse_kz_avr_image, repair_shipment_freight
 from api.landed_cost import landed_cost_get, landed_cost_export, landed_cost_senaryo_export
 from api.kur import get_tcmb_kurlar, maliyet_kur_panel_get
 
@@ -57,7 +57,8 @@ from api.maliyet.tum_export import maliyet_tum_export
 from api.maliyet.rapor import maliyet_rapor_get, maliyet_tarife_rapor_get
 from api.navlun import (navlun_tanim_liste, navlun_tanim_kaydet, navlun_hesapla,
     navlun_tahsis_olustur, navlun_bekleyen_sorgu, navlun_tahsis_kullan,
-    navlun_sevkiyat_yaz, navlun_tanim_gecmis)
+    navlun_sevkiyat_yaz, navlun_tanim_gecmis, navlun_gruplu_ant_yaz,
+    navlun_gruplu_ant_liste, navlun_gruplu_eslestir)
 from api.grup_kilo import grup_kilo_get, grup_kilo_put
 
 def read_port():
@@ -482,6 +483,32 @@ def api_generate():
             resp['priceList'] = base64.b64encode(price_list_out).decode()
         if mill_test_out:
             resp['millTest'] = base64.b64encode(mill_test_out).decode()
+        if ulke_kodu == 'kz':
+            # Nakliyat sigortası bildirim formu — hata INV/PL üretimini bozmaz
+            try:
+                from api.kz_sigorta import generate_kz_sigorta
+                fatura_tl = float(pdf_fields.get('fatura_tl') or 0)
+                if fatura_tl <= 0 and 'Net Tutar (Y)' in df_original.columns:
+                    fatura_tl = float(pd.to_numeric(df_original['Net Tutar (Y)'], errors='coerce').fillna(0).sum()) \
+                        + float(pdf_fields.get('navlun') or 0) + float(pdf_fields.get('sigorta') or 0)
+                gruplar = []
+                if 'Ürün Ara Grubu - EN' in df_original.columns:
+                    gruplar = list(dict.fromkeys(
+                        str(v).strip() for v in df_original['Ürün Ara Grubu - EN'].dropna() if str(v).strip()))
+                dosya_no = str(body.get('ihracatDosyaNo', '') or '').strip()
+                sigorta_out, sigorta_ref = generate_kz_sigorta(
+                    fatura_no, dosya_no, depo_tipi,
+                    kap=pdf_fields.get('kap', ''),
+                    brut_kg=float(pdf_fields.get('brutKg') or 0) or hedef_brut,
+                    fatura_tl=fatura_tl,
+                    urun_gruplari=gruplar,
+                    plaka=str(body.get('plaka', '') or ''),
+                    yukleme_tarihi=body.get('yuklemeTarihi') or None,
+                )
+                resp['sigortaTalimat'] = base64.b64encode(sigorta_out).decode()
+                resp['sigortaRef'] = sigorta_ref
+            except Exception:
+                logger.error("KZ sigorta formu üretilemedi: %s", fatura_no, exc_info=True)
         log_action(getattr(g, 'user', None), 'invoice_generate', f"Fatura üretti: {fatura_no} ({ulke_kodu})")
         return jsonify(resp)
 
@@ -821,6 +848,48 @@ def api_shipments_bulk_status():
         log_action(getattr(g, 'user', None), 'shipment_bulk_status', f"Toplu durum güncelleme: {updated} sevkiyat → {durum}" + (f" ({kolon} = {tarih})" if kolon and tarih else ''))
         return jsonify({'success': True, 'guncellenen': updated})
     except Exception as e:
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
+@app.route('/api/shipments/konum-raporu/onizle', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_shipments_konum_raporu_onizle():
+    """Konum raporu Excel(ler)ini okur, açık sevkiyatlarla eşleştirir. Hiçbir şey yazmaz."""
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body   = request.get_json(force=True) or {}
+        excels = body.get('excels') or []
+        if not excels:
+            return jsonify({'success': False, 'error': 'Excel dosyası yok'}), 400
+        liste    = [(e.get('ad') or 'rapor.xlsx', base64.b64decode(e.get('b64') or '')) for e in excels]
+        satirlar = konum_raporu_oku(liste)
+        if not satirlar:
+            return jsonify({'success': False, 'error': 'Excel okunamadı: "Araç Plaka" ve "Ülke Varış Tarihi" başlıkları bulunamadı (.xlsx olmalı).'}), 400
+        # Hiçbir tabloya yazmaz; yazma yalnız kullanıcı onayıyla /uygula'da
+        sonuc = konum_raporu_onizle(satirlar)
+        return jsonify({'success': True, **sonuc})
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
+
+@app.route('/api/shipments/konum-raporu/uygula', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_shipments_konum_raporu_uygula():
+    """Önizlemede onaylanan kayıtları Varış Gümrük yapar, varis_tarihi yazar."""
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body     = request.get_json(force=True) or {}
+        kalemler = body.get('kalemler') or []
+        if not kalemler:
+            return jsonify({'success': False, 'error': 'Güncellenecek kayıt yok'}), 400
+        guncellenen, atlanan = konum_raporu_uygula(kalemler)
+        log_action(getattr(g, 'user', None), 'shipment_konum_raporu',
+                   f"Konum raporu: {len(guncellenen)} sevkiyat → Varış Gümrük / BA-RS TESLİM EDİLDİ (id: {', '.join(map(str, guncellenen))})")
+        return jsonify({'success': True, 'guncellenen': len(guncellenen), 'ids': guncellenen, 'atlanan': atlanan})
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
         return jsonify({'success': False, 'error': _public_error(e)}), 500
 
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
@@ -1334,6 +1403,22 @@ def api_navlun_tahsis_kullan():
     if request.method == 'OPTIONS':
         return app.make_default_options_response()
     return navlun_tahsis_kullan()
+
+@app.route('/api/navlun/gruplu-ant', methods=['GET', 'POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_gruplu_ant():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    if request.method == 'GET':
+        return navlun_gruplu_ant_liste()
+    return navlun_gruplu_ant_yaz()
+
+@app.route('/api/navlun/gruplu-eslestir', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_navlun_gruplu_eslestir():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    return navlun_gruplu_eslestir()
 
 @app.route('/api/navlun/sevkiyat', methods=['POST', 'OPTIONS'])
 @require_auth()

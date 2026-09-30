@@ -24,23 +24,13 @@ function initT1AyrimiPanel() {
 
   container.innerHTML = `
     <div class="t1-panel">
-      <div class="t1-intro">
-        <h3>Belçika T1 Ayrımı</h3>
-        <p>INV+PL dosyasındaki <b>M–R</b> sütunları (Declarion No, Index, Total Gross/Net,
-           Unit Gross/Net) Masterfile ve T1 beyannamesinden doldurulur.
-           Dosyaları hep birlikte bırakın — hangisinin ne olduğu içeriğinden anlaşılır.
-           Referans örnek fatura uygulamada gömülü, yüklemeye gerek yok.</p>
-      </div>
-
       <div class="t1-drop" id="t1-drop"
            onclick="document.getElementById('t1-input').click()">
         <input type="file" id="t1-input" multiple accept=".xlsx,.xls,.pdf"
                style="display:none" onchange="t1DosyaEkle(this.files); this.value='';">
         <div class="t1-drop-icon"><i class="ti ti-cloud-upload"></i></div>
-        <div class="t1-drop-title">Dosyaları buraya sürükleyin veya seçmek için tıklayın</div>
-        <div class="t1-drop-desc">
-          INV+PL (.xlsx) · Masterfile (.xlsx) · T1 beyanname (.pdf) · Talep formu (.xls — opsiyonel)
-        </div>
+        <div class="t1-drop-title">Dosyaları sürükleyin veya seçin</div>
+        <div class="t1-drop-desc">INV+PL · Masterfile · T1 beyanname · Talep formu (opsiyonel)</div>
       </div>
 
       <div id="t1-liste" class="t1-liste"></div>
