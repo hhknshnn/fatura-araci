@@ -2790,8 +2790,13 @@ def _aksu_norm_key(value):
     return re.sub(r'\s+', '', str(value or '').strip().upper())
 
 
-def apply_aksu_beyanname(faturalar):
-    """Aksu satırlarını fatura no / dosya no ile eşleştirip TL + kur çevrimini yazar."""
+def apply_aksu_beyanname(faturalar, dry_run=False, satirlar=None, ekle=False):
+    """Aksu satırlarını fatura no / dosya no ile eşleştirip TL + kur çevrimini yazar.
+
+    dry_run=True: hiçbir şey yazmaz; `satirlar` listesine eşleşen kayıtların
+    mevcut/yeni TL değerini ekler (kullanıcıya üzerine yazma uyarısı için).
+    ekle=True: dolu kayıtta mevcut TL'nin üzerine ekler (toplar), ezmez.
+    """
     eslesen, atlanan, hatalar = 0, 0, []
     if not faturalar:
         return eslesen, atlanan, hatalar
@@ -2799,17 +2804,18 @@ def apply_aksu_beyanname(faturalar):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute('''
-        SELECT id, fatura_no, ihracat_dosya_no, eur_kuru, usd_kuru
+        SELECT id, fatura_no, ihracat_dosya_no, eur_kuru, usd_kuru, ihracat_beyanname_tl
         FROM shipments
     ''')
     by_fatura = {}
     by_dosya = {}
     for row in cur.fetchall():
-        sid, fatura_no, dosya_no, eur_kuru, usd_kuru = row
+        sid, fatura_no, dosya_no, eur_kuru, usd_kuru, mevcut_tl = row
         rec = {
             'id': sid,
             'eur_kuru': float(eur_kuru or 0),
             'usd_kuru': float(usd_kuru or 0),
+            'mevcut_tl': float(mevcut_tl or 0),
         }
         fkey = _aksu_norm_key(fatura_no)
         dkey = _aksu_norm_key(dosya_no)
@@ -2841,6 +2847,20 @@ def apply_aksu_beyanname(faturalar):
             atlanan += 1
             hatalar.append(f'{etiket}: eşleşen kayıt bulunamadı')
             continue
+
+        if dry_run:
+            if satirlar is not None:
+                satirlar.append({
+                    'etiket': etiket,
+                    'mevcut_tl': rec['mevcut_tl'],
+                    'yeni_tl': tutar_tl,
+                })
+            eslesen += 1
+            continue
+
+        if ekle and rec['mevcut_tl'] > 0:
+            tutar_tl = round(rec['mevcut_tl'] + tutar_tl, 2)
+        rec['mevcut_tl'] = tutar_tl
 
         eur_kuru = rec['eur_kuru']
         usd_kuru = rec['usd_kuru']

@@ -6147,7 +6147,7 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
 :is(#stepFaturaUret, #stepMaliyetEvrak) .fu-tabs .fu-tab::after { left: 8px; right: 8px; bottom: 0; border-radius: 2px 2px 0 0; }
 :is(#stepFaturaUret, #stepMaliyetEvrak) .fu-tabs .fu-tab.active::after { background: var(--accent); }
 
-#stepFaturaUret .fu-workspace { padding: 14px 20px 20px; }
+#stepFaturaUret .fu-workspace { padding: 4px 20px 20px; }
 
 /* Ortak kart */
 #stepFaturaUret .fu-tab-panel > .panel,
@@ -6160,7 +6160,7 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
 }
 #stepFaturaUret .fu-tab-panel > .panel,
 #stepFaturaUret .t1-panel { padding: 16px 18px 18px; }
-#stepFaturaUret .fu-tab-panel > .wizard-steps { padding: 8px 14px; margin-bottom: 10px; }
+#stepFaturaUret .fu-tab-panel > .wizard-steps { padding: 8px 14px; margin-bottom: 6px; }
 
 /* ── Master-detail kabuğu ──────────────────────────────────────────────────── */
 #stepFaturaUret .fu-tab-panel > #stepTaslak.panel,
@@ -6185,7 +6185,7 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
   scrollbar-width: thin;
 }
 
-:is(#stepFaturaUret, #stepMaliyetEvrak) .fu-md-main { min-width: 0; padding: 18px 22px 22px; }
+:is(#stepFaturaUret, #stepMaliyetEvrak) .fu-md-main { min-width: 0; padding: 12px 22px 22px; }
 
 /* Rail: arama */
 :is(#stepFaturaUret, #stepMaliyetEvrak) .fu-md-rail .country-search-row,
@@ -6342,8 +6342,8 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: -2px 0 16px;
-  padding-bottom: 14px;
+  margin: -2px 0 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.07);
 }
 :is(#stepFaturaUret, #stepMaliyetEvrak) .fu-md-head img {
@@ -7084,4 +7084,64 @@ body:not([data-role="admin"]) .role-admin-only { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   #shipment-detail-panel, #shipment-overlay,
   #shipment-detail-panel.is-closing, #shipment-overlay.is-closing { animation-duration: 0.01ms; }
+}
+
+/* Taslak: Komple Depo + Gruplu Sevkiyat kartları */
+#stepFaturaUret .taslak-secenek {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 8px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+#stepFaturaUret .taslak-secenek:hover { border-color: rgba(37, 99, 235, 0.40); background: #F8FAFF; }
+#stepFaturaUret .taslak-secenek:has(input:checked) {
+  border-color: var(--accent);
+  background: #EFF5FF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+#stepFaturaUret .taslak-secenek input[type=checkbox] { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); flex: none; cursor: pointer; }
+#stepFaturaUret .taslak-secenek-ikon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none;
+  border-radius: 6px; background: #F1F5F9; color: #64748B; font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+}
+#stepFaturaUret .taslak-secenek:has(input:checked) .taslak-secenek-ikon { background: var(--accent); color: #FFFFFF; }
+#stepFaturaUret .taslak-secenek-metin { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#stepFaturaUret .taslak-secenek-baslik { font-size: 13px; font-weight: 600; color: #0F172A; line-height: 1.25; }
+#stepFaturaUret .taslak-secenek-alt { font-size: 11.5px; color: #64748B; line-height: 1.3; }
+#stepFaturaUret .taslak-gruplu { padding: 0; border: 0; background: transparent; }
+
+/* Gruplu: seçilince buton + içerik tek kart */
+#stepFaturaUret .taslak-gruplu { display: block; width: fit-content; max-width: 100%; }
+#stepFaturaUret .taslak-gruplu:has(input:checked) {
+  min-width: 340px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: #EFF5FF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+#stepFaturaUret .taslak-gruplu:has(input:checked) > .taslak-secenek {
+  display: flex;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#stepFaturaUret .taslak-gruplu > .taslak-gruplu-icerik {
+  margin: 0 10px 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.me-kontrol-mevcut.dolu { color: #B45309; font-weight: 600; }
+.me-kontrol-uyari {
+  margin: 0 0 10px; padding: 8px 12px; border-radius: 8px;
+  background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E;
+  font-size: 12.5px; font-weight: 600;
 }

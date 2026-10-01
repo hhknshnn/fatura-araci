@@ -13,7 +13,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260930-kompakt2">
+  <link rel="stylesheet" href="css/style.css?v=20261001-taslak-kart8">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/tabler-icons.min.css">
 
@@ -140,9 +140,9 @@
             <i class="ti ti-ship" aria-hidden="true"></i>
             <span class="nav-label">Sevkiyatlar</span>
           </div>
-          <div class="nav-item" id="nav-fatura-uret" data-label="Fatura Üret" onclick="sidebarSelect('fatura-uret')">
+          <div class="nav-item" id="nav-fatura-uret" data-label="İhracat Yönetimi" onclick="sidebarSelect('fatura-uret')">
             <i class="ti ti-file-invoice" aria-hidden="true"></i>
-            <span class="nav-label">Fatura Üret</span>
+            <span class="nav-label">İhracat Yönetimi</span>
           </div>
           <div class="nav-item" id="nav-maliyet-evrak" data-label="Maliyet Evrak" onclick="sidebarSelect('maliyet-evrak')">
             <i class="ti ti-file-upload" aria-hidden="true"></i>
@@ -1898,7 +1898,6 @@
               <div id="taslakKayitliListe"></div>
             </div>
             <div id="taslakDepoSection" style="display:none;">
-              <div class="section-lbl">Depo Tipi</div>
               <div class="mode-options" style="margin-bottom:16px;">
                 <div class="mode-btn" id="taslak-depo-serbest" onclick="selectTaslakDepo('serbest')">
                   <div class="mode-icon"><i class="ti ti-building" aria-hidden="true"></i></div>
@@ -1914,14 +1913,16 @@
                 </div>
               </div>
               <div id="taslakKompleWrap" style="display:none;margin-bottom:16px;">
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;padding:11px 14px;border:1px dashed var(--surface3);border-radius:8px;background:var(--surface2);">
+                <label class="taslak-secenek">
                   <input type="checkbox" id="taslakKomple" onchange="taslakKompleDegisti()">
-                  <span>📦 <span id="taslakKompleLabel">Komple Depo</span></span>
+                  <span class="taslak-secenek-ikon"><i class="ti ti-package" aria-hidden="true"></i></span>
+                  <span class="taslak-secenek-metin">
+                    <span class="taslak-secenek-baslik" id="taslakKompleLabel">Komple Depo</span>
+                  </span>
                 </label>
               </div>
             </div>
             <div id="taslakFormSection" style="display:none;">
-              <div class="section-lbl">Bilgileri Girin</div>
               <div id="taslakFormAlanlari"></div>
               <div class="file-badge" id="taslakFileName" style="display:none;margin-top:10px;"></div>
               <div style="display:flex;gap:10px;margin-top:14px;">
@@ -2039,7 +2040,6 @@
             <div id="evrakTipGrid" style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px;"></div>
           </div>
           <div id="evrakFormSection" style="display:none;">
-            <div class="section-lbl">Bilgileri Girin</div>
             <div id="evrakFormAlanlari"></div>
           </div>
           <button class="btn-primary visible" id="evrakIndir" onclick="indirEvrak()"
@@ -2099,12 +2099,11 @@
                 </div>
                 <span class="me-pill me-pill-pdf">PDF</span>
               </div>
-              <div class="me-card-desc">Önce sevkiyatı seçin, PDF'i yükleyin — okunan değerleri kontrol edip Kaydet'e basın.</div>
-              <div class="me-select-row">
+                            <div class="me-select-row">
                 <select id="me-rs-select" class="me-select">
                   <option value="">— Sırbistan sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadRsShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadRsShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-rs-select-status" class="me-select-status"></div>
               <div id="me-rs-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2137,7 +2136,7 @@
                 <select id="me-ba-select" class="me-select">
                   <option value="">— Bosna sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadBaShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadBaShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-ba-select-status" class="me-select-status"></div>
 
@@ -2189,7 +2188,7 @@
                 <select id="me-mk-select" class="me-select">
                   <option value="">— Makedonya sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadMkShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadMkShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-mk-select-status" class="me-select-status"></div>
 
@@ -2237,7 +2236,7 @@
                 <select id="me-ge-select" class="me-select">
                   <option value="">— Gürcistan sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadGeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadGeShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-ge-select-status" class="me-select-status"></div>
               <div id="me-ge-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2270,7 +2269,7 @@
                 <select id="me-ko-select" class="me-select">
                   <option value="">— Kosova sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadKoShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadKoShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-ko-select-status" class="me-select-status"></div>
               <div id="me-ko-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2303,7 +2302,7 @@
                 <select id="me-kz-select" class="me-select">
                   <option value="">— Kazakistan sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadKzShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadKzShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-kz-select-status" class="me-select-status"></div>
               <div id="me-kz-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2336,7 +2335,7 @@
                 <select id="me-de-select" class="me-select">
                   <option value="">— Almanya sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadDeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadDeShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-de-select-status" class="me-select-status"></div>
               <div id="me-de-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2369,7 +2368,7 @@
                 <select id="me-nl-select" class="me-select">
                   <option value="">— Hollanda sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadNlShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadNlShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-nl-select-status" class="me-select-status"></div>
               <div id="me-nl-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2402,7 +2401,7 @@
                 <select id="me-be-select" class="me-select">
                   <option value="">— Belçika sevkiyatı seçin —</option>
                 </select>
-                <button class="me-refresh-btn" onclick="meLoadBeShipments()" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
+                <button class="me-refresh-btn" onclick="meYenile(this, meLoadBeShipments)" title="Listeyi yenile"><i class="ti ti-refresh"></i></button>
               </div>
               <div id="me-be-select-status" class="me-select-status"></div>
               <div id="me-be-drop" class="me-dropzone" ondragover="event.preventDefault();this.classList.add('vergi-drag-over')"
@@ -2462,20 +2461,21 @@
   <script src="js/processor.js?v=20260922-pdfkg-reset"></script>
   <script src="js/sku.js"></script>
   <script src="js/wizard.js?v=20260930-kz-sigorta"></script>
-  <script src="js/taslak.js?v=20260928-ulke-adres"></script>
+  <script src="js/taslak.js?v=20261001-taslak-kart6"></script>
   <script src="js/gtip.js?v=20260916-mensei-fix"></script>
   <script src="js/evrak.js"></script>
   <script src="js/t1ayrimi.js?v=20260928-sade-drop"></script>
   <script src="js/mense.js?v=20260930-tekrar3"></script>
   <script src="js/nebim-delivery.js?v=20260928-sade"></script>
-  <script src="js/shell.js?v=20260928-maliyet-ikon"></script>
+  <script src="js/shell.js?v=20261001-ihracat-yonetimi"></script>
   <script src="js/gecmis.js?v=20260930-kz-sigorta"></script>
   <script src="js/auth.js?v=20260710-login-refresh"></script>
   <script src="js/permissions.js?v=20260710-admin-portal-clean"></script>
   <script src="js/users.js?v=20260710-admin-portal"></script>
   <script src="js/audit-log.js"></script>
   <script src="js/dashboard.js?v=20260928-geri"></script>
-  <script src="js/shipments.js?v=20260930-sevk-drawer"></script>
+  <script src="js/shipments.js?v=20261001-yenile5"></script>
+  <script src="js/evrak-kontrol.js?v=20261001-ulke"></script>
   <script src="js/bildirim.js?v=20260930-drawer"></script>
   <script src="js/landed-cost.js?v=20260928-sade4"></script>
   <script src="js/vendor/chart.umd.js"></script>

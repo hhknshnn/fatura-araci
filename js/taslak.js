@@ -494,12 +494,6 @@ async function navlunKompleHesapla() {
     if (navEl) navEl.value = trSayiYaz(data.navlun);
     if (sigEl) sigEl.value = trSayiYaz(data.sigorta);
 
-    const not = document.getElementById('taslak_navlunNot');
-    if (not) {
-      not.style.display = 'block';
-      not.style.color = 'var(--accent2)';
-      not.textContent = `📦 Komple: navlun ${data.navlun} · sigorta ${data.sigorta} ${data.paraBirimi} — tamamı (değiştirilebilir)`;
-    }
   } catch (e) {
     // Sessiz geç — kullanıcı elle girebilir
   }
@@ -541,11 +535,7 @@ function buildTaslakForm() {
     const div = document.createElement('div');
     div.style.cssText = 'margin-bottom:14px;';
     const isNetKg = alan.id === 'netKg';
-    const note = isNetKg
-      ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px;">
-           ${taslakDepoTipi === 'serbest' ? 'Otomatik: BRÜT × 0.9' : 'Antrepo: elle girin'}
-         </div>`
-      : '';
+    const note = '';
     div.innerHTML = `
       <div style="font-size:13px;font-weight:500;margin-bottom:6px;">${alan.label}</div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -595,9 +585,12 @@ function injectGrupluUI(container, opts) {
   const box = document.createElement('div');
   box.className = 'taslak-gruplu taslak-tam-satir';
   box.innerHTML = `
-    <label class="taslak-gruplu-baslik">
+    <label class="taslak-secenek">
       <input type="checkbox" id="taslak_gruplu" onchange="navlunGrupluDegisti()">
-      Gruplu Sevkiyat
+      <span class="taslak-secenek-ikon"><i class="ti ti-link" aria-hidden="true"></i></span>
+      <span class="taslak-secenek-metin">
+        <span class="taslak-secenek-baslik">Gruplu Sevkiyat</span>
+      </span>
     </label>
     <div id="taslak_partnerWrap" class="taslak-gruplu-icerik" style="display:none;"></div>`;
   container.appendChild(box);
@@ -654,7 +647,7 @@ async function grupluAntListesiYukle(opts) {
     const kayitlar = data.kayitlar || [];
     // Kayıtlı taslaktan dönülürken seçili ANT artık listede yoksa (eşleşmiş) bırak
     if (!kayitlar.length) {
-      wrap.innerHTML = '<div class="taslak-gruplu-not">Bu ülke için eşleşmemiş gruplu ANT faturası yok.</div>';
+      wrap.innerHTML = '<div class="taslak-gruplu-not hata">Bu ülke için eşleşmemiş ANT faturası yok.</div>';
       if (onSecim) grupluAntSecimiBirak();
       return;
     }

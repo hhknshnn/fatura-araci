@@ -2124,6 +2124,30 @@ async function handleVergiPdf(file) {
   }
 }
 
+// Yenile: kartta ekranda kalan (biten) iş kalıntılarını temizler, sonra listeyi yeniler.
+// Yalnız ekranı sıfırlar; DB'ye dokunmaz.
+function meYenile(btn, loader) {
+  const card = btn.closest('.me-card');
+  if (card) {
+    card.querySelectorAll('.me-result').forEach(el => { el.style.display = 'none'; el.innerHTML = ''; });
+    card.querySelectorAll('.me-dz-status').forEach(el => {
+      if (el.dataset.orig === undefined) return;
+      el.textContent = el.dataset.orig; el.style.color = '';
+    });
+    card.querySelectorAll('input[type=file]').forEach(el => { el.value = ''; });
+    card.querySelectorAll('.me-select').forEach(el => { el.value = ''; });
+    card.querySelectorAll('.me-manual-box input').forEach(el => {
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    card.querySelectorAll('.me-manual-status').forEach(el => { el.innerHTML = ''; });
+  }
+  return loader();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.me-dz-status').forEach(el => { el.dataset.orig = el.textContent; });
+});
+
 async function meLoadRsShipments() {
   const sel      = document.getElementById('me-rs-select');
   const statusEl = document.getElementById('me-rs-select-status');
@@ -2187,7 +2211,7 @@ function meKontrolEt(resultEl, prefix, detailHtml, plan) {
       return `<td>
         <input type="text" inputmode="decimal" autocomplete="off" class="me-kontrol-input"
           data-row="${i}" data-field="${k}" value="${fmt(r.fields[k])}">
-        <div class="me-kontrol-mevcut">mevcut: ${fmt(mevcut)}</div>
+        <div class="me-kontrol-mevcut${mevcut ? ' dolu' : ''}"></div>
       </td>`;
     }).join('');
     return `<tr><td class="me-kontrol-etiket">${escapeHtml(etiket)}</td>${hucreler}</tr>`;
@@ -2203,6 +2227,7 @@ function meKontrolEt(resultEl, prefix, detailHtml, plan) {
     <div class="me-kontrol">
       <div class="me-kontrol-baslik"><i class="ti ti-checklist"></i> Kontrol &amp; Düzenle
         <span>Değerleri kontrol edin, gerekirse düzeltin. Kaydet'e basmadan hiçbir şey yazılmaz.</span></div>
+      <div class="me-kontrol-uyari" style="display:none;"></div>
       <div class="me-kontrol-wrap">
         <table class="me-kontrol-tablo">
           <thead><tr><th>Sevkiyat</th>${alanlar.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
@@ -2220,6 +2245,28 @@ function meKontrolEt(resultEl, prefix, detailHtml, plan) {
   const box = resultEl.querySelector('.me-kontrol');
   const inputs = [...box.querySelectorAll('.me-kontrol-input')];
 
+  // Dolu kayıt uyarısı: okunur okunmaz ve değer düzeltildikçe güncellenir
+  const doluGuncelle = () => {
+    let doluSayi = 0;
+    inputs.forEach(inp => {
+      const r = plan[+inp.dataset.row];
+      const mevcut = parseFloat(r.shipment[inp.dataset.field]) || 0;
+      const el = inp.nextElementSibling;
+      if (!el) return;
+      if (!mevcut) { el.className = 'me-kontrol-mevcut'; el.textContent = 'mevcut: boş'; return; }
+      doluSayi++;
+      const yeni = meKontrolSayi(inp.value);
+      const ayni = !Number.isNaN(yeni) && Math.abs(yeni - mevcut) < 0.005;
+      el.className = 'me-kontrol-mevcut dolu';
+      el.textContent = `⚠ DOLU: ${fmt(mevcut)} — ${ayni ? 'aynı değer' : 'farklı değer'}`;
+    });
+    const uyari = box.querySelector('.me-kontrol-uyari');
+    uyari.style.display = doluSayi ? 'block' : 'none';
+    uyari.textContent = doluSayi
+      ? '⚠ Bu sevkiyatta ilgili hücre zaten dolu. Kaydederseniz mevcut değerin üzerine yazılır.'
+      : '';
+  };
+
   const toplamGuncelle = () => {
     if (!coklu) return;
     alanlar.forEach(([k]) => {
@@ -2230,9 +2277,16 @@ function meKontrolEt(resultEl, prefix, detailHtml, plan) {
     });
   };
   inputs.forEach(inp => inp.addEventListener('input', () => {
+    if (box.dataset.onay) {
+      delete box.dataset.onay;
+      box.querySelector('.me-kontrol-kaydet').innerHTML = '<i class="ti ti-device-floppy"></i> Kaydet';
+      document.getElementById(`me-${prefix}-save-status`).innerHTML = '';
+    }
     inp.classList.toggle('hatali', Number.isNaN(meKontrolSayi(inp.value)));
+    doluGuncelle();
     toplamGuncelle();
   }));
+  doluGuncelle();
   toplamGuncelle();
 
   return new Promise(resolve => {
@@ -2255,6 +2309,27 @@ function meKontrolEt(resultEl, prefix, detailHtml, plan) {
       const st = document.getElementById(`me-${prefix}-save-status`);
       if (hata) {
         st.innerHTML = '<span style="color:var(--error);">⚠ Geçersiz tutar var (ör. 1.234,56).</span>';
+        return;
+      }
+      // Dolu hücre varsa ilk tıklamada uyar, ikinci tıklamada (onay) yaz
+      const dolu = [];
+      yeni.forEach((r, i) => {
+        alanlar.forEach(([k, l]) => {
+          if (!(k in r.fields)) return;
+          const mevcut = parseFloat(plan[i].shipment[k]) || 0;
+          if (mevcut === 0) return;
+          const ayni = Math.abs(mevcut - r.fields[k]) < 0.005;
+          const etiket = [plan[i].shipment.ihracat_dosya_no, plan[i].shipment.fatura_no].filter(Boolean).join(' · ') || `#${plan[i].shipment.id}`;
+          dolu.push({ etiket, l, mevcut, yeni: r.fields[k], ayni });
+        });
+      });
+      if (dolu.length && !box.dataset.onay) {
+        box.dataset.onay = '1';
+        const kaydetBtn = box.querySelector('.me-kontrol-kaydet');
+        kaydetBtn.innerHTML = '<i class="ti ti-alert-triangle"></i> Evet, Üzerine Yaz';
+        st.innerHTML = '<div style="color:var(--error);">⚠ Dolu kayıt var, üzerine yazılacak. Emin misiniz?' +
+          dolu.map(d => `<div style="font-size:12px;">${escapeHtml(d.etiket)} · ${d.l}: mevcut ${fmt(d.mevcut)} → yeni ${fmt(d.yeni)} <b>(${d.ayni ? 'aynı' : 'farklı'})</b></div>`).join('') +
+          '</div>';
         return;
       }
       box.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
@@ -2456,6 +2531,7 @@ async function meHandleGePdf(file) {
     if (data.tip === 'broker') {
       const toplam = data.eur.brokerage;
       detailHtml = `<div style="color:var(--success);">✓ Broker faturası — ${fmt(data.gel.brokerage)} GEL → ${fmtEur(toplam)}</div>
+        <div style="margin-top:6px;">Brokerage: <b>${fmt(data.gel.brokerage)} GEL</b> → ${fmtEur(toplam)}</div>
         <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</div>`;
 
       if (group.length > 1) {
@@ -2476,6 +2552,8 @@ async function meHandleGePdf(file) {
       const toplamVergi = data.eur.vergi;
 
       detailHtml = `<div style="color:var(--success);">✓ İthalat Beyannamesi — KDV: ${fmtEur(toplamKdv)} | Vergi: ${fmtEur(toplamVergi)}</div>
+        <div style="margin-top:6px;">KDV: <b>${fmt(data.gel.kdv)} GEL</b> → ${fmtEur(toplamKdv)}<br>
+        Vergi: <b>${fmt(data.gel.vergi)} GEL</b> → ${fmtEur(toplamVergi)}</div>
         <div style="margin-top:6px;color:var(--text3);">Kur: 1 EUR = ${fmt(data.kur.gel_per_eur)} GEL</div>`;
 
       // KDV dağıtımı
@@ -3773,13 +3851,56 @@ async function meHandleAksuFile(file) {
     const b64 = await fileToBase64(file);
     const token = localStorage.getItem('fa_auth_token');
     const payload = isExcel ? { excel: b64 } : { pdf: b64 };
-    const resp = await fetch('/api/shipments/parse-aksu-pdf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(payload),
-    });
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error);
+    const gonder = async extra => {
+      const resp = await fetch('/api/shipments/parse-aksu-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ ...payload, ...extra }),
+      });
+      const d = await resp.json();
+      if (!d.success) throw new Error(d.error);
+      return d;
+    };
+
+    // Önce önizleme: dolu kayıt varsa yazmadan önce kullanıcıya sor
+    const onizle = await gonder({ onizle: true });
+    const dolu = (onizle.satirlar || []).filter(r => r.mevcut_tl > 0);
+    let ekleModu = false;
+    if (dolu.length) {
+      const fmtTl = n => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+      const satirHtml = dolu.map(r => {
+        const ayni = Math.abs(r.mevcut_tl - r.yeni_tl) < 0.005;
+        return `<div class="me-aksu-log-row" style="color:${ayni ? 'var(--text3)' : 'var(--error)'}">` +
+          `${escapeHtml(r.etiket)}: mevcut ${fmtTl(r.mevcut_tl)} TL → yeni ${fmtTl(r.yeni_tl)} TL ` +
+          `<b>(${ayni ? 'aynı' : 'farklı'})</b> · eklenirse ${fmtTl(r.mevcut_tl + r.yeni_tl)} TL</div>`;
+      }).join('');
+      statusEl.style.color = 'var(--text3)';
+      statusEl.textContent = `⚠ ${dolu.length} kayıtta beyanname tutarı zaten dolu.`;
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+        <div style="font-size:12px;font-weight:600;color:var(--error);margin-bottom:8px;">Dolu kayıtların üzerine yazılacak. Emin misiniz?</div>
+        <div class="me-aksu-log">${satirHtml}</div>
+        <div class="me-kontrol-aksiyon" style="margin-top:10px;">
+          <button type="button" class="me-kontrol-iptal">Vazgeç</button>
+          <button type="button" class="me-kontrol-iptal me-aksu-ekle">Üzerine Ekle</button>
+          <button type="button" class="me-btn-save me-aksu-onay">Evet, Üzerine Yaz</button>
+        </div>`;
+      const onay = await new Promise(resolve => {
+        resultEl.querySelector('.me-kontrol-iptal:not(.me-aksu-ekle)').addEventListener('click', () => resolve('iptal'));
+        resultEl.querySelector('.me-aksu-ekle').addEventListener('click', () => resolve('ekle'));
+        resultEl.querySelector('.me-aksu-onay').addEventListener('click', () => resolve('yaz'));
+      });
+      resultEl.style.display = 'none';
+      resultEl.innerHTML = '';
+      if (onay === 'iptal') {
+        statusEl.style.color = 'var(--text3)';
+        statusEl.textContent = 'İptal edildi — hiçbir kayıt yazılmadı.';
+        return;
+      }
+      statusEl.textContent = '⏳ Kaydediliyor...';
+      ekleModu = onay === 'ekle';
+    }
+    const data = await gonder(ekleModu ? { ekle: true } : {});
 
     const okunan = data.okunan != null ? data.okunan + ' satır okundu, ' : '';
     statusEl.style.color = 'var(--success)';

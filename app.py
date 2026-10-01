@@ -31,6 +31,7 @@ from api.taslak_store import taslak_store_kaydet, taslak_store_liste, taslak_sto
 from api.taslak_form import taslak_form_kaydet, taslak_form_liste, taslak_form_getir, taslak_form_sil, taslak_form_koru
 from api.shipments import group_shipments, ungroup_shipment, parse_rs_vergi_pdf, parse_rs_brokerage_pdf, parse_ge_broker_pdf, parse_ge_im_pdf, parse_ko_pdf, parse_de_vergi_pdf, parse_nl_broker_pdf, parse_be_broker_pdf, parse_kz_beyanname_pdf, parse_aksu_beyanname_pdf, parse_aksu_beyanname_excel, apply_aksu_beyanname, parse_fr_pdf_import, bulk_import_fr_shipments, bulk_update_palet
 from api.nebim import nebim_delivery_get, nebim_delivery_put
+from api.evrak_kontrol import kontrol_et as evrak_kontrol_et, fatura_temizle as evrak_kontrol_temizle
 from api.audit import log_action, audit_log_get, audit_log_export
 from api.maliyet.meta import maliyet_meta_get, maliyet_kalem_post, maliyet_kalem_put, maliyet_kalem_delete, maliyet_depo_ayar_put
 from api.maliyet.tarife import maliyet_tarife_get, maliyet_tarife_post, maliyet_tarife_delete
@@ -892,6 +893,50 @@ def api_shipments_konum_raporu_uygula():
         logger.error("İstek hatası: %s", request.path, exc_info=True)
         return jsonify({'success': False, 'error': _public_error(e)}), 500
 
+@app.route('/api/evrak-kontrol/karsilastir', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_evrak_kontrol_karsilastir():
+    """Beyanname / EUR.1 / menşe PDF'lerini sistemdeki fatura (INV/PL) ile karşılaştırır. Hiçbir şey yazmaz."""
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True) or {}
+        dosyalar = body.get('dosyalar') or []
+        if not dosyalar:
+            return jsonify({'success': False, 'error': 'Dosya yok'}), 400
+        liste = [(d.get('ad') or 'belge.pdf', base64.b64decode(d.get('b64') or '')) for d in dosyalar]
+        sonuc = evrak_kontrol_et(liste, (body.get('faturaNo') or '').strip())
+        return jsonify({'success': True, **sonuc})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
+
+@app.route('/api/evrak-kontrol/onayla', methods=['POST', 'OPTIONS'])
+@require_auth()
+def api_evrak_kontrol_onayla():
+    """Kullanıcı kontrolü onayladı: faturanın INV/PL storage kayıtlarını (dosyalarıyla) siler."""
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+    try:
+        body = request.get_json(force=True) or {}
+        fatura_no = (body.get('faturaNo') or '').strip()
+        if not re.fullmatch(r'[A-Za-z0-9_.\-]{3,40}', fatura_no):
+            return jsonify({'success': False, 'error': 'Geçersiz fatura no'}), 400
+        ulke = (body.get('ulke') or '').strip().lower()
+        if ulke and not re.fullmatch(r'[a-z]{2,3}', ulke):
+            return jsonify({'success': False, 'error': 'Geçersiz ülke'}), 400
+        silinen = evrak_kontrol_temizle(fatura_no, ulke or None)
+        log_action(getattr(g, 'user', None), 'evrak_kontrol_temizle',
+                   f"Evrak kontrolü onaylandı, fatura kaydı silindi: {fatura_no}{(' (' + ulke + ')') if ulke else ''} ({silinen} kayıt)")
+        return jsonify({'success': True, 'silinen': silinen})
+    except Exception as e:
+        logger.error("İstek hatası: %s", request.path, exc_info=True)
+        return jsonify({'success': False, 'error': _public_error(e)}), 500
+
+
 @app.route('/api/shipments/export', methods=['GET', 'OPTIONS'])
 @require_auth()
 def api_shipments_export():
@@ -1685,7 +1730,15 @@ def api_parse_aksu_pdf():
             if not faturalar:
                 return jsonify({'success': False, 'error': 'PDF\'den fatura bilgisi çıkarılamadı'}), 400
 
-        eslesen, atlanan, hatalar = apply_aksu_beyanname(faturalar)
+        if body.get('onizle'):
+            satirlar = []
+            eslesen, atlanan, hatalar = apply_aksu_beyanname(faturalar, dry_run=True, satirlar=satirlar)
+            return jsonify({
+                'success': True, 'onizle': True, 'satirlar': satirlar,
+                'eslesen': eslesen, 'atlanan': atlanan, 'okunan': len(faturalar),
+            })
+
+        eslesen, atlanan, hatalar = apply_aksu_beyanname(faturalar, ekle=bool(body.get('ekle')))
         return jsonify({
             'success': True,
             'eslesen': eslesen,

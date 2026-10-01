@@ -110,7 +110,7 @@ function hideAllPanels() {
 }
 
 // ── SPA ROTASI ────────────────────────────────────────────────────────────────
-// Adres çubuğu modül (+ Fatura Üret / Maliyet Evrak sekmesi) tutar.
+// Adres çubuğu modül (+ İhracat Yönetimi / Maliyet Evrak sekmesi) tutar.
 // Yenileme ve paylaşılan link açılışta bu path'ten restore edilir.
 const APP_MODULES = [
   'dashboard', 'sevkiyatlar', 'fatura-uret', 'maliyet-evrak', 'landed-cost',
@@ -120,6 +120,7 @@ const APP_MODULES = [
 ];
 const APP_MODULE_ALIASES = {
   'maliyet-takip-2': 'maliyet-takip',
+  'ihracat-yonetimi': 'fatura-uret',   // adreste görünen ad; iç modül kimliği fatura-uret kalır
 };
 const FATURA_URET_TABS = ['taslak', 'gtip', 'invpl', 't1'];
 const MALIYET_EVRAK_TABS = ['ulkeler', 'aksu'];
@@ -137,7 +138,7 @@ let _meCurrentTab = 'ulkeler';
 let _fuPendingTab = null;
 let _mePendingTab = null;
 let _fuInvplOpened = false;
-// Fatura Üret'te ülke seçimi adreste tutulan sekmeler: /fatura-uret/taslak/rs, /fatura-uret/invpl/rs
+// İhracat Yönetimi'nde ülke seçimi adreste tutulan sekmeler: /ihracat-yonetimi/taslak/rs, /ihracat-yonetimi/invpl/rs
 const FATURA_URET_ULKE_TABS = ['taslak', 'invpl'];
 const _fuUlke = { taslak: null, invpl: null };
 let _fuPendingUlke = null;
@@ -164,7 +165,7 @@ function buildAppPath(mod, tab) {
   if (mod === 'fatura-uret') {
     const t = FATURA_URET_TABS.includes(tab) ? tab : (_fuCurrentTab || 'taslak');
     const ulke = FATURA_URET_ULKE_TABS.includes(t) ? _fuUlke[t] : null;
-    return '/fatura-uret/' + t + (ulke ? '/' + ulke : '');
+    return '/ihracat-yonetimi/' + t + (ulke ? '/' + ulke : '');
   }
   if (mod === 'maliyet-evrak') {
     const t = MALIYET_EVRAK_TABS.includes(tab) ? tab : (_meCurrentTab || 'ulkeler');
@@ -279,7 +280,7 @@ function sidebarSelect(mod) {
     audit: 'İşlem Kayıtları',
     dashboard: 'Dashboard',
     sevkiyatlar: 'Sevkiyatlar',
-    'fatura-uret': 'Fatura Üret',
+    'fatura-uret': 'İhracat Yönetimi',
     'maliyet-evrak': 'Maliyet Evrak',
     'landed-cost': 'Landed Cost',
     'nebim-delivery': 'Nebim İrsaliye',
@@ -367,7 +368,7 @@ function sidebarSelect(mod) {
       panel.className = 'panel fu-shell';
       panel.innerHTML = `
         <div class="fu-bar">
-          <div class="fu-tabs" role="tablist" aria-label="Fatura üret bölümleri">
+          <div class="fu-tabs" role="tablist" aria-label="İhracat yönetimi bölümleri">
             <button class="fu-tab active" id="fu-tab-taslak" onclick="switchFaturaUretTab('taslak')" type="button">
               <i class="fu-adim" aria-hidden="true">1</i><span>Fatura Taslağı</span>
             </button>
@@ -387,6 +388,10 @@ function sidebarSelect(mod) {
           <div class="fu-tabs fu-tabs-yan" role="tablist" aria-label="Ek işlemler">
             <button class="fu-tab" id="fu-tab-t1" onclick="switchFaturaUretTab('t1')" type="button">
               <i class="ti ti-truck-delivery" aria-hidden="true"></i><span>T1 Ayrımı · Belçika</span>
+            </button>
+            <button class="fu-tab" id="fu-btn-evrak-kontrol" onclick="evrakKontrolAc()" type="button"
+              title="Beyanname, EUR.1 ve menşe belgelerini faturayla karşılaştır">
+              <i class="ti ti-file-check" aria-hidden="true"></i><span>Evrak Kontrol</span>
             </button>
           </div>
         </div>

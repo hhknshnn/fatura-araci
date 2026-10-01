@@ -1,0 +1,7 @@
+{
+  "_aciklama": "mense_ayrimi: true = EUR.1'de Türkiye menşeli kg, menşe şahadetnamesinde yabancı menşeli kg yazar. false = EUR.1 ve menşe belgesinde toplam kg yazar. Listede olmayan ülke: belgedeki kg'a göre otomatik karar verilir.",
+  "mense_ayrimi": {
+    "ba": true,
+    "iq": false
+  }
+}
